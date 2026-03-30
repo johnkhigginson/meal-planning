@@ -29,8 +29,8 @@ model User {
   name             String   @db.NVarChar(200)
   passwordHash     String   @db.NVarChar(200)
   householdId      Int
-  role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER
-  isAdmin          Boolean  @default(false)
+  role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER (household role)
+  systemRole       String   @default("USER") @db.NVarChar(20) // USER, CONTRIBUTOR, ADMIN
   enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
   createdAt        DateTime @default(now())
 

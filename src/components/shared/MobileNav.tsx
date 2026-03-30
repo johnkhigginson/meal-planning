@@ -13,6 +13,7 @@ import {
   Store,
   LogOut,
   Settings,
+  Shield,
   LayoutDashboard,
   MoreHorizontal,
   X,
@@ -121,6 +122,21 @@ export function MobileNav() {
                   {item.label}
                 </Link>
               ))}
+              {session?.user && ((session.user as { systemRole?: string }).systemRole === "ADMIN" || (session.user as { systemRole?: string }).systemRole === "CONTRIBUTOR") && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMoreOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+                    isActive("/admin")
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-muted"
+                  )}
+                >
+                  <Shield className="h-5 w-5" />
+                  Admin
+                </Link>
+              )}
             </div>
 
             {session?.user && (

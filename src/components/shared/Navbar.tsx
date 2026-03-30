@@ -76,7 +76,7 @@ export function Navbar() {
               {session.user.email}
             </p>
           </div>
-          {(session.user as { isAdmin?: string }).isAdmin === "true" && (
+          {((session.user as { systemRole?: string }).systemRole === "ADMIN" || (session.user as { systemRole?: string }).systemRole === "CONTRIBUTOR") && (
             <Link
               href="/admin"
               className={cn(

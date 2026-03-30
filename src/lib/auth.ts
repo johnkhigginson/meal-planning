@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 
 interface ExtendedUser {
   householdId?: string;
-  isAdmin?: string;
+  systemRole?: string;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -31,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           householdId: user.householdId.toString(),
-          isAdmin: user.isAdmin ? "true" : "false",
+          systemRole: user.systemRole,
         };
       },
     }),
@@ -41,7 +41,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.householdId = (user as ExtendedUser).householdId;
-        token.isAdmin = (user as ExtendedUser).isAdmin;
+        token.systemRole = (user as ExtendedUser).systemRole;
       }
       return token;
     },
@@ -49,7 +49,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user && token.id) {
         session.user.id = token.id as string;
         (session.user as ExtendedUser).householdId = token.householdId as string;
-        (session.user as ExtendedUser).isAdmin = token.isAdmin as string;
+        (session.user as ExtendedUser).systemRole = token.systemRole as string;
       }
       return session;
     },
@@ -65,7 +65,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 interface AuthUser {
   userId: number;
   householdId: number;
+  systemRole: string;
   isAdmin: boolean;
+  isContributor: boolean;
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -73,10 +75,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!session?.user?.id) return null;
   const ext = session.user as ExtendedUser;
   if (!ext.householdId) return null;
+  const systemRole = ext.systemRole || "USER";
   return {
     userId: parseInt(session.user.id, 10),
     householdId: parseInt(ext.householdId, 10),
-    isAdmin: ext.isAdmin === "true",
+    systemRole,
+    isAdmin: systemRole === "ADMIN",
+    isContributor: systemRole === "CONTRIBUTOR" || systemRole === "ADMIN",
   };
 }
 
@@ -100,5 +105,11 @@ export async function requireUser(): Promise<AuthUser> {
 export async function requireAdmin(): Promise<AuthUser> {
   const user = await requireUser();
   if (!user.isAdmin) throw new Error("Not authorized");
+  return user;
+}
+
+export async function requireContributor(): Promise<AuthUser> {
+  const user = await requireUser();
+  if (!user.isContributor) throw new Error("Not authorized");
   return user;
 }
