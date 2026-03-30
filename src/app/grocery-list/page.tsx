@@ -3,10 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { DollarSign, Loader2, MapPin, Store } from "lucide-react";
 import Link from "next/link";
 
 interface GroceryListItem {
@@ -36,11 +38,35 @@ export default function GroceryListPage() {
   );
 }
 
+interface ShoppingStore {
+  storeId: number;
+  storeName: string;
+  price: number;
+  unitPrice: number;
+}
+
+interface ShoppingItem {
+  ingredientId: number;
+  ingredientName: string;
+  needed: number;
+  unitAbbr: string;
+  bestStore: ShoppingStore | null;
+  allStores: ShoppingStore[];
+}
+
+interface ShoppingResult {
+  byStore: Record<string, ShoppingItem[]>;
+  totalEstimate: number;
+  storeCount: number;
+}
+
 function GroceryListContent() {
   const searchParams = useSearchParams();
   const listId = searchParams.get("id");
   const [list, setList] = useState<GroceryList | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shopping, setShopping] = useState<ShoppingResult | null>(null);
+  const [loadingShopping, setLoadingShopping] = useState(false);
 
   useEffect(() => {
     if (!listId) {
@@ -66,6 +92,20 @@ function GroceryListContent() {
       const updated = await res.json();
       setList(updated);
     }
+  }
+
+  async function findBestPrices() {
+    if (!list) return;
+    setLoadingShopping(true);
+    const res = await fetch("/api/shopping-list", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groceryListId: list.id }),
+    });
+    if (res.ok) {
+      setShopping(await res.json());
+    }
+    setLoadingShopping(false);
   }
 
   if (loading) return <PageLoader />;
@@ -105,20 +145,75 @@ function GroceryListContent() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Grocery List</h1>
-        <p className="text-muted-foreground">{list.name}</p>
-        <div className="mt-2 flex gap-2 text-sm">
-          <Badge variant="outline">
-            {needToBuy.filter((i) => i.checked).length}/{needToBuy.length} checked
-          </Badge>
-          {alreadyHave.length > 0 && (
-            <Badge variant="secondary">
-              {alreadyHave.length} already in pantry
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Grocery List</h1>
+          <p className="text-sm text-muted-foreground">{list.name}</p>
+          <div className="mt-2 flex gap-2 text-sm">
+            <Badge variant="outline">
+              {needToBuy.filter((i) => i.checked).length}/{needToBuy.length} checked
             </Badge>
-          )}
+            {alreadyHave.length > 0 && (
+              <Badge variant="secondary">
+                {alreadyHave.length} already in pantry
+              </Badge>
+            )}
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={findBestPrices} disabled={loadingShopping || needToBuy.length === 0}>
+          {loadingShopping ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <DollarSign className="mr-2 h-3.5 w-3.5" />}
+          Find Best Prices
+        </Button>
       </div>
+
+      {/* Smart shopping results */}
+      {shopping && (
+        <Card className="border-green-200 bg-green-50/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Store className="h-4 w-4" />
+                Smart Shopping List
+              </CardTitle>
+              <Badge variant="default" className="text-sm">
+                ~${shopping.totalEstimate.toFixed(2)}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Comparing prices across {shopping.storeCount} favorite store{shopping.storeCount !== 1 ? "s" : ""}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(shopping.byStore).map(([storeName, storeItems]) => (
+              <div key={storeName}>
+                <div className="mb-2 flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-sm font-semibold">{storeName}</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {storeItems.length} item{storeItems.length !== 1 ? "s" : ""}
+                  </Badge>
+                </div>
+                <div className="space-y-1 pl-5">
+                  {storeItems.map((item) => (
+                    <div key={item.ingredientId} className="flex items-center justify-between text-sm">
+                      <span>
+                        {item.needed} {item.unitAbbr} {item.ingredientName}
+                      </span>
+                      {item.bestStore ? (
+                        <span className="text-xs font-medium text-green-700">
+                          ${item.bestStore.price.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">no price</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Items to buy */}
       {categories.map((category) => {

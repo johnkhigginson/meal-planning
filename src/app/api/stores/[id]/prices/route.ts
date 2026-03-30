@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireHouseholdId } from "@/lib/auth";
 import { storePriceSchema } from "@/lib/validators";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -47,4 +48,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   return NextResponse.json(price, { status: 201 });
+}
+
+export async function DELETE(request: NextRequest) {
+  await requireHouseholdId();
+  const { searchParams } = new URL(request.url);
+  const priceId = parseInt(searchParams.get("priceId") || "0", 10);
+  if (!priceId) return NextResponse.json({ error: "Price ID required" }, { status: 400 });
+
+  await prisma.storePrice.delete({ where: { id: priceId } });
+  return NextResponse.json({ success: true });
 }

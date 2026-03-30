@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Star, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Trash2, Star, Loader2, ArrowRight } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Store {
@@ -111,37 +112,29 @@ export default function StoresPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stores.map((store) => (
-          <Card key={store.id}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base">{store.name}</CardTitle>
-              <div className="flex items-center gap-2">
-                <label className="flex cursor-pointer items-center gap-1">
-                  <Checkbox
-                    checked={store.isFavorite}
-                    onCheckedChange={() => toggleFavorite(store)}
-                  />
-                  <Star
-                    className={`h-4 w-4 ${
-                      store.isFavorite
-                        ? "fill-yellow-500 text-yellow-500"
-                        : "text-muted-foreground"
-                    }`}
-                  />
-                </label>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive"
-                  onClick={() => deleteStore(store.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+          <Card key={store.id} className="group transition-all hover:shadow-md">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <Link href={`/stores/${store.id}`} className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm font-semibold group-hover:text-primary transition-colors">{store.name}</div>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {store._count.prices} prices
+                    </Badge>
+                  </div>
+                </Link>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => toggleFavorite(store)} className="p-1">
+                    <Star className={`h-4 w-4 ${store.isFavorite ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
+                  </button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteStore(store.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Link href={`/stores/${store.id}`}>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
+                  </Link>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">
-                {store._count.prices} prices tracked
-              </Badge>
             </CardContent>
           </Card>
         ))}
