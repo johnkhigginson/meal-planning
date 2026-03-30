@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
-  ChefHat,
   UtensilsCrossed,
   Package,
   CalendarDays,
@@ -9,6 +8,7 @@ import {
   Lightbulb,
   Camera,
 } from "lucide-react";
+import { LemonLogo } from "./LemonLogo";
 
 const features = [
   {
@@ -56,7 +56,7 @@ export function LandingPage() {
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <ChefHat className="h-7 w-7 text-emerald-600" />
+            <LemonLogo className="h-8 w-8" />
             <span className="text-xl font-bold">My Lemon Kitchen</span>
           </div>
           <div className="flex items-center gap-3">
@@ -71,11 +71,11 @@ export function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="bg-gradient-to-b from-emerald-50 to-background px-6 py-24 text-center">
+      <section className="bg-gradient-to-b from-yellow-50 to-background px-6 py-24 text-center">
         <div className="mx-auto max-w-3xl">
           <h1 className="text-5xl font-bold tracking-tight text-foreground">
             Meal planning,{" "}
-            <span className="text-emerald-600">simplified</span>
+            <span className="text-foreground">simplified</span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
             Plan your meals, track your pantry, and generate smart grocery
@@ -110,8 +110,8 @@ export function LandingPage() {
           <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
               <div key={feature.title} className="space-y-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
-                  <feature.icon className="h-5 w-5 text-emerald-600" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#FFF700]/20">
+                  <feature.icon className="h-5 w-5 text-foreground" />
                 </div>
                 <h3 className="text-lg font-semibold">{feature.title}</h3>
                 <p className="text-sm leading-relaxed text-muted-foreground">

@@ -102,7 +102,7 @@ export async function Dashboard({ userId }: DashboardProps) {
             <Link key={link.href} href={link.href}>
               <Card className="transition-colors hover:bg-accent">
                 <CardContent className="flex items-center gap-3 p-4">
-                  <link.icon className="h-5 w-5 text-emerald-600" />
+                  <link.icon className="h-5 w-5 text-foreground" />
                   <span className="font-medium">{link.label}</span>
                 </CardContent>
               </Card>

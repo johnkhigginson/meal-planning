@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
-  ChefHat,
   UtensilsCrossed,
   Package,
   Lightbulb,
@@ -15,6 +14,7 @@ import {
   Settings,
   LayoutDashboard,
 } from "lucide-react";
+import { LemonLogo } from "./LemonLogo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -36,8 +36,8 @@ export function Navbar() {
     <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <ChefHat className="h-6 w-6 text-emerald-600" />
-        <span className="text-base font-bold tracking-tight">My Lemon Kitchen</span>
+        <LemonLogo className="h-7 w-7" />
+        <span className="text-base font-bold tracking-tight text-sidebar-foreground">My Lemon Kitchen</span>
       </div>
 
       {/* Navigation */}
@@ -53,8 +53,8 @@ export function Navbar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-sidebar-accent text-sidebar-primary"
+                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -68,10 +68,10 @@ export function Navbar() {
       {session?.user && (
         <div className="border-t border-sidebar-border px-3 py-3">
           <div className="mb-1 px-3 py-1.5">
-            <p className="truncate text-sm font-medium">
+            <p className="truncate text-sm font-medium text-sidebar-foreground">
               {session.user.name}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-xs text-sidebar-foreground/50">
               {session.user.email}
             </p>
           </div>
@@ -80,8 +80,8 @@ export function Navbar() {
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
               pathname === "/settings"
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-sidebar-accent text-sidebar-primary"
+                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
             )}
           >
             <Settings className="h-4 w-4" />
@@ -90,7 +90,7 @@ export function Navbar() {
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start gap-3 px-3 text-[13px] text-muted-foreground hover:text-foreground"
+            className="w-full justify-start gap-3 px-3 text-[13px] text-sidebar-foreground/60 hover:text-sidebar-foreground"
             onClick={() => signOut({ callbackUrl: "/login" })}
           >
             <LogOut className="h-4 w-4" />
