@@ -56,9 +56,11 @@ interface RecipeFormProps {
   recipeId?: number;
 }
 
+let ingredientKeyCounter = 0;
+
 function newIngredientRow(): RecipeIngredientRow {
   return {
-    key: crypto.randomUUID(),
+    key: `ing-${++ingredientKeyCounter}-${Date.now()}`,
     ingredientId: 0,
     ingredientName: "",
     quantity: 0,

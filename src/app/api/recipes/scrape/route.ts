@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 
+function cleanText(text: string): string {
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#\d+;/g, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 interface ScrapedRecipe {
   name: string;
   description: string;
@@ -57,15 +66,27 @@ function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
       // Extract instructions
       let instructions = "";
       if (typeof data.recipeInstructions === "string") {
-        instructions = data.recipeInstructions;
+        instructions = cleanText(data.recipeInstructions);
       } else if (Array.isArray(data.recipeInstructions)) {
-        instructions = data.recipeInstructions
-          .map((step: string | { text?: string; "@type"?: string }, idx: number) => {
-            if (typeof step === "string") return `${idx + 1}. ${step}`;
-            if (step.text) return `${idx + 1}. ${step.text}`;
-            return "";
-          })
-          .filter(Boolean)
+        // Handle nested HowToSection groups
+        const steps: string[] = [];
+        for (const item of data.recipeInstructions) {
+          if (typeof item === "string") {
+            steps.push(cleanText(item));
+          } else if (item?.["@type"] === "HowToStep" && item.text) {
+            steps.push(cleanText(item.text));
+          } else if (item?.["@type"] === "HowToSection" && Array.isArray(item.itemListElement)) {
+            for (const sub of item.itemListElement) {
+              if (typeof sub === "string") {
+                steps.push(cleanText(sub));
+              } else if (sub?.text) {
+                steps.push(cleanText(sub.text));
+              }
+            }
+          }
+        }
+        instructions = steps
+          .map((step, idx) => `${idx + 1}. ${step}`)
           .join("\n");
       }
 
@@ -73,7 +94,7 @@ function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
       let ingredients: string[] = [];
       if (Array.isArray(data.recipeIngredient)) {
         ingredients = data.recipeIngredient.map((i: string) =>
-          typeof i === "string" ? i.trim() : String(i)
+          typeof i === "string" ? cleanText(i) : cleanText(String(i))
         );
       }
 

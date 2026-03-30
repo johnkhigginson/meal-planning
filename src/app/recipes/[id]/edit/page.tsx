@@ -54,8 +54,8 @@ export default function EditRecipePage() {
   }
 
   const initialIngredients: RecipeIngredientRow[] = recipe.ingredients.map(
-    (ing) => ({
-      key: crypto.randomUUID(),
+    (ing, idx) => ({
+      key: `edit-${ing.ingredientId}-${idx}`,
       ingredientId: ing.ingredientId,
       ingredientName: ing.ingredient.name,
       quantity: ing.quantity,

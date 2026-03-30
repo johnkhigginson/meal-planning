@@ -32,7 +32,7 @@ export const createRecipeSchema = z.object({
   sourceBookPage: z.string().max(50).optional(),
   imageUrl: z.string().url().max(2000).optional(),
   isFavorite: z.boolean().default(false),
-  ingredients: z.array(recipeIngredientSchema).min(1),
+  ingredients: z.array(recipeIngredientSchema).default([]),
   tagIds: z.array(z.number().int().positive()).default([]),
 });
 
