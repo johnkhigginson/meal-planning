@@ -70,7 +70,7 @@ export default function StoresPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Stores</h1>
+        <h1 className="text-2xl font-bold">Stores</h1>
         <p className="text-muted-foreground">
           Manage stores and pricing for smart shopping lists
         </p>

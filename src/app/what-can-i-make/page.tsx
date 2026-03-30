@@ -53,16 +53,16 @@ export default function WhatCanIMakePage() {
   }, [minMatch]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-3xl font-bold">What Can I Make?</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold">What Can I Make?</h1>
+        <p className="text-sm text-muted-foreground">
           Recipes ranked by what you have in your pantry
         </p>
       </div>
 
       <div className="flex items-center gap-4">
-        <Label htmlFor="minMatch" className="shrink-0">
+        <Label htmlFor="minMatch" className="shrink-0 text-sm">
           Minimum match:
         </Label>
         <Input

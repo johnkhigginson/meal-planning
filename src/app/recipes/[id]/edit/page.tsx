@@ -67,7 +67,7 @@ export default function EditRecipePage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-3xl font-bold">Edit Recipe</h1>
+      <h1 className="text-2xl font-bold">Edit Recipe</h1>
       <RecipeForm
         recipeId={recipe.id}
         initialData={{

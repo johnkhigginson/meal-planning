@@ -72,7 +72,7 @@ function GroceryListContent() {
   if (!listId || !list) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Grocery List</h1>
+        <h1 className="text-2xl font-bold">Grocery List</h1>
         <div className="py-12 text-center">
           <p className="text-lg text-muted-foreground">No grocery list selected</p>
           <p className="text-sm text-muted-foreground">
@@ -105,7 +105,7 @@ function GroceryListContent() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Grocery List</h1>
+        <h1 className="text-2xl font-bold">Grocery List</h1>
         <p className="text-muted-foreground">{list.name}</p>
         <div className="mt-2 flex gap-2 text-sm">
           <Badge variant="outline">

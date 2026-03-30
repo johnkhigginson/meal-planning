@@ -66,9 +66,12 @@ export default function RecipesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Recipes</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Recipes</h1>
+          <p className="text-sm text-muted-foreground">Your recipe collection</p>
+        </div>
         <Link href="/recipes/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
@@ -77,7 +80,7 @@ export default function RecipesPage() {
         </Link>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <SearchInput
           value={search}
           onChange={setSearch}

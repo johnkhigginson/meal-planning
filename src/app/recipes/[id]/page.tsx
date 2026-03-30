@@ -41,7 +41,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold">{recipe.name}</h1>
+            <h1 className="text-2xl font-bold">{recipe.name}</h1>
             {recipe.isFavorite && (
               <Heart className="h-5 w-5 fill-red-500 text-red-500" />
             )}
