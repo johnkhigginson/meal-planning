@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Star } from "lucide-react";
+import { Plus, Trash2, Star, Loader2 } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Store {
@@ -20,14 +20,18 @@ export default function StoresPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
+  const [libraryStores, setLibraryStores] = useState<{ id: number; name: string }[]>([]);
+  const [addingLibId, setAddingLibId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("/api/stores")
-      .then((r) => r.json())
-      .then((data) => {
-        setStores(data);
-        setLoading(false);
-      });
+    Promise.all([
+      fetch("/api/stores").then((r) => r.json()),
+      fetch("/api/library/stores").then((r) => r.json()),
+    ]).then(([s, lib]) => {
+      setStores(s);
+      setLibraryStores(lib);
+      setLoading(false);
+    });
   }, []);
 
   async function addStore() {
@@ -64,6 +68,20 @@ export default function StoresPage() {
     if (res.ok) {
       setStores((prev) => prev.filter((s) => s.id !== id));
     }
+  }
+
+  async function addFromLibrary(libStore: { id: number; name: string }) {
+    setAddingLibId(libStore.id);
+    const res = await fetch("/api/library/stores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ libraryStoreId: libStore.id }),
+    });
+    if (res.ok) {
+      const store = await res.json();
+      setStores((prev) => [...prev, { ...store, _count: { prices: 0 } }]);
+    }
+    setAddingLibId(null);
   }
 
   if (loading) return <PageLoader />;
@@ -135,15 +153,37 @@ export default function StoresPage() {
         )}
       </div>
 
-      <Card className="border-dashed">
-        <CardContent className="py-8 text-center text-muted-foreground">
-          <p className="text-sm">
-            Smart shopping list optimization coming soon. Add stores and prices
-            to prepare for automatic price comparison and cost-optimized
-            shopping lists.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Library stores */}
+      {(() => {
+        const storeNames = new Set(stores.map((s) => s.name));
+        const available = libraryStores.filter((ls) => !storeNames.has(ls.name));
+        if (available.length === 0) return null;
+        return (
+          <div>
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Add from Library
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {available.map((ls) => (
+                <Button
+                  key={ls.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addFromLibrary(ls)}
+                  disabled={addingLibId === ls.id}
+                >
+                  {addingLibId === ls.id ? (
+                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Plus className="mr-1.5 h-3 w-3" />
+                  )}
+                  {ls.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

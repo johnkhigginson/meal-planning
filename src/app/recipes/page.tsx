@@ -73,12 +73,17 @@ export default function RecipesPage() {
           <h1 className="text-2xl font-bold">Recipes</h1>
           <p className="text-sm text-muted-foreground">Your recipe collection</p>
         </div>
-        <Link href="/recipes/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Recipe
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/recipes/library">
+            <Button variant="outline">Browse Library</Button>
+          </Link>
+          <Link href="/recipes/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Recipe
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-3">

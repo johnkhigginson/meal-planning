@@ -30,6 +30,7 @@ model User {
   passwordHash     String   @db.NVarChar(200)
   householdId      Int
   role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER
+  isAdmin          Boolean  @default(false)
   enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
   createdAt        DateTime @default(now())
 
@@ -57,11 +58,12 @@ model Unit {
   abbreviation String @db.NVarChar(10)
   unitType     String @db.NVarChar(20)
 
-  recipeIngredients     RecipeIngredient[]
-  inventoryItems        InventoryItem[]
-  groceryListItems      GroceryListItem[]
-  storePrices           StorePrice[]
-  defaultForIngredients Ingredient[]
+  recipeIngredients        RecipeIngredient[]
+  inventoryItems           InventoryItem[]
+  groceryListItems         GroceryListItem[]
+  storePrices              StorePrice[]
+  defaultForIngredients    Ingredient[]
+  libraryRecipeIngredients LibraryRecipeIngredient[]
 
   conversionsFrom UnitConversion[] @relation("FromUnit")
   conversionsTo   UnitConversion[] @relation("ToUnit")
@@ -89,10 +91,11 @@ model Ingredient {
 
   defaultUnit Unit? @relation(fields: [defaultUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  recipeIngredients RecipeIngredient[]
-  inventoryItems    InventoryItem[]
-  groceryListItems  GroceryListItem[]
-  storePrices       StorePrice[]
+  recipeIngredients        RecipeIngredient[]
+  inventoryItems           InventoryItem[]
+  groceryListItems         GroceryListItem[]
+  storePrices              StorePrice[]
+  libraryRecipeIngredients LibraryRecipeIngredient[]
 }
 
 // ─── Recipes ────────────────────────────────────────────────────
@@ -256,4 +259,42 @@ model StorePrice {
   unit       Unit       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([storeId, ingredientId])
+}
+
+// ─── Library (Admin-managed, available to all users) ────────
+
+model LibraryRecipe {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.NVarChar(300)
+  description     String?  @db.NVarChar(Max)
+  instructions    String   @db.NVarChar(Max)
+  servings        Int
+  prepTimeMinutes Int?
+  cookTimeMinutes Int?
+  sourceType      String   @default("PERSONAL") @db.NVarChar(20)
+  sourceUrl       String?  @db.NVarChar(2000)
+  category        String?  @db.NVarChar(100)
+  createdAt       DateTime @default(now())
+
+  ingredients LibraryRecipeIngredient[]
+}
+
+model LibraryRecipeIngredient {
+  id              Int     @id @default(autoincrement())
+  libraryRecipeId Int
+  ingredientId    Int
+  quantity        Float
+  unitId          Int
+  notes           String? @db.NVarChar(200)
+  optional        Boolean @default(false)
+  sortOrder       Int     @default(0)
+
+  libraryRecipe LibraryRecipe @relation(fields: [libraryRecipeId], references: [id], onDelete: Cascade)
+  ingredient    Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unit          Unit          @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model LibraryStore {
+  id   Int    @id @default(autoincrement())
+  name String @unique @db.NVarChar(200)
 }
