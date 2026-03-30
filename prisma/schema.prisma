@@ -236,10 +236,11 @@ model GroceryListItem {
 // ─── Stores (Stubbed) ──────────────────────────────────────────
 
 model Store {
-  id          Int     @id @default(autoincrement())
-  householdId Int
-  name        String  @db.NVarChar(200)
-  isFavorite  Boolean @default(false)
+  id               Int     @id @default(autoincrement())
+  householdId      Int
+  name             String  @db.NVarChar(200)
+  isFavorite       Boolean @default(false)
+  krogerLocationId String? @db.NVarChar(50)
 
   household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
   prices    StorePrice[]

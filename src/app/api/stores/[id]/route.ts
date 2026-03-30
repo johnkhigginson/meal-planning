@@ -13,7 +13,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const existing = await prisma.store.findFirst({ where: { id: storeId, householdId } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const store = await prisma.store.update({ where: { id: storeId }, data: { name: body.name, isFavorite: body.isFavorite } });
+  const data: Record<string, unknown> = {};
+  if (body.name !== undefined) data.name = body.name;
+  if (body.isFavorite !== undefined) data.isFavorite = body.isFavorite;
+  if (body.krogerLocationId !== undefined) data.krogerLocationId = body.krogerLocationId;
+
+  const store = await prisma.store.update({ where: { id: storeId }, data });
   return NextResponse.json(store);
 }
 
