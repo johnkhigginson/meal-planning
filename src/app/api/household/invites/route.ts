@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { sendHouseholdInviteEmail } from "@/lib/email";
 
 export async function GET() {
   const { householdId } = await requireUser();
@@ -57,6 +58,14 @@ export async function POST(request: NextRequest) {
     update: { status: "PENDING", invitedBy: userId },
     create: { householdId, email, invitedBy: userId },
   });
+
+  // Send invite email
+  const household = await prisma.household.findUnique({ where: { id: householdId } });
+  try {
+    await sendHouseholdInviteEmail(email, user!.name, household!.name);
+  } catch (err) {
+    console.error("Failed to send invite email:", err);
+  }
 
   return NextResponse.json(invite, { status: 201 });
 }
