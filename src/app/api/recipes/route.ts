@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUserId } from "@/lib/auth";
+import { requireHouseholdId } from "@/lib/auth";
 import { createRecipeSchema } from "@/lib/validators";
 
 export async function GET(request: NextRequest) {
-  const userId = await requireUserId();
+  const householdId = await requireHouseholdId();
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") || "";
   const sourceType = searchParams.get("sourceType");
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1", 10);
   const limit = parseInt(searchParams.get("limit") || "20", 10);
 
-  const where: Record<string, unknown> = { userId };
+  const where: Record<string, unknown> = { householdId };
 
   if (q) {
     where.OR = [
@@ -21,27 +21,18 @@ export async function GET(request: NextRequest) {
       { description: { contains: q } },
     ];
   }
-  if (sourceType) {
-    where.sourceType = sourceType;
-  }
-  if (favoritesOnly) {
-    where.isFavorite = true;
-  }
+  if (sourceType) where.sourceType = sourceType;
+  if (favoritesOnly) where.isFavorite = true;
   if (tagIds) {
     const ids = tagIds.split(",").map(Number).filter(Boolean);
-    if (ids.length > 0) {
-      where.tags = { some: { tagId: { in: ids } } };
-    }
+    if (ids.length > 0) where.tags = { some: { tagId: { in: ids } } };
   }
 
   const [recipes, total] = await Promise.all([
     prisma.recipe.findMany({
       where,
       include: {
-        ingredients: {
-          include: { ingredient: true, unit: true },
-          orderBy: { sortOrder: "asc" },
-        },
+        ingredients: { include: { ingredient: true, unit: true }, orderBy: { sortOrder: "asc" } },
         tags: { include: { tag: true } },
       },
       orderBy: { updatedAt: "desc" },
@@ -55,7 +46,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const userId = await requireUserId();
+  const householdId = await requireHouseholdId();
   const body = await request.json();
   const parsed = createRecipeSchema.safeParse(body);
   if (!parsed.success) {
@@ -67,7 +58,7 @@ export async function POST(request: NextRequest) {
   const recipe = await prisma.recipe.create({
     data: {
       ...recipeData,
-      userId,
+      householdId,
       ingredients: {
         create: ingredients.map((ing, idx) => ({
           ingredientId: ing.ingredientId,
@@ -78,15 +69,10 @@ export async function POST(request: NextRequest) {
           sortOrder: ing.sortOrder ?? idx,
         })),
       },
-      tags: {
-        create: tagIds.map((tagId) => ({ tagId })),
-      },
+      tags: { create: tagIds.map((tagId) => ({ tagId })) },
     },
     include: {
-      ingredients: {
-        include: { ingredient: true, unit: true },
-        orderBy: { sortOrder: "asc" },
-      },
+      ingredients: { include: { ingredient: true, unit: true }, orderBy: { sortOrder: "asc" } },
       tags: { include: { tag: true } },
     },
   });

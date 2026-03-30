@@ -11,17 +11,17 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 interface DashboardProps {
-  userId: number;
+  householdId: number;
 }
 
-export async function Dashboard({ userId }: DashboardProps) {
+export async function Dashboard({ householdId }: DashboardProps) {
   const [recipeCount, pantryCount, storeCount, currentPlan] =
     await Promise.all([
-      prisma.recipe.count({ where: { userId } }),
-      prisma.inventoryItem.count({ where: { userId } }),
-      prisma.store.count({ where: { userId } }),
+      prisma.recipe.count({ where: { householdId } }),
+      prisma.inventoryItem.count({ where: { householdId } }),
+      prisma.store.count({ where: { householdId } }),
       prisma.mealPlan.findFirst({
-        where: { userId },
+        where: { householdId },
         orderBy: { weekStartDate: "desc" },
         include: { _count: { select: { entries: true } } },
       }),

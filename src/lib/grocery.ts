@@ -13,7 +13,7 @@ interface AggregatedItem {
   needed: number;
 }
 
-export async function generateGroceryList(mealPlanId: number, userId: number): Promise<{
+export async function generateGroceryList(mealPlanId: number, householdId: number): Promise<{
   items: AggregatedItem[];
   mealPlanId: number;
 }> {
@@ -35,7 +35,7 @@ export async function generateGroceryList(mealPlanId: number, userId: number): P
       },
     }),
     prisma.inventoryItem.findMany({
-      where: { userId },
+      where: { householdId },
       include: { ingredient: true, unit: true },
     }),
     prisma.unitConversion.findMany(),
@@ -153,13 +153,13 @@ export async function generateGroceryList(mealPlanId: number, userId: number): P
 
 export async function saveGroceryList(
   mealPlanId: number,
-  userId: number,
+  householdId: number,
   items: AggregatedItem[]
 ): Promise<number> {
   const groceryList = await prisma.groceryList.create({
     data: {
       mealPlanId,
-      userId,
+      householdId,
       name: `Grocery List - ${new Date().toLocaleDateString()}`,
       items: {
         create: items.map((item) => ({

@@ -13,7 +13,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { LemonLogo } from "@/components/shared/LemonLogo";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -59,9 +58,6 @@ export default function RegisterPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-2">
-          <LemonLogo className="h-14 w-14" />
-        </div>
         <CardTitle className="text-xl">Create your account</CardTitle>
       </CardHeader>
       <CardContent>

@@ -25,6 +25,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id.toString(),
           email: user.email,
           name: user.name,
+          householdId: user.householdId.toString(),
         };
       },
     }),
@@ -33,12 +34,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.householdId = (user as { householdId?: string }).householdId;
       }
       return token;
     },
     session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        (session.user as { householdId?: string }).householdId = token.householdId as string;
       }
       return session;
     },
@@ -52,19 +55,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 });
 
 /**
- * Get the current user's ID from the session. Returns null if not authenticated.
+ * Get the current user's ID and household ID. Returns null if not authenticated.
  */
-export async function getCurrentUserId(): Promise<number | null> {
+export async function getCurrentUser(): Promise<{ userId: number; householdId: number } | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
-  return parseInt(session.user.id, 10);
+  const householdId = (session.user as { householdId?: string }).householdId;
+  if (!householdId) return null;
+  return {
+    userId: parseInt(session.user.id, 10),
+    householdId: parseInt(householdId, 10),
+  };
 }
 
 /**
- * Get the current user's ID, throwing if not authenticated.
+ * @deprecated Use getCurrentUser() instead
  */
-export async function requireUserId(): Promise<number> {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error("Not authenticated");
-  return userId;
+export async function getCurrentUserId(): Promise<number | null> {
+  const user = await getCurrentUser();
+  return user?.userId ?? null;
+}
+
+/**
+ * Get the current user's household ID, throwing if not authenticated.
+ */
+export async function requireHouseholdId(): Promise<number> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  return user.householdId;
+}
+
+/**
+ * Get both IDs, throwing if not authenticated.
+ */
+export async function requireUser(): Promise<{ userId: number; householdId: number }> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Not authenticated");
+  return user;
 }

@@ -13,7 +13,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { LemonLogo } from "@/components/shared/LemonLogo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -44,10 +43,7 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-2">
-          <LemonLogo className="h-14 w-14" />
-        </div>
-        <CardTitle className="text-xl">Sign in to My Lemon Kitchen</CardTitle>
+        <CardTitle className="text-xl">Welcome back</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

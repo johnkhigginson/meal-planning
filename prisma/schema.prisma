@@ -7,21 +7,46 @@ datasource db {
   provider = "sqlserver"
 }
 
-// ─── Users ──────────────────────────────────────────────────────
+// ─── Households & Users ─────────────────────────────────────────
 
-model User {
-  id             Int      @id @default(autoincrement())
-  email          String   @unique @db.NVarChar(320)
-  name           String   @db.NVarChar(200)
-  passwordHash   String   @db.NVarChar(200)
-  enabledMealSlots String @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
-  createdAt      DateTime @default(now())
+model Household {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.NVarChar(200)
+  createdAt DateTime @default(now())
 
+  members        User[]
   recipes        Recipe[]
   inventoryItems InventoryItem[]
   mealPlans      MealPlan[]
   groceryLists   GroceryList[]
   stores         Store[]
+  invites        HouseholdInvite[]
+}
+
+model User {
+  id               Int      @id @default(autoincrement())
+  email            String   @unique @db.NVarChar(320)
+  name             String   @db.NVarChar(200)
+  passwordHash     String   @db.NVarChar(200)
+  householdId      Int
+  role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER
+  enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
+  createdAt        DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+}
+
+model HouseholdInvite {
+  id          Int      @id @default(autoincrement())
+  householdId Int
+  email       String   @db.NVarChar(320)
+  invitedBy   Int
+  status      String   @default("PENDING") @db.NVarChar(20) // PENDING, ACCEPTED, DECLINED
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, email])
 }
 
 // ─── Units & Conversions ────────────────────────────────────────
@@ -30,7 +55,7 @@ model Unit {
   id           Int    @id @default(autoincrement())
   name         String @unique @db.NVarChar(50)
   abbreviation String @db.NVarChar(10)
-  unitType     String @db.NVarChar(20) // VOLUME, WEIGHT, COUNT, OTHER
+  unitType     String @db.NVarChar(20)
 
   recipeIngredients     RecipeIngredient[]
   inventoryItems        InventoryItem[]
@@ -74,14 +99,14 @@ model Ingredient {
 
 model Recipe {
   id              Int      @id @default(autoincrement())
-  userId          Int
+  householdId     Int
   name            String   @db.NVarChar(300)
   description     String?  @db.NVarChar(Max)
   instructions    String   @db.NVarChar(Max)
   servings        Int
   prepTimeMinutes Int?
   cookTimeMinutes Int?
-  sourceType      String   @default("PERSONAL") @db.NVarChar(20) // PERSONAL, WEBSITE, BOOK
+  sourceType      String   @default("PERSONAL") @db.NVarChar(20)
   sourceUrl       String?  @db.NVarChar(2000)
   sourceBookTitle String?  @db.NVarChar(300)
   sourceBookPage  String?  @db.NVarChar(50)
@@ -90,7 +115,7 @@ model Recipe {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household       Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
   ingredients     RecipeIngredient[]
   tags            RecipeTag[]
   mealPlanEntries MealPlanEntry[]
@@ -134,34 +159,34 @@ model RecipeTag {
 
 model InventoryItem {
   id             Int       @id @default(autoincrement())
-  userId         Int
+  householdId    Int
   ingredientId   Int
   quantity       Float
   unitId         Int
   expirationDate DateTime?
   updatedAt      DateTime  @updatedAt
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household  Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   unit       Unit       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@unique([userId, ingredientId])
+  @@unique([householdId, ingredientId])
 }
 
 // ─── Meal Planning ──────────────────────────────────────────────
 
 model MealPlan {
   id            Int      @id @default(autoincrement())
-  userId        Int
+  householdId   Int
   weekStartDate DateTime @db.Date
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household    Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
   entries      MealPlanEntry[]
   groceryLists GroceryList[]
 
-  @@unique([userId, weekStartDate])
+  @@unique([householdId, weekStartDate])
 }
 
 model MealPlanEntry {
@@ -169,7 +194,7 @@ model MealPlanEntry {
   mealPlanId Int
   recipeId   Int
   date       DateTime @db.Date
-  mealSlot   String   @db.NVarChar(20) // BREAKFAST, LUNCH, DINNER, SNACK
+  mealSlot   String   @db.NVarChar(20)
   servings   Int
 
   mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
@@ -179,15 +204,15 @@ model MealPlanEntry {
 // ─── Grocery Lists ──────────────────────────────────────────────
 
 model GroceryList {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  mealPlanId Int?
-  name       String   @db.NVarChar(200)
-  createdAt  DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  householdId Int
+  mealPlanId  Int?
+  name        String   @db.NVarChar(200)
+  createdAt   DateTime @default(now())
 
-  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mealPlan MealPlan?         @relation(fields: [mealPlanId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  items    GroceryListItem[]
+  household Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  mealPlan  MealPlan?         @relation(fields: [mealPlanId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items     GroceryListItem[]
 }
 
 model GroceryListItem {
@@ -208,13 +233,13 @@ model GroceryListItem {
 // ─── Stores (Stubbed) ──────────────────────────────────────────
 
 model Store {
-  id         Int     @id @default(autoincrement())
-  userId     Int
-  name       String  @db.NVarChar(200)
-  isFavorite Boolean @default(false)
+  id          Int     @id @default(autoincrement())
+  householdId Int
+  name        String  @db.NVarChar(200)
+  isFavorite  Boolean @default(false)
 
-  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  prices StorePrice[]
+  household Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  prices    StorePrice[]
 }
 
 model StorePrice {

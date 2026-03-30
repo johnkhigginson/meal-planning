@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { getCurrentUserId } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +15,12 @@ interface PageProps {
 }
 
 export default async function RecipeDetailPage({ params }: PageProps) {
-  const userId = await getCurrentUserId();
-  if (!userId) redirect("/login");
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  const householdId = user.householdId;
   const { id } = await params;
   const recipe = await prisma.recipe.findFirst({
-    where: { id: parseInt(id, 10), userId },
+    where: { id: parseInt(id, 10), householdId },
     include: {
       ingredients: {
         include: { ingredient: true, unit: true },

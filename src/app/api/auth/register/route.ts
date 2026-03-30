@@ -28,8 +28,37 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
+
+  // Check if there's a pending invite for this email
+  const invite = await prisma.householdInvite.findFirst({
+    where: { email, status: "PENDING" },
+  });
+
+  let householdId: number;
+
+  if (invite) {
+    // Join existing household
+    householdId = invite.householdId;
+    await prisma.householdInvite.update({
+      where: { id: invite.id },
+      data: { status: "ACCEPTED" },
+    });
+  } else {
+    // Create new household
+    const household = await prisma.household.create({
+      data: { name: `${name}'s Kitchen` },
+    });
+    householdId = household.id;
+  }
+
   const user = await prisma.user.create({
-    data: { name, email, passwordHash },
+    data: {
+      name,
+      email,
+      passwordHash,
+      householdId,
+      role: invite ? "MEMBER" : "OWNER",
+    },
   });
 
   return NextResponse.json(

@@ -30,12 +30,12 @@ export interface RecipeMatch {
 }
 
 export async function findMatchingRecipes(
-  userId: number,
+  householdId: number,
   minMatchScore: number = 0
 ): Promise<RecipeMatch[]> {
   const [recipes, inventory, conversions] = await Promise.all([
     prisma.recipe.findMany({
-      where: { userId },
+      where: { householdId },
       include: {
         ingredients: {
           include: { ingredient: true, unit: true },
@@ -45,7 +45,7 @@ export async function findMatchingRecipes(
       },
     }),
     prisma.inventoryItem.findMany({
-      where: { userId },
+      where: { householdId },
       include: { ingredient: true, unit: true },
     }),
     prisma.unitConversion.findMany(),
