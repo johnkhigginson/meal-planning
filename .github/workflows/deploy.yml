@@ -1,0 +1,66 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to server
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: mylemonkitchen.com
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+          REMOTE_PORT: ${{ secrets.SSH_PORT || 22 }}
+          SOURCE: "./"
+          TARGET: /var/www/mylemonkitchen.com
+          EXCLUDE: "node_modules/, .git/, .env"
+
+      - name: Install deps and restart on server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: mylemonkitchen.com
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            cd /var/www/mylemonkitchen.com
+
+            # Install production dependencies
+            npm ci --production
+
+            # Generate Prisma client on server
+            npx prisma generate
+
+            # Restart with PM2
+            if pm2 describe meal-planning > /dev/null 2>&1; then
+              pm2 restart meal-planning
+            else
+              PORT=3003 pm2 start npm --name meal-planning -- start
+            fi
+
+            pm2 save

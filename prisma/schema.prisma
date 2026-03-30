@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+// ─── Users ──────────────────────────────────────────────────────
+
+model User {
+  id             Int      @id @default(autoincrement())
+  email          String   @unique @db.NVarChar(320)
+  name           String   @db.NVarChar(200)
+  passwordHash   String   @db.NVarChar(200)
+  enabledMealSlots String @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
+  createdAt      DateTime @default(now())
+
+  recipes        Recipe[]
+  inventoryItems InventoryItem[]
+  mealPlans      MealPlan[]
+  groceryLists   GroceryList[]
+  stores         Store[]
+}
+
+// ─── Units & Conversions ────────────────────────────────────────
+
+model Unit {
+  id           Int    @id @default(autoincrement())
+  name         String @unique @db.NVarChar(50)
+  abbreviation String @db.NVarChar(10)
+  unitType     String @db.NVarChar(20) // VOLUME, WEIGHT, COUNT, OTHER
+
+  recipeIngredients     RecipeIngredient[]
+  inventoryItems        InventoryItem[]
+  groceryListItems      GroceryListItem[]
+  storePrices           StorePrice[]
+  defaultForIngredients Ingredient[]
+
+  conversionsFrom UnitConversion[] @relation("FromUnit")
+  conversionsTo   UnitConversion[] @relation("ToUnit")
+}
+
+model UnitConversion {
+  id         Int   @id @default(autoincrement())
+  fromUnitId Int
+  toUnitId   Int
+  factor     Float
+
+  fromUnit Unit @relation("FromUnit", fields: [fromUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  toUnit   Unit @relation("ToUnit", fields: [toUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([fromUnitId, toUnitId])
+}
+
+// ─── Ingredients ────────────────────────────────────────────────
+
+model Ingredient {
+  id            Int     @id @default(autoincrement())
+  name          String  @unique @db.NVarChar(200)
+  category      String? @db.NVarChar(100)
+  defaultUnitId Int?
+
+  defaultUnit Unit? @relation(fields: [defaultUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  recipeIngredients RecipeIngredient[]
+  inventoryItems    InventoryItem[]
+  groceryListItems  GroceryListItem[]
+  storePrices       StorePrice[]
+}
+
+// ─── Recipes ────────────────────────────────────────────────────
+
+model Recipe {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  name            String   @db.NVarChar(300)
+  description     String?  @db.NVarChar(Max)
+  instructions    String   @db.NVarChar(Max)
+  servings        Int
+  prepTimeMinutes Int?
+  cookTimeMinutes Int?
+  sourceType      String   @default("PERSONAL") @db.NVarChar(20) // PERSONAL, WEBSITE, BOOK
+  sourceUrl       String?  @db.NVarChar(2000)
+  sourceBookTitle String?  @db.NVarChar(300)
+  sourceBookPage  String?  @db.NVarChar(50)
+  imageUrl        String?  @db.NVarChar(2000)
+  isFavorite      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ingredients     RecipeIngredient[]
+  tags            RecipeTag[]
+  mealPlanEntries MealPlanEntry[]
+}
+
+model RecipeIngredient {
+  id           Int     @id @default(autoincrement())
+  recipeId     Int
+  ingredientId Int
+  quantity     Float
+  unitId       Int
+  notes        String? @db.NVarChar(200)
+  optional     Boolean @default(false)
+  sortOrder    Int     @default(0)
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unit       Unit       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Tags ───────────────────────────────────────────────────────
+
+model Tag {
+  id   Int    @id @default(autoincrement())
+  name String @unique @db.NVarChar(100)
+
+  recipes RecipeTag[]
+}
+
+model RecipeTag {
+  recipeId Int
+  tagId    Int
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+}
+
+// ─── Inventory ──────────────────────────────────────────────────
+
+model InventoryItem {
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  ingredientId   Int
+  quantity       Float
+  unitId         Int
+  expirationDate DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unit       Unit       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([userId, ingredientId])
+}
+
+// ─── Meal Planning ──────────────────────────────────────────────
+
+model MealPlan {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  weekStartDate DateTime @db.Date
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries      MealPlanEntry[]
+  groceryLists GroceryList[]
+
+  @@unique([userId, weekStartDate])
+}
+
+model MealPlanEntry {
+  id         Int      @id @default(autoincrement())
+  mealPlanId Int
+  recipeId   Int
+  date       DateTime @db.Date
+  mealSlot   String   @db.NVarChar(20) // BREAKFAST, LUNCH, DINNER, SNACK
+  servings   Int
+
+  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Grocery Lists ──────────────────────────────────────────────
+
+model GroceryList {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  mealPlanId Int?
+  name       String   @db.NVarChar(200)
+  createdAt  DateTime @default(now())
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlan MealPlan?         @relation(fields: [mealPlanId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items    GroceryListItem[]
+}
+
+model GroceryListItem {
+  id            Int     @id @default(autoincrement())
+  groceryListId Int
+  ingredientId  Int
+  quantity      Float
+  unitId        Int
+  checked       Boolean @default(false)
+  inInventory   Float   @default(0)
+  needed        Float
+
+  groceryList GroceryList @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unit        Unit        @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Stores (Stubbed) ──────────────────────────────────────────
+
+model Store {
+  id         Int     @id @default(autoincrement())
+  userId     Int
+  name       String  @db.NVarChar(200)
+  isFavorite Boolean @default(false)
+
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prices StorePrice[]
+}
+
+model StorePrice {
+  id           Int      @id @default(autoincrement())
+  storeId      Int
+  ingredientId Int
+  price        Decimal  @db.Decimal(10, 2)
+  quantity     Float
+  unitId       Int
+  lastUpdated  DateTime @default(now())
+
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  unit       Unit       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([storeId, ingredientId])
+}
