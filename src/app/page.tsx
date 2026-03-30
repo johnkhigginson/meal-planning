@@ -8,13 +8,15 @@ import {
   Store,
 } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireUserId } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const userId = await requireUserId();
+  const userId = await getCurrentUserId();
+  if (!userId) redirect("/login");
 
   const [recipeCount, pantryCount, storeCount, currentPlan] =
     await Promise.all([

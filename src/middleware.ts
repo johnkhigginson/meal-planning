@@ -1,10 +1,18 @@
-export { auth as middleware } from "@/lib/auth";
+import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
+
+export default auth((req) => {
+  if (!req.auth && req.nextUrl.pathname !== "/login" && req.nextUrl.pathname !== "/register") {
+    const loginUrl = new URL("/login", req.nextUrl.origin);
+    return NextResponse.redirect(loginUrl);
+  }
+  return NextResponse.next();
+});
 
 export const runtime = "nodejs";
 
 export const config = {
   matcher: [
-    // Protect all routes except auth pages, api/auth, static files
-    "/((?!login|register|api/auth|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
   ],
 };
