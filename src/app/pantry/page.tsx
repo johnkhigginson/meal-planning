@@ -466,7 +466,9 @@ export default function PantryPage() {
                   onValueChange={(v) => v && setAddUnitId(parseInt(v, 10))}
                 >
                   <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Unit" />
+                    <SelectValue placeholder="Unit">
+                      {addUnitId ? units.find((u) => u.id === addUnitId)?.name ?? "" : null}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(

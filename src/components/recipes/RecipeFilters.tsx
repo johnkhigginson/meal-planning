@@ -37,7 +37,9 @@ export function RecipeFilters({
     <div className="flex flex-wrap items-center gap-3">
       <Select value={sourceType} onValueChange={(v) => onSourceTypeChange(v ?? "ALL")}>
         <SelectTrigger className="w-40">
-          <SelectValue placeholder="All Sources" />
+          <SelectValue placeholder="All Sources">
+            {{ ALL: "All Sources", PERSONAL: "Personal", WEBSITE: "Website", BOOK: "Book" }[sourceType] ?? "All Sources"}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="ALL">All Sources</SelectItem>

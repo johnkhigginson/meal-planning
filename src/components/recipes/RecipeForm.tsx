@@ -322,7 +322,9 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
             onValueChange={(v) => updateForm("sourceType", v ?? "PERSONAL")}
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue>
+                {{ PERSONAL: "Personal Recipe", WEBSITE: "Website", BOOK: "Cookbook / Book" }[form.sourceType] ?? "Personal Recipe"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="PERSONAL">Personal Recipe</SelectItem>

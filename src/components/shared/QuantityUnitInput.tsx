@@ -43,6 +43,8 @@ export function QuantityUnitInput({
     {} as Record<string, Unit[]>
   );
 
+  const selectedUnit = units.find((u) => u.id === unitId);
+
   return (
     <div className="flex gap-2">
       <Input
@@ -59,7 +61,9 @@ export function QuantityUnitInput({
         onValueChange={(v) => v && onUnitChange(parseInt(v, 10))}
       >
         <SelectTrigger className="w-36">
-          <SelectValue placeholder="Unit" />
+          <SelectValue placeholder="Unit">
+            {selectedUnit ? `${selectedUnit.name} (${selectedUnit.abbreviation})` : null}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {Object.entries(grouped).map(([type, groupUnits]) => (
