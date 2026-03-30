@@ -25,11 +25,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="hidden lg:block">
         <Navbar />
       </div>
-      {/* Mobile top bar */}
+      {/* Mobile top + bottom bars */}
       <div className="lg:hidden">
         <MobileNav />
       </div>
-      <main className="flex-1 overflow-auto p-4 pt-0 lg:p-6">{children}</main>
+      {/* Content area — bottom padding on mobile for tab bar */}
+      <main className="flex-1 overflow-auto p-4 pb-20 lg:p-6 lg:pb-6">{children}</main>
     </>
   );
 }

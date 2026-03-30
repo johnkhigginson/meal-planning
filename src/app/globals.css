@@ -123,9 +123,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
   button,
   [role="button"] {
@@ -133,5 +136,12 @@
   }
   a {
     cursor: pointer;
+  }
+
+  /* Standalone PWA: account for status bar */
+  @media (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
   }
 }
