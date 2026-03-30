@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2 } from "lucide-react";
 
@@ -239,6 +240,33 @@ export default function MealPlanPage() {
         >
           Today
         </Button>
+      </div>
+
+      {/* Meal slot toggles */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Show:</span>
+        {ALL_MEAL_SLOTS.map((slot) => (
+          <Badge
+            key={slot}
+            variant={enabledSlots.includes(slot) ? "default" : "outline"}
+            className="cursor-pointer"
+            onClick={() => {
+              const updated = enabledSlots.includes(slot)
+                ? enabledSlots.filter((s) => s !== slot)
+                : [...enabledSlots, slot];
+              if (updated.length === 0) return;
+              setEnabledSlots(updated);
+              // Save to user settings
+              fetch("/api/user/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabledMealSlots: updated.join(",") }),
+              });
+            }}
+          >
+            {SLOT_LABELS[slot]}
+          </Badge>
+        ))}
       </div>
 
       {loading ? (

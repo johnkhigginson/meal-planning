@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +15,6 @@ import {
 import { ChefHat, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -33,23 +31,22 @@ export default function LoginPage() {
       redirect: false,
     });
 
-    setLoading(false);
-
     if (result?.error) {
       setError("Invalid email or password");
+      setLoading(false);
     } else {
-      router.push("/");
-      router.refresh();
+      // Successful login — full page navigation to pick up the session
+      window.location.href = "/";
     }
   }
 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <ChefHat className="h-6 w-6 text-primary" />
+        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+          <ChefHat className="h-6 w-6 text-emerald-600" />
         </div>
-        <CardTitle className="text-xl">Sign in to Meal Planner</CardTitle>
+        <CardTitle className="text-xl">Sign in to My Lemon Kitchen</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/shared/Providers";
-import { Navbar } from "@/components/shared/Navbar";
+import { AppShell } from "@/components/shared/AppShell";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Meal Planner",
-  description: "Plan meals, track inventory, and generate smart grocery lists",
+  title: "My Lemon Kitchen",
+  description: "Plan meals, track your pantry, and generate smart grocery lists",
 };
 
 export default function RootLayout({
@@ -31,8 +31,7 @@ export default function RootLayout({
     >
       <body className="flex h-full min-h-screen">
         <Providers>
-          <Navbar />
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>
