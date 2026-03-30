@@ -64,6 +64,7 @@ export default function LibraryPage() {
   }, []);
 
   const [scrapeError, setScrapeError] = useState("");
+  const [parsedIngredients, setParsedIngredients] = useState<{ ingredientId: number; ingredientName: string; quantity: number; unitId: number; notes: string; optional: boolean }[]>([]);
 
   async function scrapeUrl() {
     if (!recipeUrl) return;
@@ -83,6 +84,22 @@ export default function LibraryPage() {
         setRecipeDesc(data.description || "");
         setRecipeInstructions(data.instructions || "");
         setRecipeServings(data.servings || 4);
+
+        // Parse ingredients
+        if (data.ingredients?.length) {
+          try {
+            const parseRes = await fetch("/api/ingredients/parse", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ingredients: data.ingredients }),
+            });
+            if (parseRes.ok) {
+              const parsed = await parseRes.json();
+              setParsedIngredients(parsed);
+            }
+          } catch {}
+        }
+
         if (!data.instructions) {
           setScrapeError("Imported but no instructions found on this page");
         }
@@ -107,6 +124,13 @@ export default function LibraryPage() {
         category: recipeCategory || undefined,
         sourceUrl: recipeUrl || undefined,
         sourceType: recipeUrl ? "WEBSITE" : "PERSONAL",
+        ingredients: parsedIngredients.map((p) => ({
+          ingredientId: p.ingredientId,
+          quantity: p.quantity,
+          unitId: p.unitId,
+          notes: p.notes || undefined,
+          optional: p.optional,
+        })),
       }),
     });
     if (res.ok) {
@@ -125,6 +149,8 @@ export default function LibraryPage() {
     setRecipeServings(4);
     setRecipeCategory("");
     setRecipeUrl("");
+    setScrapeError("");
+    setParsedIngredients([]);
   }
 
   async function deleteRecipe(id: number) {
@@ -272,6 +298,18 @@ export default function LibraryPage() {
                 <Input placeholder="e.g. Dinner, Dessert" value={recipeCategory} onChange={(e) => setRecipeCategory(e.target.value)} />
               </div>
             </div>
+            {parsedIngredients.length > 0 && (
+              <div className="space-y-2">
+                <Label>Ingredients ({parsedIngredients.length})</Label>
+                <div className="max-h-32 overflow-y-auto rounded-lg border p-2 text-xs">
+                  {parsedIngredients.map((p, i) => (
+                    <div key={i} className="py-0.5">
+                      {p.quantity} &middot; {p.ingredientName}{p.notes ? ` (${p.notes})` : ""}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Instructions *</Label>
               <Textarea rows={5} value={recipeInstructions} onChange={(e) => setRecipeInstructions(e.target.value)} />
