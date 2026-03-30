@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [name, setName] = useState("");
   const [enabledSlots, setEnabledSlots] = useState<string[]>([]);
+  const [householdName, setHouseholdName] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -68,6 +69,7 @@ export default function SettingsPage() {
       .then((data) => {
         setSettings(data);
         setName(data.name);
+        setHouseholdName(data.household?.name || "");
         setEnabledSlots(data.enabledMealSlots.split(",").filter(Boolean));
       });
     fetch("/api/household/invites")
@@ -88,7 +90,7 @@ export default function SettingsPage() {
     const res = await fetch("/api/user/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, enabledMealSlots: enabledSlots.join(",") }),
+      body: JSON.stringify({ name, enabledMealSlots: enabledSlots.join(","), householdName }),
     });
     if (res.ok) setSaved(true);
     setSaving(false);
@@ -190,10 +192,26 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            <CardTitle>{settings.household.name}</CardTitle>
+            <CardTitle>Household</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isOwner && (
+            <div className="space-y-2">
+              <Label htmlFor="householdName">Household Name</Label>
+              <Input
+                id="householdName"
+                value={householdName}
+                onChange={(e) => { setHouseholdName(e.target.value); setSaved(false); }}
+              />
+            </div>
+          )}
+          {!isOwner && (
+            <div className="space-y-2">
+              <Label>Household Name</Label>
+              <p className="text-sm">{settings.household.name}</p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label className="text-muted-foreground">Members</Label>
             {settings.household.members.map((member) => (

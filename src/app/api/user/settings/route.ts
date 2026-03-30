@@ -25,7 +25,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const { userId } = await requireUser();
+  const { userId, householdId } = await requireUser();
   const body = await request.json();
 
   const data: Record<string, unknown> = {};
@@ -37,6 +37,17 @@ export async function PUT(request: NextRequest) {
     data,
     select: { id: true, name: true, email: true, enabledMealSlots: true, role: true },
   });
+
+  // Update household name if provided (owners only)
+  if (body.householdName) {
+    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (currentUser?.role === "OWNER") {
+      await prisma.household.update({
+        where: { id: householdId },
+        data: { name: body.householdName },
+      });
+    }
+  }
 
   return NextResponse.json(user);
 }
