@@ -179,15 +179,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Save button */}
-      <div className="flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving || enabledSlots.length === 0}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save Settings
-        </Button>
-        {saved && <span className="text-sm text-green-600">Settings saved</span>}
-      </div>
-
       {/* Household */}
       <Card>
         <CardHeader>
@@ -278,6 +269,15 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Save button */}
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={saving || enabledSlots.length === 0}>
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Save Settings
+        </Button>
+        {saved && <span className="text-sm text-green-600">Settings saved</span>}
+      </div>
     </div>
   );
 }
