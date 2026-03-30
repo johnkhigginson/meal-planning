@@ -1,28 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
-const SYSTEM_PROMPT = `You are a grocery receipt parser. Given a photo of a grocery receipt, extract each purchased item with its name and quantity.
+const SYSTEM_PROMPT = `You are a grocery receipt parser. Given a photo of a grocery receipt, extract each purchased item with structured detail.
 
 Return ONLY valid JSON with this structure (no markdown, no code fences):
 {
   "storeName": "Store Name or null if not visible",
   "items": [
     {
-      "name": "item name (normalized, lowercase, e.g. 'chicken breast', 'whole milk', 'bananas')",
+      "rawName": "exactly as printed on receipt",
+      "genericName": "generic ingredient name for pantry tracking (e.g. 'chicken breast' not 'Tyson Boneless Skinless Chicken Breast')",
+      "brand": "brand name or null",
+      "size": "package size as printed (e.g. '16 oz', '1 lb', '1 gal') or null",
       "quantity": 1,
-      "unit": "each"
+      "unit": "each",
+      "price": 4.99,
+      "category": "one of: Produce, Dairy, Meat, Seafood, Pantry, Frozen, Bakery, Beverages, Condiments, Spices, Other"
     }
   ]
 }
 
 Rules:
-- Normalize item names to common grocery terms (e.g. "BNLS SKNLS CHKN BRST" → "chicken breast")
-- Default quantity to 1 and unit to "each" if not specified on the receipt
-- For weighted items, use the weight and appropriate unit (lb, oz, etc.)
-- For liquid items, use volume units if listed (gallon, oz, etc.)
-- Skip non-food items like bags, tax lines, totals, discounts, and payment info
-- Skip duplicate/subtotal lines
-- Keep it simple: just the food/grocery items`;
+- genericName should be the common ingredient name stripped of brand, size, and descriptors. Examples:
+  - "BNLS SKNLS CHKN BRST" → genericName: "chicken breast"
+  - "GV 2% MILK 1GAL" → genericName: "milk", brand: "Great Value", size: "1 gal"
+  - "ORGANIC BABY SPINACH 5OZ" → genericName: "baby spinach", size: "5 oz"
+  - "KROGER SHARP CHEDDAR 8OZ" → genericName: "sharp cheddar cheese", brand: "Kroger", size: "8 oz"
+- Always include the price if visible on the receipt
+- Parse abbreviated sizes: 16OZ → "16 oz", 1LB → "1 lb", 1GAL → "1 gal"
+- For produce sold by weight, use the weight and lb/oz unit
+- quantity is number of that item purchased (usually 1, but 2 if bought twice)
+- unit for pantry: use weight/volume if on package, otherwise "each"
+- Skip non-grocery items: bags, tax, subtotals, totals, discounts, payment, change, coupons
+- Skip duplicate/subtotal lines`;
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -59,7 +69,7 @@ export async function POST(request: NextRequest) {
               },
             },
             {
-              text: "Extract all grocery items from this receipt. Return only JSON.",
+              text: "Extract all grocery items from this receipt with generic names, brands, sizes, and prices. Return only JSON.",
             },
           ],
         },

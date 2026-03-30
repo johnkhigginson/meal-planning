@@ -48,9 +48,14 @@ interface Ingredient {
 }
 
 interface ParsedReceiptItem {
-  name: string;
+  rawName: string;
+  genericName: string;
+  brand: string | null;
+  size: string | null;
   quantity: number;
   unit: string;
+  price: number | null;
+  category: string | null;
   selected: boolean;
   ingredientId: number | null;
   unitId: number | null;
@@ -223,10 +228,15 @@ export default function PantryPage() {
       setReceiptStoreName(data.storeName || null);
 
       const parsed: ParsedReceiptItem[] = (data.items || []).map(
-        (item: { name: string; quantity?: number; unit?: string }) => ({
-          name: item.name,
+        (item: { rawName?: string; genericName?: string; name?: string; brand?: string; size?: string; quantity?: number; unit?: string; price?: number; category?: string }) => ({
+          rawName: item.rawName || item.name || "",
+          genericName: item.genericName || item.name || "",
+          brand: item.brand || null,
+          size: item.size || null,
           quantity: item.quantity || 1,
           unit: item.unit || "each",
+          price: item.price || null,
+          category: item.category || null,
           selected: true,
           ingredientId: null,
           unitId: findUnitId(item.unit || "each"),
@@ -257,31 +267,31 @@ export default function PantryPage() {
     const eachUnitId = units.find((u) => u.name === "each")?.id || units[0]?.id;
 
     for (const item of selected) {
-      // Find or create ingredient
+      const searchName = item.genericName || item.rawName;
       let ingredientId = item.ingredientId;
 
       if (!ingredientId) {
-        // Search for existing
+        // Search for existing by generic name
         const searchRes = await fetch(
-          `/api/ingredients?q=${encodeURIComponent(item.name)}`
+          `/api/ingredients?q=${encodeURIComponent(searchName)}`
         );
         if (searchRes.ok) {
           const matches = await searchRes.json();
           const exact = matches.find(
             (m: { name: string }) =>
-              m.name.toLowerCase() === item.name.toLowerCase()
+              m.name.toLowerCase() === searchName.toLowerCase()
           );
           if (exact) {
             ingredientId = exact.id;
           }
         }
 
-        // Create if not found
+        // Create with generic name and category
         if (!ingredientId) {
           const createRes = await fetch("/api/ingredients", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: item.name }),
+            body: JSON.stringify({ name: searchName, category: item.category || undefined }),
           });
           if (createRes.ok) {
             const created = await createRes.json();
@@ -292,8 +302,11 @@ export default function PantryPage() {
 
       if (!ingredientId) continue;
 
+      // Parse size for unit matching
+      const sizeUnitId = item.size ? findUnitId(item.size.replace(/^[\d.]+\s*/, "")) : null;
+
       // Add to inventory
-      const unitId = item.unitId || eachUnitId;
+      const unitId = sizeUnitId || item.unitId || eachUnitId;
       const res = await fetch("/api/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -317,6 +330,38 @@ export default function PantryPage() {
           }
           return [...prev, newItem];
         });
+      }
+
+      // Save price to matching store if we have a store name and price
+      if (item.price && receiptStoreName) {
+        try {
+          const storesRes = await fetch("/api/stores");
+          if (storesRes.ok) {
+            const allStores = await storesRes.json();
+            const matchingStore = allStores.find(
+              (s: { name: string }) =>
+                s.name.toLowerCase().includes(receiptStoreName!.toLowerCase()) ||
+                receiptStoreName!.toLowerCase().includes(s.name.toLowerCase())
+            );
+            if (matchingStore) {
+              // Parse size quantity (e.g. "16 oz" -> 16)
+              const sizeMatch = item.size?.match(/^([\d.]+)/);
+              const sizeQty = sizeMatch ? parseFloat(sizeMatch[1]) : 1;
+              const priceUnitId = sizeUnitId || eachUnitId;
+
+              await fetch(`/api/stores/${matchingStore.id}/prices`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ingredientId,
+                  price: item.price,
+                  quantity: sizeQty,
+                  unitId: priceUnitId,
+                }),
+              });
+            }
+          }
+        } catch {}
       }
     }
 
@@ -561,23 +606,37 @@ export default function PantryPage() {
           </DialogHeader>
           <div className="max-h-96 space-y-2 overflow-y-auto">
             <p className="text-sm text-muted-foreground">
-              Select items to add to your pantry. Uncheck any you don&apos;t want to import.
+              Items are imported by their generic name. Prices are saved for future smart shopping.
             </p>
             {receiptItems.map((item, index) => (
               <label
                 key={index}
-                className="flex cursor-pointer items-center gap-3 rounded-md border p-2 hover:bg-accent"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 hover:bg-accent"
               >
                 <Checkbox
                   checked={item.selected}
                   onCheckedChange={() => toggleReceiptItem(index)}
+                  className="mt-0.5"
                 />
-                <div className="flex-1">
-                  <span className="font-medium">{item.name}</span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {item.quantity} {item.unit}
-                  </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">{item.genericName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {item.rawName !== item.genericName && (
+                      <span className="block truncate">{item.rawName}</span>
+                    )}
+                    <span className="flex flex-wrap gap-x-2 mt-0.5">
+                      {item.brand && <span>{item.brand}</span>}
+                      {item.size && <span>{item.size}</span>}
+                      {item.quantity > 1 && <span>Qty: {item.quantity}</span>}
+                      {item.category && <span>{item.category}</span>}
+                    </span>
+                  </div>
                 </div>
+                {item.price != null && (
+                  <span className="shrink-0 text-sm font-medium text-green-700">
+                    ${item.price.toFixed(2)}
+                  </span>
+                )}
               </label>
             ))}
             {receiptItems.length === 0 && (
