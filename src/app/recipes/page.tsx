@@ -7,6 +7,7 @@ import { SearchInput } from "@/components/shared/SearchInput";
 import { RecipeCard } from "@/components/recipes/RecipeCard";
 import { RecipeFilters } from "@/components/recipes/RecipeFilters";
 import { Plus } from "lucide-react";
+import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Tag {
   id: number;
@@ -98,7 +99,7 @@ export default function RecipesPage() {
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground">Loading recipes...</p>
+        <PageLoader />
       ) : recipes.length === 0 ? (
         <div className="py-12 text-center">
           <p className="text-lg text-muted-foreground">No recipes found</p>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { PageLoader } from "@/components/shared/PageLoader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ interface GroceryList {
 
 export default function GroceryListPage() {
   return (
-    <Suspense fallback={<p className="text-muted-foreground">Loading...</p>}>
+    <Suspense fallback={<PageLoader />}>
       <GroceryListContent />
     </Suspense>
   );
@@ -67,7 +68,7 @@ function GroceryListContent() {
     }
   }
 
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
+  if (loading) return <PageLoader />;
 
   if (!listId || !list) {
     return (

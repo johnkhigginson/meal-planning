@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
+import { PageLoader } from "@/components/shared/PageLoader";
 import type { RecipeIngredientRow } from "@/components/recipes/IngredientInput";
 
 interface RecipeData {
@@ -46,7 +47,7 @@ export default function EditRecipePage() {
   }, [params.id]);
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading...</p>;
+    return <PageLoader />;
   }
 
   if (!recipe) {

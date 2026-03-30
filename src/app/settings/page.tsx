@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2, Save, UserPlus, X, Users } from "lucide-react";
+import { PageLoader } from "@/components/shared/PageLoader";
 
 const ALL_MEAL_SLOTS = [
   { value: "BREAKFAST", label: "Breakfast" },
@@ -125,7 +126,7 @@ export default function SettingsPage() {
     setInvites((prev) => prev.filter((i) => i.id !== id));
   }
 
-  if (!settings) return <p className="text-muted-foreground">Loading...</p>;
+  if (!settings) return <PageLoader />;
 
   const isOwner = settings.role === "OWNER";
 

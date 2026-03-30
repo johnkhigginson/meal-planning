@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Star } from "lucide-react";
+import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Store {
   id: number;
@@ -65,7 +66,7 @@ export default function StoresPage() {
     }
   }
 
-  if (loading) return <p className="text-muted-foreground">Loading stores...</p>;
+  if (loading) return <PageLoader />;
 
   return (
     <div className="space-y-6">

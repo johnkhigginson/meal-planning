@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { Plus, Trash2, Save, Upload, Camera, Loader2, Receipt } from "lucide-react";
+import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Unit {
   id: number;
@@ -335,7 +336,7 @@ export default function PantryPage() {
     i.ingredient.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return <p className="text-muted-foreground">Loading pantry...</p>;
+  if (loading) return <PageLoader />;
 
   return (
     <div className="space-y-5">
