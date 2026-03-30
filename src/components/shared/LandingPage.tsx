@@ -63,37 +63,37 @@ export function LandingPage() {
     <div className="flex min-h-screen flex-col bg-white">
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2.5">
-            <LemonLogo className="h-8 w-8" />
-            <span className="text-lg font-bold tracking-tight">My Lemon Kitchen</span>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2">
+            <LemonLogo className="h-7 w-7" />
+            <span className="text-base font-bold tracking-tight sm:text-lg">My Lemon Kitchen</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link href="/login">
-              <Button variant="ghost" className="text-sm">Sign In</Button>
+              <Button variant="ghost" size="sm" className="text-sm">Sign In</Button>
             </Link>
             <Link href="/register">
-              <Button className="text-sm">Get Started</Button>
+              <Button size="sm" className="text-sm">Get Started</Button>
             </Link>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden px-6 py-28">
+      <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-28">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#FFF700]/15 via-transparent to-transparent" />
         <div className="relative mx-auto max-w-4xl text-center">
           <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center">
             <LemonLogo className="h-16 w-16" />
           </div>
-          <h1 className="text-5xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-6xl">
+          <h1 className="text-3xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
             Meal planning,
             <br />
             <span className="bg-gradient-to-r from-[#FFF700] to-[#f5c800] bg-clip-text text-transparent">
               squeezed simple.
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
             Plan meals, track your pantry, and build smart grocery lists.
             Import recipes from anywhere. Share everything with your household.
           </p>
@@ -117,7 +117,7 @@ export function LandingPage() {
       </section>
 
       {/* Features */}
-      <section className="border-t bg-neutral-50 px-6 py-24">
+      <section className="border-t bg-neutral-50 px-4 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-6xl">
           <div className="text-center">
             <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
@@ -144,7 +144,7 @@ export function LandingPage() {
       </section>
 
       {/* Household CTA */}
-      <section className="border-t px-6 py-24">
+      <section className="border-t px-4 py-16 sm:px-6 sm:py-24">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-3xl font-bold tracking-tight">
             Built for households, not just individuals
@@ -163,7 +163,7 @@ export function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-neutral-50 px-6 py-8">
+      <footer className="border-t bg-neutral-50 px-4 py-8 sm:px-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2">
             <LemonLogo className="h-5 w-5" />

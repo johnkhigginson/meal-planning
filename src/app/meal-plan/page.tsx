@@ -172,7 +172,7 @@ export default function MealPlanPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Meal Plan</h1>
           <p className="text-sm text-muted-foreground">
@@ -181,16 +181,14 @@ export default function MealPlanPage() {
             {weekDates[6].toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={generateGroceryList} disabled={generating || !plan?.entries.length}>
-            {generating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <ShoppingCart className="mr-2 h-3.5 w-3.5" />}
-            Grocery List
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={generateGroceryList} disabled={generating || !plan?.entries.length}>
+          {generating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <ShoppingCart className="mr-2 h-3.5 w-3.5" />}
+          Grocery List
+        </Button>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-1.5">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { const p = new Date(currentMonday); p.setDate(p.getDate() - 7); setCurrentMonday(p); }}>
             <ChevronLeft className="h-4 w-4" />
@@ -200,7 +198,7 @@ export default function MealPlanPage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {ALL_MEAL_SLOTS.map((slot) => (
             <Badge
               key={slot}
@@ -226,68 +224,91 @@ export default function MealPlanPage() {
           Loading...
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-sm">
-          <div className="grid min-w-[800px]" style={{ gridTemplateColumns: `80px repeat(7, 1fr)` }}>
-            {/* Day headers */}
-            <div className="border-b bg-muted/30 p-3" />
+        <>
+          {/* Desktop grid */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-sm md:block">
+            <div className="grid" style={{ gridTemplateColumns: `80px repeat(7, 1fr)` }}>
+              <div className="border-b bg-muted/30 p-3" />
+              {weekDates.map((date, i) => (
+                <div key={i} className={`border-b border-l bg-muted/30 p-3 text-center ${isToday(date) ? "bg-primary/5" : ""}`}>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{DAY_LABELS[i]}</div>
+                  <div className={`mt-0.5 text-lg font-semibold ${isToday(date) ? "text-primary" : ""}`}>{date.getDate()}</div>
+                </div>
+              ))}
+              {activeSlots.map((slot, slotIdx) => (
+                <>
+                  <div key={`label-${slot}`} className={`flex items-start p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground ${slotIdx > 0 ? "border-t" : ""}`}>
+                    {SLOT_LABELS[slot]}
+                  </div>
+                  {weekDates.map((date, dayIdx) => {
+                    const entries = getEntries(date, slot);
+                    return (
+                      <div key={`${slot}-${dayIdx}`} className={`group/cell min-h-[90px] border-l p-1.5 ${slotIdx > 0 ? "border-t" : ""} ${isToday(date) ? "bg-primary/[0.02]" : ""}`}>
+                        {entries.map((entry) => (
+                          <div key={entry.id} className="mb-1 flex items-start justify-between gap-1 rounded-lg bg-primary/5 px-2 py-1.5 text-xs leading-snug transition-colors hover:bg-primary/10">
+                            <span className="font-medium">{entry.recipe.name}</span>
+                            <button onClick={() => removeEntry(entry.id)} className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/cell:opacity-100">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                        <button onClick={() => openPicker(formatDate(date), slot)} className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-muted-foreground group-hover/cell:opacity-100">
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </>
+              ))}
+            </div>
+          </div>
+
+          {/* Mobile: stacked day cards */}
+          <div className="space-y-3 md:hidden">
             {weekDates.map((date, i) => (
-              <div
-                key={i}
-                className={`border-b border-l bg-muted/30 p-3 text-center ${isToday(date) ? "bg-primary/5" : ""}`}
-              >
-                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{DAY_LABELS[i]}</div>
-                <div className={`mt-0.5 text-lg font-semibold ${isToday(date) ? "text-primary" : ""}`}>
-                  {date.getDate()}
+              <div key={i} className={`rounded-2xl border border-border/60 bg-card shadow-sm ${isToday(date) ? "ring-2 ring-primary/20" : ""}`}>
+                <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5 rounded-t-2xl">
+                  <span className="text-sm font-semibold">{DAY_LABELS[i]}</span>
+                  <span className={`text-sm ${isToday(date) ? "font-bold text-primary" : "text-muted-foreground"}`}>
+                    {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+                <div className="divide-y">
+                  {activeSlots.map((slot) => {
+                    const entries = getEntries(date, slot);
+                    return (
+                      <div key={slot} className="px-4 py-3">
+                        <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                          {SLOT_LABELS[slot]}
+                        </div>
+                        {entries.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {entries.map((entry) => (
+                              <div key={entry.id} className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm">
+                                <span className="font-medium">{entry.recipe.name}</span>
+                                <button onClick={() => removeEntry(entry.id)} className="shrink-0 p-1 text-muted-foreground hover:text-destructive">
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openPicker(formatDate(date), slot)}
+                            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs text-muted-foreground hover:bg-muted"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
-
-            {/* Slot rows */}
-            {activeSlots.map((slot, slotIdx) => (
-              <>
-                {/* Slot label */}
-                <div
-                  key={`label-${slot}`}
-                  className={`flex items-start p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground ${slotIdx > 0 ? "border-t" : ""}`}
-                >
-                  {SLOT_LABELS[slot]}
-                </div>
-
-                {/* Day cells */}
-                {weekDates.map((date, dayIdx) => {
-                  const entries = getEntries(date, slot);
-                  return (
-                    <div
-                      key={`${slot}-${dayIdx}`}
-                      className={`group/cell min-h-[90px] border-l p-1.5 ${slotIdx > 0 ? "border-t" : ""} ${isToday(date) ? "bg-primary/[0.02]" : ""}`}
-                    >
-                      {entries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className="mb-1 flex items-start justify-between gap-1 rounded-lg bg-primary/5 px-2 py-1.5 text-xs leading-snug transition-colors hover:bg-primary/10"
-                        >
-                          <span className="font-medium">{entry.recipe.name}</span>
-                          <button
-                            onClick={() => removeEntry(entry.id)}
-                            className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/cell:opacity-100"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        onClick={() => openPicker(formatDate(date), slot)}
-                        className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-muted-foreground group-hover/cell:opacity-100"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </>
-            ))}
           </div>
-        </div>
+        </>
       )}
 
       {/* Recipe Picker */}

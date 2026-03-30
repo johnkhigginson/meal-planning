@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { Navbar } from "./Navbar";
+import { MobileNav } from "./MobileNav";
 
 const authPages = ["/login", "/register"];
 
@@ -10,19 +11,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  // Don't show sidebar on auth pages or landing page when not logged in
   const isAuthPage = authPages.includes(pathname);
   const isLandingPage = pathname === "/" && !session;
-  const showSidebar = session && !isAuthPage && !isLandingPage;
+  const showNav = session && !isAuthPage && !isLandingPage;
 
-  if (!showSidebar) {
+  if (!showNav) {
     return <div className="flex-1">{children}</div>;
   }
 
   return (
     <>
-      <Navbar />
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block">
+        <Navbar />
+      </div>
+      {/* Mobile top bar */}
+      <div className="lg:hidden">
+        <MobileNav />
+      </div>
+      <main className="flex-1 overflow-auto p-4 pt-0 lg:p-6">{children}</main>
     </>
   );
 }

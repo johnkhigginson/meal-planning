@@ -346,8 +346,8 @@ export default function PantryPage() {
   if (loading) return <p className="text-muted-foreground">Loading pantry...</p>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Pantry</h1>
         <div className="flex gap-2">
           <input
@@ -395,8 +395,8 @@ export default function PantryPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Ingredient</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Quantity</TableHead>
+            <TableHead className="hidden sm:table-cell">Category</TableHead>
+            <TableHead>Qty</TableHead>
             <TableHead>Unit</TableHead>
             <TableHead className="w-24">Actions</TableHead>
           </TableRow>
@@ -508,7 +508,7 @@ export default function PantryPage() {
               <TableCell className="font-medium">
                 {item.ingredient.name}
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="hidden text-muted-foreground sm:table-cell">
                 {item.ingredient.category || "-"}
               </TableCell>
               <TableCell>
