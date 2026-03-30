@@ -63,20 +63,32 @@ export default function LibraryPage() {
     });
   }, []);
 
+  const [scrapeError, setScrapeError] = useState("");
+
   async function scrapeUrl() {
     if (!recipeUrl) return;
     setScraping(true);
-    const res = await fetch("/api/recipes/scrape", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: recipeUrl }),
-    });
-    if (res.ok) {
+    setScrapeError("");
+    try {
+      const res = await fetch("/api/recipes/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: recipeUrl }),
+      });
       const data = await res.json();
-      setRecipeName(data.name || "");
-      setRecipeDesc(data.description || "");
-      setRecipeInstructions(data.instructions || "");
-      setRecipeServings(data.servings || 4);
+      if (!res.ok) {
+        setScrapeError(data.error || "Failed to import");
+      } else {
+        setRecipeName(data.name || "");
+        setRecipeDesc(data.description || "");
+        setRecipeInstructions(data.instructions || "");
+        setRecipeServings(data.servings || 4);
+        if (!data.instructions) {
+          setScrapeError("Imported but no instructions found on this page");
+        }
+      }
+    } catch {
+      setScrapeError("Failed to connect");
     }
     setScraping(false);
   }
@@ -235,11 +247,12 @@ export default function LibraryPage() {
             <div className="space-y-2">
               <Label>Import from URL (optional)</Label>
               <div className="flex gap-2">
-                <Input placeholder="https://..." value={recipeUrl} onChange={(e) => setRecipeUrl(e.target.value)} />
+                <Input placeholder="https://..." value={recipeUrl} onChange={(e) => { setRecipeUrl(e.target.value); setScrapeError(""); }} />
                 <Button variant="outline" onClick={scrapeUrl} disabled={scraping || !recipeUrl}>
                   {scraping ? <Loader2 className="h-4 w-4 animate-spin" /> : "Import"}
                 </Button>
               </div>
+              {scrapeError && <p className="text-xs text-destructive">{scrapeError}</p>}
             </div>
             <div className="space-y-2">
               <Label>Name *</Label>

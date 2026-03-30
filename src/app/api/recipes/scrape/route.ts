@@ -63,30 +63,42 @@ function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
         continue;
       }
 
-      // Extract instructions
+      // Extract instructions — handle many formats
       let instructions = "";
-      if (typeof data.recipeInstructions === "string") {
-        instructions = cleanText(data.recipeInstructions);
-      } else if (Array.isArray(data.recipeInstructions)) {
-        // Handle nested HowToSection groups
+      const rawInstructions = data.recipeInstructions;
+      if (typeof rawInstructions === "string") {
+        // Could be HTML or plain text
+        instructions = cleanText(rawInstructions);
+      } else if (Array.isArray(rawInstructions)) {
         const steps: string[] = [];
-        for (const item of data.recipeInstructions) {
+        for (const item of rawInstructions) {
           if (typeof item === "string") {
             steps.push(cleanText(item));
-          } else if (item?.["@type"] === "HowToStep" && item.text) {
-            steps.push(cleanText(item.text));
-          } else if (item?.["@type"] === "HowToSection" && Array.isArray(item.itemListElement)) {
+          } else if (item?.["@type"] === "HowToStep") {
+            steps.push(cleanText(item.text || item.description || ""));
+          } else if (
+            item?.["@type"] === "HowToSection" &&
+            Array.isArray(item.itemListElement)
+          ) {
+            if (item.name) steps.push(`--- ${cleanText(item.name)} ---`);
             for (const sub of item.itemListElement) {
               if (typeof sub === "string") {
                 steps.push(cleanText(sub));
-              } else if (sub?.text) {
-                steps.push(cleanText(sub.text));
+              } else {
+                steps.push(cleanText(sub?.text || sub?.description || ""));
               }
             }
+          } else if (item?.text) {
+            steps.push(cleanText(item.text));
+          } else if (item?.description) {
+            steps.push(cleanText(item.description));
           }
         }
         instructions = steps
-          .map((step, idx) => `${idx + 1}. ${step}`)
+          .filter(Boolean)
+          .map((step, idx) =>
+            step.startsWith("---") ? step : `${idx + 1}. ${step}`
+          )
           .join("\n");
       }
 
@@ -157,14 +169,62 @@ function extractFallback(html: string): ScrapedRecipe | null {
 
   if (!name) return null;
 
+  // Try to find instructions from common selectors
+  let instructions = "";
+  const instructionSelectors = [
+    '[itemprop="recipeInstructions"]',
+    ".recipe-instructions",
+    ".instructions",
+    ".recipe-directions",
+    ".directions",
+    ".steps",
+    ".recipe-steps",
+  ];
+  for (const sel of instructionSelectors) {
+    const el = $(sel);
+    if (el.length) {
+      const items = el.find("li, p, [itemprop='step'], [itemprop='text']");
+      if (items.length) {
+        instructions = items
+          .map((_: number, e: unknown) => cleanText($(e as string).text()))
+          .get()
+          .filter(Boolean)
+          .map((s: string, i: number) => `${i + 1}. ${s}`)
+          .join("\n");
+      } else {
+        instructions = cleanText(el.text());
+      }
+      if (instructions) break;
+    }
+  }
+
+  // Try to find ingredients
+  let ingredients: string[] = [];
+  const ingredientSelectors = [
+    '[itemprop="recipeIngredient"]',
+    '[itemprop="ingredients"]',
+    ".recipe-ingredients li",
+    ".ingredients li",
+  ];
+  for (const sel of ingredientSelectors) {
+    const items = $(sel);
+    if (items.length) {
+      ingredients = items
+        .map((_: number, e: unknown) => cleanText($(e as string).text()))
+        .get()
+        .filter(Boolean);
+      if (ingredients.length) break;
+    }
+  }
+
   return {
     name,
     description,
-    instructions: "",
+    instructions,
     servings: null,
     prepTimeMinutes: null,
     cookTimeMinutes: null,
-    ingredients: [],
+    ingredients,
     imageUrl,
   };
 }
