@@ -152,7 +152,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
   }
 
   // Apply scraped/parsed data to the form
-  function applyImportedData(data: {
+  async function applyImportedData(data: {
     name?: string;
     description?: string;
     instructions?: string;
@@ -171,8 +171,36 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       prepTimeMinutes: data.prepTimeMinutes ?? prev.prepTimeMinutes,
       cookTimeMinutes: data.cookTimeMinutes ?? prev.cookTimeMinutes,
     }));
+
+    // Auto-parse ingredient strings into structured rows
     if (data.ingredients && data.ingredients.length > 0) {
-      setRawIngredients(data.ingredients);
+      try {
+        const parseRes = await fetch("/api/ingredients/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ingredients: data.ingredients }),
+        });
+        if (parseRes.ok) {
+          const parsed = await parseRes.json();
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const rows: RecipeIngredientRow[] = parsed.map(
+              (p: { ingredientId: number; ingredientName: string; quantity: number; unitId: number; notes: string; optional: boolean }, idx: number) => ({
+                key: `parsed-${p.ingredientId}-${idx}`,
+                ingredientId: p.ingredientId,
+                ingredientName: p.ingredientName,
+                quantity: p.quantity,
+                unitId: p.unitId,
+                notes: p.notes,
+                optional: p.optional,
+              })
+            );
+            updateForm("ingredients", rows);
+          }
+        }
+      } catch {
+        // Fall back to showing raw strings
+        setRawIngredients(data.ingredients);
+      }
     }
   }
 
