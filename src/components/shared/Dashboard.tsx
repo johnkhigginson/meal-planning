@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   UtensilsCrossed,
   Package,
@@ -6,6 +6,7 @@ import {
   ShoppingCart,
   Lightbulb,
   Store,
+  ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -28,82 +29,65 @@ export async function Dashboard({ householdId }: DashboardProps) {
     ]);
 
   const stats = [
-    {
-      href: "/recipes",
-      label: "Recipes",
-      value: recipeCount,
-      description: "in your collection",
-      icon: UtensilsCrossed,
-    },
-    {
-      href: "/pantry",
-      label: "Pantry Items",
-      value: pantryCount,
-      description: "tracked in your pantry",
-      icon: Package,
-    },
-    {
-      href: "/meal-plan",
-      label: "Planned Meals",
-      value: currentPlan?._count.entries ?? 0,
-      description: "this week",
-      icon: CalendarDays,
-    },
-    {
-      href: "/stores",
-      label: "Stores",
-      value: storeCount,
-      description: "for price tracking",
-      icon: Store,
-    },
+    { href: "/recipes", label: "Recipes", value: recipeCount, icon: UtensilsCrossed },
+    { href: "/pantry", label: "Pantry", value: pantryCount, icon: Package },
+    { href: "/meal-plan", label: "Planned", value: currentPlan?._count.entries ?? 0, icon: CalendarDays },
+    { href: "/stores", label: "Stores", value: storeCount, icon: Store },
   ];
 
   const quickLinks = [
-    { href: "/recipes/new", label: "Add Recipe", icon: UtensilsCrossed },
-    { href: "/what-can-i-make", label: "What Can I Make?", icon: Lightbulb },
-    { href: "/meal-plan", label: "Plan Meals", icon: CalendarDays },
-    { href: "/grocery-list", label: "Grocery List", icon: ShoppingCart },
+    { href: "/recipes/new", label: "Add a recipe", description: "Import from web, photo, or write your own", icon: UtensilsCrossed },
+    { href: "/what-can-i-make", label: "What can I make?", description: "Find recipes matching your pantry", icon: Lightbulb },
+    { href: "/meal-plan", label: "Plan your week", description: "Drag recipes into your weekly calendar", icon: CalendarDays },
+    { href: "/grocery-list", label: "Grocery list", description: "Auto-generated from your meal plan", icon: ShoppingCart },
   ];
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome to your meal planning hub
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Here&apos;s what&apos;s in your kitchen
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Link key={stat.href} href={stat.href}>
-            <Card className="transition-colors hover:bg-accent">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {stat.label}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stat.description}
-                </p>
+            <Card className="transition-all hover:shadow-md">
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5">
+                  <stat.icon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold leading-none">{stat.value}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{stat.label}</div>
+                </div>
               </CardContent>
             </Card>
           </Link>
         ))}
       </div>
 
+      {/* Quick Actions */}
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Quick Actions</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Quick Actions
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
           {quickLinks.map((link) => (
             <Link key={link.href} href={link.href}>
-              <Card className="transition-colors hover:bg-accent">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <link.icon className="h-5 w-5 text-foreground" />
-                  <span className="font-medium">{link.label}</span>
+              <Card className="group transition-all hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                    <link.icon className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold">{link.label}</div>
+                    <div className="text-xs text-muted-foreground">{link.description}</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground/30 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
                 </CardContent>
               </Card>
             </Link>
