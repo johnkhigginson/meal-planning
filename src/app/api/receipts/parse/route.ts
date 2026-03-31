@@ -15,24 +15,40 @@ Return ONLY valid JSON with this structure (no markdown, no code fences):
       "quantity": 1,
       "unit": "each",
       "price": 4.99,
-      "category": "one of: Produce, Dairy, Meat, Seafood, Pantry, Frozen, Bakery, Beverages, Condiments, Spices, Other"
+      "category": "one of: Produce, Dairy, Meat, Seafood, Pantry, Frozen, Bakery, Beverages, Condiments, Spices, Other",
+      "isIngredient": true
     }
   ]
 }
 
 Rules:
+- CRITICAL: Set "isIngredient" to classify each item:
+  - true = food/cooking ingredient that belongs in a kitchen pantry (produce, meat, dairy, grains, canned goods, spices, oils, sauces, baking supplies, eggs, etc.)
+  - false = everything else. This includes:
+    - Beverages: soda, energy drinks, juice, alcohol, coffee, tea (unless cooking ingredient like cooking wine)
+    - Household: cleaning supplies, paper towels, toilet paper, trash bags, detergent
+    - Clothing: jeans, shirts, socks, underwear
+    - Electronics: batteries, cables, phone accessories
+    - Health/Beauty: shampoo, toothpaste, vitamins, medicine, diapers
+    - Pet supplies: dog food, cat litter
+    - Prepared/snack foods: chips, candy, cookies, frozen pizza, frozen meals, ice cream
+    - Other non-food: books, toys, gift cards, membership fees
+  - When in doubt, ask: "Would someone use this as an ingredient in a recipe?" If no → false
 - genericName should be the common ingredient name stripped of brand, size, and descriptors. Examples:
   - "BNLS SKNLS CHKN BRST" → genericName: "chicken breast"
   - "GV 2% MILK 1GAL" → genericName: "milk", brand: "Great Value", size: "1 gal"
   - "ORGANIC BABY SPINACH 5OZ" → genericName: "baby spinach", size: "5 oz"
   - "KROGER SHARP CHEDDAR 8OZ" → genericName: "sharp cheddar cheese", brand: "Kroger", size: "8 oz"
+  - "KS MENS JEANS" → isIngredient: false
+  - "PEPSI 12PK" → isIngredient: false
+  - "TIDE PODS" → isIngredient: false
 - Always include the price if visible on the receipt
 - Parse abbreviated sizes: 16OZ → "16 oz", 1LB → "1 lb", 1GAL → "1 gal"
 - For produce sold by weight, use the weight and lb/oz unit
 - quantity is number of that item purchased (usually 1, but 2 if bought twice)
 - unit for pantry: use weight/volume if on package, otherwise "each"
-- Skip non-grocery items: bags, tax, subtotals, totals, discounts, payment, change, coupons
-- Skip duplicate/subtotal lines`;
+- Include ALL items from the receipt (both ingredient and non-ingredient) so the user can see what was skipped
+- Skip ONLY non-item lines: tax, subtotals, totals, discounts, payment, change, coupons, member numbers`;
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();

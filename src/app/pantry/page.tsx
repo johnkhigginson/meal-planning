@@ -56,6 +56,7 @@ interface ParsedReceiptItem {
   unit: string;
   price: number | null;
   category: string | null;
+  isIngredient: boolean;
   selected: boolean;
   ingredientId: number | null;
   unitId: number | null;
@@ -228,7 +229,7 @@ export default function PantryPage() {
       setReceiptStoreName(data.storeName || null);
 
       const parsed: ParsedReceiptItem[] = (data.items || []).map(
-        (item: { rawName?: string; genericName?: string; name?: string; brand?: string; size?: string; quantity?: number; unit?: string; price?: number; category?: string }) => ({
+        (item: { rawName?: string; genericName?: string; name?: string; brand?: string; size?: string; quantity?: number; unit?: string; price?: number; category?: string; isIngredient?: boolean }) => ({
           rawName: item.rawName || item.name || "",
           genericName: item.genericName || item.name || "",
           brand: item.brand || null,
@@ -237,7 +238,8 @@ export default function PantryPage() {
           unit: item.unit || "each",
           price: item.price || null,
           category: item.category || null,
-          selected: true,
+          isIngredient: item.isIngredient !== false,
+          selected: item.isIngredient !== false,
           ingredientId: null,
           unitId: findUnitId(item.unit || "each"),
         })
@@ -606,39 +608,81 @@ export default function PantryPage() {
           </DialogHeader>
           <div className="max-h-96 space-y-2 overflow-y-auto">
             <p className="text-sm text-muted-foreground">
-              Items are imported by their generic name. Prices are saved for future smart shopping.
+              Ingredients are auto-selected. Non-food items are skipped. Prices are saved for smart shopping.
             </p>
-            {receiptItems.map((item, index) => (
-              <label
-                key={index}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 hover:bg-accent"
-              >
-                <Checkbox
-                  checked={item.selected}
-                  onCheckedChange={() => toggleReceiptItem(index)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">{item.genericName}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {item.rawName !== item.genericName && (
-                      <span className="block truncate">{item.rawName}</span>
-                    )}
-                    <span className="flex flex-wrap gap-x-2 mt-0.5">
-                      {item.brand && <span>{item.brand}</span>}
-                      {item.size && <span>{item.size}</span>}
-                      {item.quantity > 1 && <span>Qty: {item.quantity}</span>}
-                      {item.category && <span>{item.category}</span>}
-                    </span>
-                  </div>
+
+            {/* Ingredients */}
+            {receiptItems.filter((i) => i.isIngredient).length > 0 && (
+              <div className="space-y-1.5">
+                {receiptItems.map((item, index) => {
+                  if (!item.isIngredient) return null;
+                  return (
+                    <label
+                      key={index}
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 hover:bg-accent"
+                    >
+                      <Checkbox
+                        checked={item.selected}
+                        onCheckedChange={() => toggleReceiptItem(index)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold">{item.genericName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {item.rawName !== item.genericName && (
+                            <span className="block truncate">{item.rawName}</span>
+                          )}
+                          <span className="flex flex-wrap gap-x-2 mt-0.5">
+                            {item.brand && <span>{item.brand}</span>}
+                            {item.size && <span>{item.size}</span>}
+                            {item.quantity > 1 && <span>Qty: {item.quantity}</span>}
+                          </span>
+                        </div>
+                      </div>
+                      {item.price != null && (
+                        <span className="shrink-0 text-sm font-medium text-green-700">
+                          ${item.price.toFixed(2)}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Non-ingredients */}
+            {receiptItems.filter((i) => !i.isIngredient).length > 0 && (
+              <div className="space-y-1.5">
+                <div className="mt-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Skipped (not ingredients)
                 </div>
-                {item.price != null && (
-                  <span className="shrink-0 text-sm font-medium text-green-700">
-                    ${item.price.toFixed(2)}
-                  </span>
-                )}
-              </label>
-            ))}
+                {receiptItems.map((item, index) => {
+                  if (item.isIngredient) return null;
+                  return (
+                    <label
+                      key={index}
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-dashed p-3 opacity-50 hover:opacity-75"
+                    >
+                      <Checkbox
+                        checked={item.selected}
+                        onCheckedChange={() => toggleReceiptItem(index)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm">{item.genericName}</div>
+                        <div className="text-xs text-muted-foreground truncate">{item.rawName}</div>
+                      </div>
+                      {item.price != null && (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          ${item.price.toFixed(2)}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
             {receiptItems.length === 0 && (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 No items found on receipt
