@@ -21,6 +21,7 @@ model Household {
   groceryLists   GroceryList[]
   stores         Store[]
   invites        HouseholdInvite[]
+  recipeBooks    RecipeBook[]
 }
 
 model User {
@@ -122,6 +123,8 @@ model Recipe {
   ingredients     RecipeIngredient[]
   tags            RecipeTag[]
   mealPlanEntries MealPlanEntry[]
+  bookEntries     RecipeBookEntry[]
+  shares          ShareLink[]
 }
 
 model RecipeIngredient {
@@ -298,4 +301,47 @@ model LibraryRecipeIngredient {
 model LibraryStore {
   id   Int    @id @default(autoincrement())
   name String @unique @db.NVarChar(200)
+}
+
+// ─── Recipe Books ───────────────────────────────────────────────
+
+model RecipeBook {
+  id          Int      @id @default(autoincrement())
+  householdId Int
+  name        String   @db.NVarChar(300)
+  description String?  @db.NVarChar(Max)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  household Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  entries   RecipeBookEntry[]
+  shares    ShareLink[]
+}
+
+model RecipeBookEntry {
+  id           Int      @id @default(autoincrement())
+  recipeBookId Int
+  recipeId     Int
+  sortOrder    Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  recipeBook RecipeBook @relation(fields: [recipeBookId], references: [id], onDelete: Cascade)
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([recipeBookId, recipeId])
+}
+
+// ─── Sharing ────────────────────────────────────────────────────
+
+model ShareLink {
+  id            Int      @id @default(autoincrement())
+  token         String   @unique @db.NVarChar(64)
+  shareType     String   @db.NVarChar(20) // RECIPE, BOOK
+  recipeId      Int?
+  recipeBookId  Int?
+  createdById   Int
+  createdAt     DateTime @default(now())
+
+  recipe     Recipe?     @relation(fields: [recipeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recipeBook RecipeBook? @relation(fields: [recipeBookId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

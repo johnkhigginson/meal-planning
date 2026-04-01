@@ -11,6 +11,7 @@ import {
   CalendarDays,
   ShoppingCart,
   Store,
+  BookOpen,
   LogOut,
   Settings,
   Shield,
@@ -31,6 +32,7 @@ const primaryTabs = [
 
 // Secondary items shown in "More" sheet
 const secondaryItems = [
+  { href: "/books", label: "Books", icon: BookOpen },
   { href: "/what-can-i-make", label: "What Can I Make?", icon: Lightbulb },
   { href: "/grocery-list", label: "Grocery List", icon: ShoppingCart },
   { href: "/stores", label: "Stores", icon: Store },

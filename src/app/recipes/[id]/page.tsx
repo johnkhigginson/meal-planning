@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Clock, Users, Pencil, Heart, BookOpen, Globe } from "lucide-react";
 import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
+import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -51,6 +52,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           )}
         </div>
         <div className="flex gap-2">
+          <ShareRecipeButton recipeId={recipe.id} />
           <Link href={`/recipes/${recipe.id}/edit`}>
             <Button variant="outline" size="sm">
               <Pencil className="mr-1 h-4 w-4" />

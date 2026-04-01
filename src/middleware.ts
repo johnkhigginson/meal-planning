@@ -8,7 +8,7 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   // Allow public paths
-  if (publicPaths.includes(pathname)) {
+  if (publicPaths.includes(pathname) || pathname.startsWith("/share/")) {
     return NextResponse.next();
   }
 

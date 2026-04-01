@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { RecipeCard } from "@/components/recipes/RecipeCard";
 import { RecipeFilters } from "@/components/recipes/RecipeFilters";
-import { Plus } from "lucide-react";
+import { Plus, Upload, Loader2 } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Tag {
@@ -30,6 +30,8 @@ export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [search, setSearch] = useState("");
+  const [importingDoc, setImportingDoc] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState("ALL");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -73,18 +75,54 @@ export default function RecipesPage() {
           <h1 className="text-2xl font-bold">Recipes</h1>
           <p className="text-sm text-muted-foreground">Your recipe collection</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/recipes/library">
-            <Button variant="outline">Browse Library</Button>
+            <Button variant="outline" size="sm">Browse Library</Button>
           </Link>
+          <label>
+            <input
+              type="file"
+              accept=".txt,.md,.docx,.pdf,text/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setImportingDoc(true);
+                setImportResult(null);
+                const formData = new FormData();
+                formData.append("document", file);
+                const res = await fetch("/api/recipes/import-doc", { method: "POST", body: formData });
+                if (res.ok) {
+                  const data = await res.json();
+                  setImportResult(`Imported ${data.imported} recipe${data.imported !== 1 ? "s" : ""}`);
+                  fetchRecipes();
+                } else {
+                  setImportResult("Import failed");
+                }
+                setImportingDoc(false);
+                e.target.value = "";
+              }}
+            />
+            <Button variant="outline" size="sm" disabled={importingDoc} onClick={(e) => { (e.currentTarget.parentElement?.querySelector("input") as HTMLInputElement)?.click(); }}>
+              {importingDoc ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5" />}
+              Import Doc
+            </Button>
+          </label>
           <Link href="/recipes/new">
-            <Button>
+            <Button size="sm">
               <Plus className="mr-2 h-4 w-4" />
               Add Recipe
             </Button>
           </Link>
         </div>
       </div>
+
+      {importResult && (
+        <div className="rounded-xl border border-border/60 bg-card px-4 py-2.5 text-sm shadow-sm">
+          {importResult}
+          <button className="ml-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => setImportResult(null)}>dismiss</button>
+        </div>
+      )}
 
       <div className="space-y-3">
         <SearchInput

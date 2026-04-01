@@ -14,6 +14,7 @@ import {
   Settings,
   LayoutDashboard,
   Shield,
+  BookOpen,
 } from "lucide-react";
 import { LemonLogo } from "./LemonLogo";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/recipes", label: "Recipes", icon: UtensilsCrossed },
+  { href: "/books", label: "Books", icon: BookOpen },
   { href: "/pantry", label: "Pantry", icon: Package },
   { href: "/what-can-i-make", label: "What Can I Make?", icon: Lightbulb },
   { href: "/meal-plan", label: "Meal Plan", icon: CalendarDays },
