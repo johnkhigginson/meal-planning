@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { normalizeEmail } from "@/lib/email-normalize";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export async function POST(request: NextRequest) {
-  const { name, email, password } = await request.json();
+  const body = await request.json();
+  const { name, password } = body;
 
-  if (!name || !email || !password) {
+  // Honeypot: a hidden field real users never see. Bots that fill every input
+  // trip it. Respond with a generic error so the trap isn't obvious.
+  if (typeof body.company === "string" && body.company.trim() !== "") {
+    return NextResponse.json({ error: "Registration failed" }, { status: 400 });
+  }
+
+  if (!name || !body.email || !password) {
     return NextResponse.json(
       { error: "Name, email, and password are required" },
       { status: 400 }
@@ -18,6 +27,17 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const humanVerified = await verifyTurnstile(body.turnstileToken, ip);
+  if (!humanVerified) {
+    return NextResponse.json(
+      { error: "Verification failed. Please try again." },
+      { status: 400 }
+    );
+  }
+
+  const email = normalizeEmail(body.email);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

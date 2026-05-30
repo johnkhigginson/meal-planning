@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { sendHouseholdInviteEmail } from "@/lib/email";
+import { normalizeEmail } from "@/lib/email-normalize";
 
 export async function GET() {
   const { householdId } = await requireUser();
@@ -16,11 +17,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const { userId, householdId } = await requireUser();
-  const { email } = await request.json();
+  const { email: rawEmail } = await request.json();
 
-  if (!email || typeof email !== "string") {
+  if (!rawEmail || typeof rawEmail !== "string") {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
+
+  const email = normalizeEmail(rawEmail);
 
   // Check if user is owner
   const user = await prisma.user.findUnique({ where: { id: userId } });

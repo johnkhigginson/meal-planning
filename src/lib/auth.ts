@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { normalizeEmail } from "./email-normalize";
 
 interface ExtendedUser {
   householdId?: string;
@@ -16,10 +17,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: {},
       },
       async authorize(credentials) {
-        const email = credentials?.email as string;
+        const rawEmail = credentials?.email as string;
         const password = credentials?.password as string;
-        if (!email || !password) return null;
+        if (!rawEmail || !password) return null;
 
+        const email = normalizeEmail(rawEmail);
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
 
