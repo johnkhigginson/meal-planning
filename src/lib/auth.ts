@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { normalizeEmail } from "./email-normalize";
+import { verifyTurnstile } from "./turnstile";
 
 interface ExtendedUser {
   householdId?: string;
@@ -15,6 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: {},
         password: {},
+        turnstileToken: {},
       },
       async authorize(credentials) {
         const rawEmail = credentials?.email as string;
@@ -25,8 +27,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
 
+        // Bot protection on sign-in. The auto-login right after registration
+        // sends no token and is exempt because the register endpoint already
+        // verified Turnstile; we recognize it by lastLogin being null. Every
+        // login after that must pass verification (no-op when keys are unset).
+        if (user.lastLogin) {
+          const captchaOk = await verifyTurnstile(credentials?.turnstileToken);
+          if (!captchaOk) return null;
+        }
+
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLogin: new Date() },
+        });
 
         return {
           id: user.id.toString(),

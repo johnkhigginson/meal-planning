@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Clock, Users, Pencil, Heart, BookOpen, Globe } from "lucide-react";
 import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
 import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
+import { RecipeNotes } from "@/components/recipes/RecipeNotes";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -28,6 +29,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         orderBy: { sortOrder: "asc" },
       },
       tags: { include: { tag: true } },
+      notes: { orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -147,6 +149,20 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           <div className="whitespace-pre-wrap">{recipe.instructions}</div>
         </CardContent>
       </Card>
+
+      {/* Notes */}
+      {recipe.notes.length > 0 && (
+        <RecipeNotes
+          recipeId={recipe.id}
+          readOnly
+          initialNotes={recipe.notes.map((n) => ({
+            id: n.id,
+            body: n.body,
+            createdByName: n.createdByName,
+            createdAt: n.createdAt.toISOString(),
+          }))}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { RecipeForm } from "@/components/recipes/RecipeForm";
+import { RecipeNotes } from "@/components/recipes/RecipeNotes";
 import { PageLoader } from "@/components/shared/PageLoader";
 import type { RecipeIngredientRow } from "@/components/recipes/IngredientInput";
 
@@ -87,6 +88,7 @@ export default function EditRecipePage() {
           tagIds: recipe.tags.map((t) => t.tag.id),
         }}
       />
+      <RecipeNotes recipeId={recipe.id} />
     </div>
   );
 }

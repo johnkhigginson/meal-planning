@@ -12,8 +12,16 @@ export async function GET() {
       email: true,
       role: true,
       systemRole: true,
+      enabledMealSlots: true,
+      lastLogin: true,
       createdAt: true,
-      household: { select: { id: true, name: true } },
+      household: {
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { members: true, recipes: true } },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });

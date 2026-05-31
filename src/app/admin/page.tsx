@@ -21,8 +21,18 @@ interface UserData {
   email: string;
   role: string;
   systemRole: string;
+  enabledMealSlots: string;
+  lastLogin: string | null;
   createdAt: string;
-  household: { id: number; name: string };
+  household: {
+    id: number;
+    name: string;
+    _count: { members: number; recipes: number };
+  };
+}
+
+function titleCase(value: string) {
+  return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -136,16 +146,44 @@ export default function AdminDashboard() {
               className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold">{user.name}</span>
                   <Badge variant={ROLE_VARIANTS[user.systemRole]} className="text-[10px]">
                     {ROLE_LABELS[user.systemRole]}
                   </Badge>
+                  {user.role === "OWNER" && (
+                    <Badge variant="outline" className="text-[10px]">
+                      Household owner
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">{user.email}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground/60">
-                  {user.household.name} &middot; Joined {new Date(user.createdAt).toLocaleDateString()}
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground/70">
+                  <span>{user.household.name}</span>
+                  <span>
+                    {user.household._count.members} member
+                    {user.household._count.members === 1 ? "" : "s"}
+                  </span>
+                  <span>
+                    {user.household._count.recipes} recipe
+                    {user.household._count.recipes === 1 ? "" : "s"}
+                  </span>
+                  <span>Joined {new Date(user.createdAt).toLocaleDateString()}</span>
+                  <span>
+                    {user.lastLogin
+                      ? `Last login ${new Date(user.lastLogin).toLocaleDateString()}`
+                      : "Never logged in"}
+                  </span>
                 </div>
+                {user.enabledMealSlots && (
+                  <div className="mt-0.5 text-xs text-muted-foreground/60">
+                    Meals:{" "}
+                    {user.enabledMealSlots
+                      .split(",")
+                      .map((s) => titleCase(s))
+                      .join(", ")}
+                  </div>
+                )}
               </div>
               <Select
                 value={user.systemRole}

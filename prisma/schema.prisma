@@ -34,6 +34,7 @@ model User {
   systemRole       String   @default("USER") @db.NVarChar(20) // USER, CONTRIBUTOR, ADMIN
   enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
   createdAt        DateTime @default(now())
+  lastLogin        DateTime?
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 }
@@ -125,6 +126,7 @@ model Recipe {
   mealPlanEntries MealPlanEntry[]
   bookEntries     RecipeBookEntry[]
   shares          ShareLink[]
+  notes           RecipeNote[]
 }
 
 model RecipeIngredient {
@@ -140,6 +142,17 @@ model RecipeIngredient {
   recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   unit       Unit       @relation(fields: [unitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model RecipeNote {
+  id              Int      @id @default(autoincrement())
+  recipeId        Int
+  body            String   @db.NVarChar(Max)
+  createdByUserId Int?
+  createdByName   String?  @db.NVarChar(200)
+  createdAt       DateTime @default(now())
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 }
 
 // ─── Tags ───────────────────────────────────────────────────────
