@@ -3,7 +3,7 @@
 export const UNIT_TYPES = ["VOLUME", "WEIGHT", "COUNT", "OTHER"] as const;
 export type UnitType = (typeof UNIT_TYPES)[number];
 
-export const SOURCE_TYPES = ["PERSONAL", "WEBSITE", "BOOK"] as const;
+export const SOURCE_TYPES = ["PERSONAL", "WEBSITE", "BOOK", "BLOG"] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 
 export const MEAL_SLOTS = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"] as const;
