@@ -97,6 +97,16 @@ check("instructions found after Directions:", sec.instructions.toLowerCase().inc
 check("htmlToText strips tags", !htmlToText(j.posts[0].contentHtml).includes("<"));
 check("excerpt truncates", excerpt("a".repeat(400)).length <= 281);
 check("upgradeBloggerImage null-safe", upgradeBloggerImage(null) === null);
+check(
+  "non-Blogger URL with =s### token is left untouched",
+  upgradeBloggerImage("https://example.com/pic.jpg?x=s320") === "https://example.com/pic.jpg?x=s320",
+  upgradeBloggerImage("https://example.com/pic.jpg?x=s320")
+);
+check(
+  "googleusercontent thumbnail upgraded",
+  upgradeBloggerImage("https://lh3.googleusercontent.com/abc=s220") === "https://lh3.googleusercontent.com/abc=s1600",
+  upgradeBloggerImage("https://lh3.googleusercontent.com/abc=s220")
+);
 
 // ── slug ──
 console.log("Slugs:");

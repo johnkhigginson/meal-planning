@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Clock, Users, Globe } from "lucide-react";
 import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
+import { sanitizeBlogHtml } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
 
@@ -122,11 +123,11 @@ export default async function BlogRecipePage({ params }: PageProps) {
             </Card>
           </div>
         ) : recipe.bodyHtml ? (
-          // Preserved original post HTML (migrated content). Authored by the
-          // blog owner, rendered as-is to keep formatting and images intact.
+          // Preserved original post HTML (migrated content). Sanitized again at
+          // render so even content stored before sanitization was added is safe.
           <div
             className={`mt-6 ${PROSE_CLASS}`}
-            dangerouslySetInnerHTML={{ __html: recipe.bodyHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(recipe.bodyHtml) }}
           />
         ) : (
           <div className="mt-6 whitespace-pre-wrap">{recipe.instructions}</div>

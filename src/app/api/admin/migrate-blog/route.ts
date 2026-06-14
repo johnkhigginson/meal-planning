@@ -10,6 +10,7 @@ import {
   type BloggerImport,
 } from "@/lib/blogger";
 import { uniqueSlug } from "@/lib/slug";
+import { sanitizeBlogHtml } from "@/lib/sanitize";
 
 export const runtime = "nodejs";
 // A full blog can have hundreds of posts; give the import room to run.
@@ -84,13 +85,18 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // A stable identity for a post so re-runs are idempotent. Prefer the
+  // permalink; fall back to title+date for exports that omit the alternate link.
+  const postKey = (name: string, permalink: string | null, published: Date | null) =>
+    permalink || `${name}|${published?.toISOString() ?? ""}`;
+
   // Build dedupe + slug-collision sets from existing household data.
   const existingRecipes = await prisma.recipe.findMany({
     where: { householdId },
-    select: { id: true, slug: true, sourceUrl: true },
+    select: { id: true, name: true, slug: true, sourceUrl: true, publishedAt: true },
   });
-  const importedUrls = new Set(
-    existingRecipes.map((r) => r.sourceUrl).filter((u): u is string => !!u)
+  const seenKeys = new Set(
+    existingRecipes.map((r) => postKey(r.name, r.sourceUrl, r.publishedAt))
   );
   const takenSlugs = new Set(
     existingRecipes.map((r) => r.slug).filter((s): s is string => !!s)
@@ -130,14 +136,17 @@ export async function POST(request: NextRequest) {
   });
 
   for (const post of ordered) {
-    if (post.permalink && importedUrls.has(post.permalink)) {
+    const name = (post.title || "Untitled Recipe").slice(0, 300);
+    const key = postKey(name, post.permalink, post.publishedAt);
+    if (seenKeys.has(key)) {
       skipped++;
       continue;
     }
+    seenKeys.add(key);
 
     try {
-      const name = (post.title || "Untitled Recipe").slice(0, 300);
       const slug = uniqueSlug(name, takenSlugs, `recipe-${imported + 1}`);
+      const safeHtml = sanitizeBlogHtml(post.contentHtml);
       const plain = htmlToText(post.contentHtml);
       const sections = extractRecipeSections(post.contentHtml);
       // `instructions` is non-nullable; fall back to the full post text so the
@@ -152,7 +161,7 @@ export async function POST(request: NextRequest) {
           slug,
           description: plain ? excerpt(plain) : null,
           instructions,
-          bodyHtml: post.contentHtml || null,
+          bodyHtml: safeHtml || null,
           servings: 4,
           sourceType: "BLOG",
           sourceUrl: post.permalink ?? null,
@@ -160,8 +169,6 @@ export async function POST(request: NextRequest) {
           publishedAt: post.publishedAt ?? null,
         },
       });
-
-      if (post.permalink) importedUrls.add(post.permalink);
 
       // Labels → tags.
       for (const label of post.labels) {

@@ -30,8 +30,11 @@ const BLOGGER_LABEL_SCHEME = "http://www.blogger.com/atom/ns#";
 
 // Blogger serves thumbnail-sized image URLs like .../s72-c/photo.jpg.
 // Upgrade the size token so migrated posts keep a high-resolution hero image.
+// Only rewrite Blogger/Google-hosted images so unrelated URLs that happen to
+// contain an "=s###" token aren't corrupted.
 export function upgradeBloggerImage(url: string | null | undefined): string | null {
   if (!url) return null;
+  if (!/(\.bp\.blogspot\.com|googleusercontent\.com|blogger\.com)/i.test(url)) return url;
   return url.replace(/\/s\d+(-c)?\//, "/s1600/").replace(/=s\d+(-c)?(-[a-z]+)?$/, "=s1600");
 }
 
@@ -111,10 +114,11 @@ export async function fetchAllBloggerPosts(
   const pageSize = 150;
   let startIndex = 1;
   let blogTitle = "";
+  let total = Infinity;
   const posts: BloggerPost[] = [];
 
   // Hard cap on iterations as a safety net against unexpected pagination loops.
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 500; i++) {
     const feedUrl = `${origin}/feeds/posts/default?alt=json&max-results=${pageSize}&start-index=${startIndex}`;
     const res = await fetchImpl(feedUrl, {
       headers: { Accept: "application/json" },
@@ -124,12 +128,16 @@ export async function fetchAllBloggerPosts(
       throw new Error(`Blogger feed request failed (${res.status}) for ${origin}`);
     }
     const json = await res.json();
-    const { blogTitle: title, posts: page } = parseBloggerJsonFeed(json);
+    const { blogTitle: title, posts: page, total: reported } = parseBloggerJsonFeed(json);
     if (title) blogTitle = title;
+    if (reported) total = reported;
+    // An empty page is the only reliable end signal — Blogger may return fewer
+    // than max-results per page, so don't stop on a short (but non-empty) page.
     if (page.length === 0) break;
     posts.push(...page);
-    if (page.length < pageSize) break;
-    startIndex += pageSize;
+    if (posts.length >= total) break;
+    // Advance by the number actually returned to avoid skipping entries.
+    startIndex += page.length;
   }
 
   return { blogTitle, posts };

@@ -11,7 +11,8 @@ export default auth((req) => {
   if (
     publicPaths.includes(pathname) ||
     pathname.startsWith("/share/") ||
-    pathname.startsWith("/blog")
+    pathname === "/blog" ||
+    pathname.startsWith("/blog/")
   ) {
     return NextResponse.next();
   }
