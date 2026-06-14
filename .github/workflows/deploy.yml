@@ -38,6 +38,7 @@ jobs:
 
             npm ci
             npx prisma generate
+            npx prisma db push
             npm run build
 
             if pm2 describe meal-planning > /dev/null 2>&1; then

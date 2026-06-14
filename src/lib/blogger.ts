@@ -162,9 +162,14 @@ export function parseBloggerXmlExport(xml: string): BloggerImport {
       if (scheme === BLOGGER_LABEL_SCHEME && term) labels.push(term);
     });
 
-    // Drafts carry an app:draft=yes control flag.
-    entry.find("control > draft").each((__, d) => {
-      if ($(d).text().trim().toLowerCase() === "yes") isDraft = true;
+    // Drafts carry an app:draft=yes control flag. In XML mode the tag keeps its
+    // namespace prefix (e.g. <app:draft>), which a plain "draft" selector won't
+    // match, so detect by local name instead.
+    entry.find("*").each((__, node) => {
+      const tag = ("tagName" in node ? node.tagName : (node as { name?: string }).name) || "";
+      if (tag === "draft" || tag.endsWith(":draft")) {
+        if ($(node).text().trim().toLowerCase() === "yes") isDraft = true;
+      }
     });
 
     if (!isPost || isDraft) return;
