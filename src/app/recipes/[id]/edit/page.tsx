@@ -20,6 +20,7 @@ interface RecipeData {
   sourceBookTitle: string | null;
   sourceBookPage: string | null;
   authorId: number | null;
+  imageUrl: string | null;
   isFavorite: boolean;
   ingredients: {
     id: number;
@@ -85,6 +86,7 @@ export default function EditRecipePage() {
           sourceBookTitle: recipe.sourceBookTitle || "",
           sourceBookPage: recipe.sourceBookPage || "",
           authorId: recipe.authorId ?? null,
+          imageUrl: recipe.imageUrl || "",
           isFavorite: recipe.isFavorite,
           ingredients: initialIngredients,
           tagIds: recipe.tags.map((t) => t.tag.id),

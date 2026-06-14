@@ -66,6 +66,16 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Photo */}
+      {recipe.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={recipe.imageUrl}
+          alt={recipe.name}
+          className="max-h-96 w-full rounded-2xl object-cover"
+        />
+      )}
+
       {/* Meta info */}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         {totalTime > 0 && (

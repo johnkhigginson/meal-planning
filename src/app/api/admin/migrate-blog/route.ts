@@ -20,6 +20,7 @@ interface MigrateInput {
   blogUrl?: string;
   xml?: string;
   bookName?: string;
+  authorId?: number;
 }
 
 async function readInput(request: NextRequest): Promise<MigrateInput> {
@@ -28,10 +29,12 @@ async function readInput(request: NextRequest): Promise<MigrateInput> {
     const form = await request.formData();
     const file = form.get("file") as File | null;
     const xml = file ? await file.text() : (form.get("xml") as string | null) ?? undefined;
+    const authorRaw = form.get("authorId") as string | null;
     return {
       blogUrl: (form.get("blogUrl") as string | null) ?? undefined,
       xml: xml ?? undefined,
       bookName: (form.get("bookName") as string | null) ?? undefined,
+      authorId: authorRaw ? parseInt(authorRaw, 10) : undefined,
     };
   }
   return (await request.json()) as MigrateInput;
@@ -75,6 +78,25 @@ export async function POST(request: NextRequest) {
   }
 
   const { householdId, userId } = admin;
+
+  // Resolve the author for the imported recipes. Defaults to the importer, but
+  // can be set to any member of the household (e.g. assign all of Mom's posts
+  // to Mom's account). Reject authors outside the household.
+  let authorId = userId;
+  if (input.authorId != null && input.authorId !== userId) {
+    const member = await prisma.user.findFirst({
+      where: { id: input.authorId, householdId },
+      select: { id: true },
+    });
+    if (!member) {
+      return NextResponse.json(
+        { error: "Selected author is not a member of this household." },
+        { status: 400 }
+      );
+    }
+    authorId = input.authorId;
+  }
+
   const bookName = (input.bookName || data.blogTitle || "The Recipe Society").trim();
 
   // Find-or-create the destination cookbook for this household.
@@ -156,7 +178,7 @@ export async function POST(request: NextRequest) {
       const recipe = await prisma.recipe.create({
         data: {
           householdId,
-          authorId: userId,
+          authorId,
           name,
           slug,
           description: plain ? excerpt(plain) : null,

@@ -52,6 +52,7 @@ interface RecipeFormData {
   sourceBookTitle: string;
   sourceBookPage: string;
   authorId: number | null;
+  imageUrl: string;
   isFavorite: boolean;
   ingredients: RecipeIngredientRow[];
   tagIds: number[];
@@ -103,6 +104,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       sourceBookTitle: "",
       sourceBookPage: "",
       authorId: null,
+      imageUrl: "",
       isFavorite: false,
       ingredients: [newIngredientRow()],
       tagIds: [],
@@ -179,6 +181,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       servings: data.servings || prev.servings,
       prepTimeMinutes: data.prepTimeMinutes ?? prev.prepTimeMinutes,
       cookTimeMinutes: data.cookTimeMinutes ?? prev.cookTimeMinutes,
+      imageUrl: data.imageUrl || prev.imageUrl,
     }));
 
     // Auto-parse ingredient strings into structured rows
@@ -288,6 +291,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       sourceBookTitle: form.sourceType === "BOOK" ? form.sourceBookTitle || undefined : undefined,
       sourceBookPage: form.sourceType === "BOOK" ? form.sourceBookPage || undefined : undefined,
       authorId: form.authorId,
+      imageUrl: form.imageUrl.trim() || undefined,
       isFavorite: form.isFavorite,
       ingredients: form.ingredients
         .filter((ing) => ing.ingredientId > 0 && ing.quantity > 0 && ing.unitId > 0)
@@ -508,6 +512,30 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
               onChange={(e) => updateForm("description", e.target.value)}
               rows={2}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl">Photo URL</Label>
+            <div className="flex items-start gap-3">
+              {form.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.imageUrl}
+                  alt="Recipe preview"
+                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                />
+              )}
+              <Input
+                id="imageUrl"
+                type="url"
+                value={form.imageUrl}
+                onChange={(e) => updateForm("imageUrl", e.target.value)}
+                placeholder="https://…/photo.jpg"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A link to a photo for this recipe. Auto-filled when importing from a website.
+            </p>
           </div>
 
           {members.length > 0 && (

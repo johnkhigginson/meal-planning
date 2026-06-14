@@ -12,6 +12,7 @@ interface RecipeCardProps {
     prepTimeMinutes: number | null;
     cookTimeMinutes: number | null;
     sourceType: string;
+    imageUrl?: string | null;
     isFavorite: boolean;
     tags: { tag: { id: number; name: string } }[];
   };
@@ -23,7 +24,15 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
 
   return (
     <Link href={`/recipes/${recipe.id}`}>
-      <Card className="group h-full transition-all hover:shadow-md">
+      <Card className="group h-full overflow-hidden transition-all hover:shadow-md">
+        {recipe.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={recipe.imageUrl}
+            alt={recipe.name}
+            className="h-36 w-full object-cover"
+          />
+        )}
         <CardContent className="space-y-3 p-5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-sm font-semibold leading-snug group-hover:text-primary transition-colors">

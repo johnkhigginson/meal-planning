@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Rss, Loader2, Upload, CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
 
@@ -19,17 +26,37 @@ interface MigrateResult {
   errors: string[];
 }
 
+interface Member {
+  id: number;
+  name: string;
+}
+
 export default function MigratePage() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as { systemRole?: string } | undefined)?.systemRole === "ADMIN";
+  const currentUserId = session?.user?.id ?? "";
 
   const [blogUrl, setBlogUrl] = useState("therecipesociety.blogspot.com");
   const [bookName, setBookName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [authorId, setAuthorId] = useState<string>("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MigrateResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Load household members so the importer can attribute recipes to a chosen
+  // account (defaults to the current user).
+  useEffect(() => {
+    fetch("/api/household/members")
+      .then((r) => r.json())
+      .then((data: Member[]) => {
+        setMembers(data);
+        setAuthorId((prev) => prev || currentUserId);
+      })
+      .catch(() => {});
+  }, [currentUserId]);
 
   async function runImport() {
     setRunning(true);
@@ -37,19 +64,21 @@ export default function MigratePage() {
     setResult(null);
 
     try {
+      const author = authorId ? parseInt(authorId, 10) : undefined;
       let res: Response;
       if (file) {
         // Offline path: send the Blogger XML export as multipart.
         const fd = new FormData();
         fd.append("file", file);
         if (bookName.trim()) fd.append("bookName", bookName.trim());
+        if (author) fd.append("authorId", String(author));
         res = await fetch("/api/admin/migrate-blog", { method: "POST", body: fd });
       } else {
         // Live path: fetch the blog's feed server-side.
         res = await fetch("/api/admin/migrate-blog", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ blogUrl, bookName: bookName.trim() || undefined }),
+          body: JSON.stringify({ blogUrl, bookName: bookName.trim() || undefined, authorId: author }),
         });
       }
 
@@ -156,6 +185,30 @@ export default function MigratePage() {
               placeholder="Defaults to the blog's title"
             />
           </div>
+
+          {members.length > 0 && (
+            <div className="space-y-2">
+              <Label>Attribute recipes to</Label>
+              <Select value={authorId} onValueChange={(v) => v && setAuthorId(v)}>
+                <SelectTrigger>
+                  <SelectValue>
+                    {members.find((m) => String(m.id) === authorId)?.name ?? "Choose an account"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Every imported recipe will be owned by this person. Invite family from
+                Settings first if they&apos;re not listed.
+              </p>
+            </div>
+          )}
 
           <Button onClick={runImport} disabled={running || (!file && !blogUrl.trim())}>
             {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rss className="mr-2 h-4 w-4" />}
