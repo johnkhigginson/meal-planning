@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, MessageCircle, Trash2 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 interface Comment {
   id: number;
@@ -54,6 +55,7 @@ export function RecipeComments({ recipeId, canModerate }: { recipeId: number; ca
         return;
       }
       if (data.comment) setComments((prev) => [...prev, data.comment]);
+      trackEvent("comment_posted", { recipe_id: recipeId });
       setBody("");
     } catch {
       setError("Could not post your comment.");

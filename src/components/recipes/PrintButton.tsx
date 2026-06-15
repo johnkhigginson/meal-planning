@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export function PrintButton({ label = "Print" }: { label?: string }) {
   return (
@@ -10,7 +11,10 @@ export function PrintButton({ label = "Print" }: { label?: string }) {
       variant="outline"
       size="sm"
       className="print:hidden"
-      onClick={() => window.print()}
+      onClick={() => {
+        trackEvent("recipe_print");
+        window.print();
+      }}
     >
       <Printer className="mr-1.5 h-4 w-4" />
       {label}

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Users, UtensilsCrossed, Store, ArrowRight, Rss, LogIn, Loader2, ScrollText } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface UserData {
@@ -99,6 +100,7 @@ export default function AdminDashboard() {
         return;
       }
       const { token } = await res.json();
+      trackEvent("impersonate_start", { target_user_id: userId });
       await signIn("impersonate", { token, redirect: false });
       // Full reload so the app picks up the impersonated session.
       window.location.assign("/");

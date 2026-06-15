@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { IngredientInput, type RecipeIngredientRow } from "./IngredientInput";
 import { Plus, Loader2, Globe, Upload, Camera } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 interface Unit {
   id: number;
@@ -261,6 +262,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
 
       const data = await res.json();
       applyImportedData(data);
+      trackEvent("recipe_url_import");
     } catch {
       setImportError("Failed to connect to URL");
     } finally {
@@ -344,6 +346,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
 
     if (res.ok) {
       const recipe = await res.json();
+      trackEvent(recipeId ? "recipe_updated" : "recipe_created", { source_type: form.sourceType });
       router.push(`/recipes/${recipe.id}`);
     }
   }

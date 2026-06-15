@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,6 +121,8 @@ export default function RegisterPage() {
       resetTurnstile(); // Turnstile tokens are single-use
       return;
     }
+
+    trackEvent("sign_up");
 
     // Auto sign in then redirect
     const result = await signIn("credentials", {

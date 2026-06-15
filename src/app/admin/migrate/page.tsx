@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Rss, Loader2, Upload, CheckCircle2, AlertTriangle, ExternalLink, Sparkles, ImageDown } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 interface MigrateResult {
   blogTitle: string;
@@ -107,6 +108,7 @@ export default function MigratePage() {
         setError(data.error || "Import failed");
       } else {
         setResult(data);
+        trackEvent("blog_import", { imported: data.imported, updated: data.updated, comments: data.importedComments });
       }
     } catch {
       setError("Something went wrong running the import.");
@@ -143,7 +145,10 @@ export default function MigratePage() {
           remaining: d.remaining,
           done: d.done,
         });
-        if (d.done) break;
+        if (d.done) {
+          trackEvent("ai_extraction", { total: processedTotal });
+          break;
+        }
         // A batch with no progress means every recipe in it errored (usually a
         // rate/quota limit). Surface the reason instead of stopping silently —
         // re-running later resumes where it left off.
@@ -183,7 +188,10 @@ export default function MigratePage() {
         }
         convertedTotal += d.converted;
         setImgProgress({ converted: convertedTotal, remaining: d.remaining, done: d.done });
-        if (d.done) break;
+        if (d.done) {
+          trackEvent("photos_localized", { total: convertedTotal });
+          break;
+        }
         if (d.processed === 0) {
           setImgError(
             d.errors?.length

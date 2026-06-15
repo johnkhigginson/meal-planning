@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Clock, Users, Search } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export interface BrowserPost {
   id: number;
@@ -84,7 +85,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
             {categories.map((c) => (
               <button
                 key={c.name}
-                onClick={() => setActiveTag(c.name)}
+                onClick={() => { setActiveTag(c.name); trackEvent("blog_category_filter", { category: c.name }); }}
                 className={`rounded-full px-2.5 py-1 text-sm transition-colors ${
                   activeTag === c.name ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}

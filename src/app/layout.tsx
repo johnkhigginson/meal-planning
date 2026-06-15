@@ -3,6 +3,7 @@ import { Nunito, Nunito_Sans } from "next/font/google";
 import { Providers } from "@/components/shared/Providers";
 import { AppShell } from "@/components/shared/AppShell";
 import { ServiceWorkerRegistrar } from "@/components/shared/ServiceWorkerRegistrar";
+import { Analytics } from "@/components/shared/Analytics";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -55,6 +56,7 @@ export default function RootLayout({
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        <Analytics />
         <ServiceWorkerRegistrar />
       </body>
     </html>

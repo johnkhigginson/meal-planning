@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
+import { trackEvent } from "@/lib/analytics";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,6 +117,7 @@ export default function LoginPage() {
       setLoading(false);
       resetTurnstile(); // Turnstile tokens are single-use
     } else {
+      trackEvent("login");
       // Successful login — full page navigation to pick up the session
       window.location.href = "/";
     }

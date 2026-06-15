@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink } from "lucide-react";
 
 interface BookRecipe {
@@ -120,6 +121,7 @@ export default function BookDetailPage() {
       setBook((prev) =>
         prev ? { ...prev, isPublished: updated.isPublished, slug: updated.slug } : prev
       );
+      trackEvent(updated.isPublished ? "cookbook_published" : "cookbook_unpublished");
     }
     setPublishing(false);
   }
