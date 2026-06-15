@@ -12,8 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Save, UserPlus, X, Users } from "lucide-react";
+import { Loader2, Save, UserPlus, X, Users, LayoutDashboard } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { OPTIONAL_NAV_ITEMS, parseHiddenNav } from "@/lib/nav";
 
 const ALL_MEAL_SLOTS = [
   { value: "BREAKFAST", label: "Breakfast" },
@@ -41,6 +43,7 @@ interface UserSettings {
   name: string;
   email: string;
   enabledMealSlots: string;
+  hiddenNavItems: string;
   role: string;
   household: {
     id: number;
@@ -50,9 +53,11 @@ interface UserSettings {
 }
 
 export default function SettingsPage() {
+  const { update } = useSession();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [name, setName] = useState("");
   const [enabledSlots, setEnabledSlots] = useState<string[]>([]);
+  const [hiddenNav, setHiddenNav] = useState<Set<string>>(new Set());
   const [householdName, setHouseholdName] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -72,6 +77,7 @@ export default function SettingsPage() {
         setName(data.name);
         setHouseholdName(data.household?.name || "");
         setEnabledSlots(data.enabledMealSlots.split(",").filter(Boolean));
+        setHiddenNav(parseHiddenNav(data.hiddenNavItems));
       });
     fetch("/api/household/invites")
       .then((r) => r.json())
@@ -85,15 +91,31 @@ export default function SettingsPage() {
     setSaved(false);
   }
 
+  // Nav toggles are framed as "show" for clarity; we store the hidden set.
+  function toggleNavVisible(href: string, visible: boolean) {
+    setHiddenNav((prev) => {
+      const next = new Set(prev);
+      if (visible) next.delete(href);
+      else next.add(href);
+      return next;
+    });
+    setSaved(false);
+  }
+
   async function handleSave() {
     if (enabledSlots.length === 0) return;
     setSaving(true);
+    const hiddenNavItems = Array.from(hiddenNav).join(",");
     const res = await fetch("/api/user/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, enabledMealSlots: enabledSlots.join(","), householdName }),
+      body: JSON.stringify({ name, enabledMealSlots: enabledSlots.join(","), householdName, hiddenNavItems }),
     });
-    if (res.ok) setSaved(true);
+    if (res.ok) {
+      setSaved(true);
+      // Refresh the session token so the sidebar/menu updates immediately.
+      await update({ hiddenNavItems });
+    }
     setSaving(false);
   }
 
@@ -176,6 +198,30 @@ export default function SettingsPage() {
           {enabledSlots.length === 0 && (
             <p className="text-sm text-destructive">Select at least one meal slot</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Menu */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <LayoutDashboard className="h-5 w-5" />
+            <CardTitle>Menu</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Choose which sections appear in your menu. Recipes and Cookbooks are always shown.
+          </p>
+          {OPTIONAL_NAV_ITEMS.map((item) => (
+            <label key={item.href} className="flex cursor-pointer items-center gap-3">
+              <Checkbox
+                checked={!hiddenNav.has(item.href)}
+                onCheckedChange={(c) => toggleNavVisible(item.href, c === true)}
+              />
+              <span className="text-sm font-medium">{item.label}</span>
+            </label>
+          ))}
         </CardContent>
       </Card>
 

@@ -10,6 +10,7 @@ interface ExtendedUser {
   householdId?: string;
   systemRole?: string;
   impersonatedBy?: string | null;
+  hiddenNavItems?: string;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -52,6 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name,
           householdId: user.householdId.toString(),
           systemRole: user.systemRole,
+          hiddenNavItems: user.hiddenNavItems,
         };
       },
     }),
@@ -77,17 +79,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           householdId: user.householdId.toString(),
           systemRole: user.systemRole,
           impersonatedBy: payload.impersonatedBy != null ? payload.impersonatedBy.toString() : null,
+          hiddenNavItems: user.hiddenNavItems,
         };
       },
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.householdId = (user as ExtendedUser).householdId;
         token.systemRole = (user as ExtendedUser).systemRole;
         token.impersonatedBy = (user as ExtendedUser).impersonatedBy ?? null;
+        token.hiddenNavItems = (user as ExtendedUser).hiddenNavItems ?? "";
+      }
+      // Live update of menu preferences (via useSession().update) without a
+      // re-login.
+      if (trigger === "update" && session && typeof (session as { hiddenNavItems?: unknown }).hiddenNavItems === "string") {
+        token.hiddenNavItems = (session as { hiddenNavItems: string }).hiddenNavItems;
       }
       return token;
     },
@@ -97,6 +106,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as ExtendedUser).householdId = token.householdId as string;
         (session.user as ExtendedUser).systemRole = token.systemRole as string;
         (session.user as ExtendedUser).impersonatedBy = (token.impersonatedBy as string | null) ?? null;
+        (session.user as ExtendedUser).hiddenNavItems = (token.hiddenNavItems as string) ?? "";
       }
       return session;
     },

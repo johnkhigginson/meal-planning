@@ -16,11 +16,13 @@ import {
   Settings,
   Shield,
   LayoutDashboard,
+  HelpCircle,
   MoreHorizontal,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LemonLogo } from "./LemonLogo";
+import { parseHiddenNav } from "@/lib/nav";
 
 // Primary tabs shown in bottom bar
 const primaryTabs = [
@@ -36,6 +38,7 @@ const secondaryItems = [
   { href: "/what-can-i-make", label: "What Can I Make?", icon: Lightbulb },
   { href: "/grocery-list", label: "Grocery List", icon: ShoppingCart },
   { href: "/stores", label: "Stores", icon: Store },
+  { href: "/help", label: "Help & Tutorial", icon: HelpCircle },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -43,6 +46,10 @@ export function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession();
+
+  const hidden = parseHiddenNav((session?.user as { hiddenNavItems?: string } | undefined)?.hiddenNavItems);
+  const tabs = primaryTabs.filter((t) => !hidden.has(t.href));
+  const secondary = secondaryItems.filter((i) => !hidden.has(i.href));
 
   function isActive(href: string) {
     return pathname === href || (href !== "/" && pathname.startsWith(href));
@@ -61,7 +68,7 @@ export function MobileNav() {
       {/* Bottom tab bar */}
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
         <div className="flex items-stretch justify-around">
-          {primaryTabs.map((tab) => (
+          {tabs.map((tab) => (
             <Link
               key={tab.href}
               href={tab.href}
@@ -108,7 +115,7 @@ export function MobileNav() {
             </div>
 
             <div className="px-3 pb-3">
-              {secondaryItems.map((item) => (
+              {secondary.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

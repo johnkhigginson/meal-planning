@@ -15,10 +15,12 @@ import {
   LayoutDashboard,
   Shield,
   BookOpen,
+  HelpCircle,
 } from "lucide-react";
 import { LemonLogo } from "./LemonLogo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { parseHiddenNav } from "@/lib/nav";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -35,6 +37,9 @@ export function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
+  const hidden = parseHiddenNav((session?.user as { hiddenNavItems?: string } | undefined)?.hiddenNavItems);
+  const visibleItems = navItems.filter((item) => !hidden.has(item.href));
+
   return (
     <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
@@ -45,7 +50,7 @@ export function Navbar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 px-3 pt-2">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));
@@ -92,6 +97,18 @@ export function Navbar() {
               Admin
             </Link>
           )}
+          <Link
+            href="/help"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+              pathname === "/help"
+                ? "bg-sidebar-accent text-sidebar-primary"
+                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            )}
+          >
+            <HelpCircle className="h-4 w-4" />
+            Help &amp; Tutorial
+          </Link>
           <Link
             href="/settings"
             className={cn(
