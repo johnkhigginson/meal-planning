@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/email-normalize";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { audit } from "@/lib/audit";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -79,6 +80,15 @@ export async function POST(request: NextRequest) {
       householdId,
       role: invite ? "MEMBER" : "OWNER",
     },
+  });
+
+  await audit({
+    category: "AUTH",
+    action: "REGISTER",
+    summary: `${user.name} created an account`,
+    actorUserId: user.id,
+    actorName: user.name,
+    householdId,
   });
 
   return NextResponse.json(

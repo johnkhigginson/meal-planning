@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireHouseholdId } from "@/lib/auth";
+import { requireHouseholdId, requireUser } from "@/lib/auth";
 import { updateRecipeSchema } from "@/lib/validators";
+import { audit } from "@/lib/audit";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -20,7 +21,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
-  const householdId = await requireHouseholdId();
+  const user = await requireUser();
+  const householdId = user.householdId;
   const { id } = await params;
   const recipeId = parseInt(id, 10);
   const body = await request.json();
@@ -66,15 +68,40 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       tags: { include: { tag: true } },
     },
   });
+
+  await audit({
+    category: "RECIPE",
+    action: "RECIPE_UPDATED",
+    summary: `${user.name} edited recipe “${updated?.name ?? existing.name}”`,
+    actorUserId: user.userId,
+    actorName: user.name,
+    householdId,
+    targetType: "RECIPE",
+    targetId: recipeId,
+  });
+
   return NextResponse.json(updated);
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
-  const householdId = await requireHouseholdId();
+  const user = await requireUser();
+  const householdId = user.householdId;
   const { id } = await params;
   const recipeId = parseInt(id, 10);
   const existing = await prisma.recipe.findFirst({ where: { id: recipeId, householdId } });
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
   await prisma.recipe.delete({ where: { id: recipeId } });
+
+  await audit({
+    category: "RECIPE",
+    action: "RECIPE_DELETED",
+    summary: `${user.name} deleted recipe “${existing.name}”`,
+    actorUserId: user.userId,
+    actorName: user.name,
+    householdId,
+    targetType: "RECIPE",
+    targetId: recipeId,
+  });
+
   return NextResponse.json({ success: true });
 }

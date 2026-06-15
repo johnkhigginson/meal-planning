@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -27,5 +28,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   }
 
   await prisma.comment.delete({ where: { id: commentId } });
+
+  await audit({
+    category: "COMMENT",
+    action: "COMMENT_DELETED",
+    summary: `${user.name} deleted a comment`,
+    actorUserId: user.userId,
+    actorName: user.name,
+    householdId: user.householdId,
+    targetType: "COMMENT",
+    targetId: commentId,
+  });
+
   return NextResponse.json({ success: true });
 }

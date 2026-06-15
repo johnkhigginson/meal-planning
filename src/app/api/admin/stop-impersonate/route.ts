@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createImpersonationToken } from "@/lib/impersonation";
+import { audit } from "@/lib/audit";
 
 // Return to the original admin account. Reads `impersonatedBy` from the current
 // (NextAuth-signed) session — which only an admin-initiated impersonation can
@@ -19,7 +20,15 @@ export async function POST() {
     return NextResponse.json({ error: "Invalid impersonation state" }, { status: 400 });
   }
 
-  console.warn(`[impersonation] returning to admin ${adminId}`);
+  await audit({
+    category: "ADMIN",
+    action: "IMPERSONATE_STOP",
+    summary: `Returned to admin account`,
+    actorUserId: adminId,
+    targetType: "USER",
+    targetId: adminId,
+  });
+
   // impersonatedBy = null → resulting session is a normal admin session.
   const token = createImpersonationToken(adminId, null);
   return NextResponse.json({ token });

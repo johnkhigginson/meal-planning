@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireHouseholdId } from "@/lib/auth";
+import { requireHouseholdId, getCurrentUser } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
+import { audit } from "@/lib/audit";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -80,6 +81,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const book = await prisma.recipeBook.update({ where: { id: bookId }, data });
+
+  // Log publish/unpublish transitions (the significant, public-facing change).
+  if (body.isPublished !== undefined && !!body.isPublished !== existing.isPublished) {
+    const actor = await getCurrentUser();
+    await audit({
+      category: "BOOK",
+      action: book.isPublished ? "BOOK_PUBLISHED" : "BOOK_UNPUBLISHED",
+      summary: `${actor?.name ?? "Someone"} ${book.isPublished ? "published" : "unpublished"} cookbook “${book.name}”${book.isPublished ? ` at /blog/${book.slug}` : ""}`,
+      actorUserId: actor?.userId,
+      actorName: actor?.name,
+      householdId,
+      targetType: "BOOK",
+      targetId: bookId,
+    });
+  }
+
   return NextResponse.json(book);
 }
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { sendHouseholdInviteEmail } from "@/lib/email";
 import { normalizeEmail } from "@/lib/email-normalize";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   const { householdId } = await requireUser();
@@ -69,6 +70,16 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Failed to send invite email:", err);
   }
+
+  await audit({
+    category: "USER",
+    action: "INVITE_SENT",
+    summary: `${user!.name} invited ${email} to ${household?.name ?? "the household"}`,
+    actorUserId: userId,
+    actorName: user!.name,
+    householdId,
+    metadata: { email },
+  });
 
   return NextResponse.json(invite, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isRecipePubliclyVisible } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
+import { audit, clientIp } from "@/lib/audit";
 
 // Comments on a published blog recipe. Anyone can read; posting requires being
 // signed in.
@@ -60,5 +61,17 @@ export async function POST(request: NextRequest) {
     data: { recipeId, userId: user.userId, authorName: dbUser?.name ?? "Member", body: text },
     select: { id: true, authorName: true, body: true, createdAt: true },
   });
+
+  await audit({
+    category: "COMMENT",
+    action: "COMMENT_CREATED",
+    summary: `${comment.authorName} commented on a recipe`,
+    actorUserId: user.userId,
+    actorName: comment.authorName,
+    targetType: "RECIPE",
+    targetId: recipeId,
+    ip: clientIp(request),
+  });
+
   return NextResponse.json({ comment: { ...comment, mine: true } }, { status: 201 });
 }

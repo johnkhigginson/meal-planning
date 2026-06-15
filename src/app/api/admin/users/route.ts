@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 
 export async function GET() {
   await requireAdmin();
@@ -51,6 +52,17 @@ export async function PUT(request: NextRequest) {
     where: { id: userId },
     data: { systemRole },
     select: { id: true, name: true, email: true, systemRole: true },
+  });
+
+  await audit({
+    category: "ADMIN",
+    action: "ROLE_CHANGED",
+    summary: `${admin.name} set ${user.name}'s role to ${systemRole}`,
+    actorUserId: admin.userId,
+    actorName: admin.name,
+    targetType: "USER",
+    targetId: user.id,
+    metadata: { systemRole },
   });
 
   return NextResponse.json(user);

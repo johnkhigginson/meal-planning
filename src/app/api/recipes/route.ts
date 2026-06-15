@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireHouseholdId } from "@/lib/auth";
+import { requireHouseholdId, requireUser } from "@/lib/auth";
 import { createRecipeSchema } from "@/lib/validators";
+import { audit } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const householdId = await requireHouseholdId();
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const householdId = await requireHouseholdId();
+  const user = await requireUser();
+  const householdId = user.householdId;
   const body = await request.json();
   const parsed = createRecipeSchema.safeParse(body);
   if (!parsed.success) {
@@ -86,6 +88,17 @@ export async function POST(request: NextRequest) {
       ingredients: { include: { ingredient: true, unit: true }, orderBy: { sortOrder: "asc" } },
       tags: { include: { tag: true } },
     },
+  });
+
+  await audit({
+    category: "RECIPE",
+    action: "RECIPE_CREATED",
+    summary: `${user.name} added recipe “${recipe.name}”`,
+    actorUserId: user.userId,
+    actorName: user.name,
+    householdId,
+    targetType: "RECIPE",
+    targetId: recipe.id,
   });
 
   return NextResponse.json(recipe, { status: 201 });

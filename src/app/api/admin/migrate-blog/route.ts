@@ -11,6 +11,7 @@ import {
 } from "@/lib/blogger";
 import { uniqueSlug } from "@/lib/slug";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
+import { audit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 // A full blog can have hundreds of posts; give the import room to run.
@@ -280,6 +281,18 @@ export async function POST(request: NextRequest) {
       }
     }
   }
+
+  await audit({
+    category: "IMPORT",
+    action: "BLOG_IMPORTED",
+    summary: `${admin.name} imported “${book.name}” — ${imported} new, ${updated} updated, ${importedComments} comments`,
+    actorUserId: admin.userId,
+    actorName: admin.name,
+    householdId,
+    targetType: "BOOK",
+    targetId: book.id,
+    metadata: { imported, updated, skipped, importedComments, totalPosts: data.posts.length },
+  });
 
   return NextResponse.json({
     blogTitle: data.blogTitle,

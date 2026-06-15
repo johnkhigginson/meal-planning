@@ -167,6 +167,25 @@ model RecipeNote {
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 }
 
+// Audit / activity log of important actions across the app, viewable by admins.
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  category    String   @db.NVarChar(40) // AUTH, RECIPE, BOOK, COMMENT, IMPORT, USER, ADMIN
+  action      String   @db.NVarChar(80) // e.g. LOGIN, RECIPE_CREATED, BOOK_PUBLISHED
+  summary     String   @db.NVarChar(500) // human-readable description
+  userId      Int? // actor (null for anonymous/system)
+  actorName   String?  @db.NVarChar(200) // denormalized so it survives user deletion
+  householdId Int?
+  targetType  String?  @db.NVarChar(40) // RECIPE, BOOK, USER, COMMENT
+  targetId    Int?
+  metadata    String?  @db.NVarChar(Max) // optional JSON details
+  ip          String?  @db.NVarChar(64)
+
+  @@index([createdAt])
+  @@index([category, createdAt])
+}
+
 // Recipe photos uploaded from a device. Stored in the DB (rather than the
 // filesystem) so they survive rsync-based deploys, and served via /api/images.
 model UploadedImage {

@@ -5,6 +5,7 @@ import { prisma } from "./prisma";
 import { normalizeEmail } from "./email-normalize";
 import { verifyTurnstile } from "./turnstile";
 import { verifyImpersonationToken } from "./impersonation";
+import { audit } from "./audit";
 
 interface ExtendedUser {
   householdId?: string;
@@ -45,6 +46,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLogin: new Date() },
+        });
+
+        await audit({
+          category: "AUTH",
+          action: "LOGIN",
+          summary: `${user.name} signed in`,
+          actorUserId: user.id,
+          actorName: user.name,
+          householdId: user.householdId,
         });
 
         return {
@@ -122,6 +132,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 interface AuthUser {
   userId: number;
   householdId: number;
+  name: string;
   systemRole: string;
   isAdmin: boolean;
   isContributor: boolean;
@@ -136,6 +147,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return {
     userId: parseInt(session.user.id, 10),
     householdId: parseInt(ext.householdId, 10),
+    name: session.user.name ?? "",
     systemRole,
     isAdmin: systemRole === "ADMIN",
     isContributor: systemRole === "CONTRIBUTOR" || systemRole === "ADMIN",
