@@ -29,6 +29,8 @@ interface MigrateResult {
 interface Member {
   id: number;
   name: string;
+  email?: string;
+  household?: { id: number; name: string };
 }
 
 export default function MigratePage() {
@@ -40,23 +42,26 @@ export default function MigratePage() {
   const [bookName, setBookName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [authorId, setAuthorId] = useState<string>("");
+  const [ownerId, setOwnerId] = useState<string>("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MigrateResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load household members so the importer can attribute recipes to a chosen
-  // account (defaults to the current user).
+  // Load all users (admin scope) so the importer can hand ownership to any
+  // account — including someone in their own separate household, e.g. Mom.
+  // The cookbook and recipes are created in the chosen owner's household.
   useEffect(() => {
-    fetch("/api/household/members")
+    fetch("/api/admin/users")
       .then((r) => r.json())
-      .then((data: Member[]) => {
-        setMembers(data);
-        setAuthorId((prev) => prev || currentUserId);
+      .then((data: { users?: Member[] }) => {
+        setMembers(data.users ?? []);
+        setOwnerId((prev) => prev || currentUserId);
       })
       .catch(() => {});
   }, [currentUserId]);
+
+  const selectedOwner = members.find((m) => String(m.id) === ownerId);
 
   async function runImport() {
     setRunning(true);
@@ -64,21 +69,21 @@ export default function MigratePage() {
     setResult(null);
 
     try {
-      const author = authorId ? parseInt(authorId, 10) : undefined;
+      const owner = ownerId ? parseInt(ownerId, 10) : undefined;
       let res: Response;
       if (file) {
         // Offline path: send the Blogger XML export as multipart.
         const fd = new FormData();
         fd.append("file", file);
         if (bookName.trim()) fd.append("bookName", bookName.trim());
-        if (author) fd.append("authorId", String(author));
+        if (owner) fd.append("ownerUserId", String(owner));
         res = await fetch("/api/admin/migrate-blog", { method: "POST", body: fd });
       } else {
         // Live path: fetch the blog's feed server-side.
         res = await fetch("/api/admin/migrate-blog", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ blogUrl, bookName: bookName.trim() || undefined, authorId: author }),
+          body: JSON.stringify({ blogUrl, bookName: bookName.trim() || undefined, ownerUserId: owner }),
         });
       }
 
@@ -188,24 +193,33 @@ export default function MigratePage() {
 
           {members.length > 0 && (
             <div className="space-y-2">
-              <Label>Attribute recipes to</Label>
-              <Select value={authorId} onValueChange={(v) => v && setAuthorId(v)}>
+              <Label>Owner</Label>
+              <Select value={ownerId} onValueChange={(v) => v && setOwnerId(v)}>
                 <SelectTrigger>
                   <SelectValue>
-                    {members.find((m) => String(m.id) === authorId)?.name ?? "Choose an account"}
+                    {selectedOwner
+                      ? `${selectedOwner.name}${selectedOwner.household ? ` · ${selectedOwner.household.name}` : ""}`
+                      : "Choose an owner"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {members.map((m) => (
                     <SelectItem key={m.id} value={String(m.id)}>
                       {m.name}
+                      {m.household ? ` · ${m.household.name}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Every imported recipe will be owned by this person. Invite family from
-                Settings first if they&apos;re not listed.
+                The cookbook and every imported recipe are created in this person&apos;s
+                household and owned by them — not just attributed.
+                {selectedOwner?.household && (
+                  <>
+                    {" "}
+                    Importing into <span className="font-medium">{selectedOwner.household.name}</span>.
+                  </>
+                )}
               </p>
             </div>
           )}

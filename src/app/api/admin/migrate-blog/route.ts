@@ -20,7 +20,7 @@ interface MigrateInput {
   blogUrl?: string;
   xml?: string;
   bookName?: string;
-  authorId?: number;
+  ownerUserId?: number;
 }
 
 async function readInput(request: NextRequest): Promise<MigrateInput> {
@@ -29,12 +29,12 @@ async function readInput(request: NextRequest): Promise<MigrateInput> {
     const form = await request.formData();
     const file = form.get("file") as File | null;
     const xml = file ? await file.text() : (form.get("xml") as string | null) ?? undefined;
-    const authorRaw = form.get("authorId") as string | null;
+    const ownerRaw = form.get("ownerUserId") as string | null;
     return {
       blogUrl: (form.get("blogUrl") as string | null) ?? undefined,
       xml: xml ?? undefined,
       bookName: (form.get("bookName") as string | null) ?? undefined,
-      authorId: authorRaw ? parseInt(authorRaw, 10) : undefined,
+      ownerUserId: ownerRaw ? parseInt(ownerRaw, 10) : undefined,
     };
   }
   return (await request.json()) as MigrateInput;
@@ -77,24 +77,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No posts found in the provided source." }, { status: 404 });
   }
 
-  const { householdId, userId } = admin;
-
-  // Resolve the author for the imported recipes. Defaults to the importer, but
-  // can be set to any member of the household (e.g. assign all of Mom's posts
-  // to Mom's account). Reject authors outside the household.
-  let authorId = userId;
-  if (input.authorId != null && input.authorId !== userId) {
-    const member = await prisma.user.findFirst({
-      where: { id: input.authorId, householdId },
-      select: { id: true },
+  // Resolve the OWNER of the imported content. The cookbook and recipes are
+  // created in the owner's household (households are the ownership boundary in
+  // this app) and credited to the owner via authorId — so an admin can import a
+  // blog into, say, Mom's own household and have her truly own it, not just be
+  // labeled. Defaults to the importing admin's own account.
+  let householdId = admin.householdId;
+  let authorId = admin.userId;
+  if (input.ownerUserId != null && input.ownerUserId !== admin.userId) {
+    const owner = await prisma.user.findUnique({
+      where: { id: input.ownerUserId },
+      select: { id: true, householdId: true },
     });
-    if (!member) {
-      return NextResponse.json(
-        { error: "Selected author is not a member of this household." },
-        { status: 400 }
-      );
+    if (!owner) {
+      return NextResponse.json({ error: "Selected owner not found." }, { status: 400 });
     }
-    authorId = input.authorId;
+    householdId = owner.householdId;
+    authorId = owner.id;
   }
 
   const bookName = (input.bookName || data.blogTitle || "The Recipe Society").trim();
