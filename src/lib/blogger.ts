@@ -20,12 +20,21 @@ export interface BloggerPost {
   author: string | null; // original "Posted by" name from Blogger
 }
 
+export interface BloggerComment {
+  author: string | null;
+  body: string; // plain text
+  publishedAt: Date | null;
+  postPermalink: string | null; // parent post's permalink (thr:in-reply-to)
+}
+
 export interface BloggerImport {
   blogTitle: string;
   posts: BloggerPost[];
+  comments: BloggerComment[];
 }
 
 const BLOGGER_KIND_POST = "http://schemas.google.com/blogger/2008/kind#post";
+const BLOGGER_KIND_COMMENT = "http://schemas.google.com/blogger/2008/kind#comment";
 const BLOGGER_KIND_SCHEME = "http://schemas.google.com/g/2005#kind";
 const BLOGGER_LABEL_SCHEME = "http://www.blogger.com/atom/ns#";
 
@@ -145,7 +154,65 @@ export async function fetchAllBloggerPosts(
     startIndex += page.length;
   }
 
-  return { blogTitle, posts };
+  // Comments live in a separate feed; pull them too (best-effort).
+  let comments: BloggerComment[] = [];
+  try {
+    comments = await fetchAllBloggerComments(origin, fetchImpl);
+  } catch {
+    comments = [];
+  }
+
+  return { blogTitle, posts, comments };
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function parseBloggerJsonComments(json: any): { comments: BloggerComment[]; total: number } {
+  const feed = json?.feed;
+  if (!feed) return { comments: [], total: 0 };
+  const entries: any[] = feed.entry ?? [];
+  const total = parseInt(feed["openSearch$totalResults"]?.$t ?? "0", 10) || entries.length;
+  const comments = entries.map((entry): BloggerComment => {
+    const authors: any[] = entry.author ?? [];
+    const inReplyTo = entry["thr$in-reply-to"];
+    return {
+      author: authors[0]?.name?.$t ?? null,
+      body: htmlToText(entry.content?.$t ?? entry.summary?.$t ?? ""),
+      publishedAt: parseDate(entry.published?.$t),
+      postPermalink: inReplyTo?.href ?? null,
+    };
+  });
+  return { comments, total };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+// Paginate the blog-wide comments feed.
+export async function fetchAllBloggerComments(
+  blogUrl: string,
+  fetchImpl: FetchImpl = fetch
+): Promise<BloggerComment[]> {
+  const origin = normalizeBlogUrl(blogUrl);
+  const pageSize = 150;
+  let startIndex = 1;
+  let total = Infinity;
+  const comments: BloggerComment[] = [];
+
+  for (let i = 0; i < 500; i++) {
+    const feedUrl = `${origin}/feeds/comments/default?alt=json&max-results=${pageSize}&start-index=${startIndex}`;
+    const res = await fetchImpl(feedUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) break; // comments are optional; stop quietly
+    const json = await res.json();
+    const { comments: page, total: reported } = parseBloggerJsonComments(json);
+    if (reported) total = reported;
+    if (page.length === 0) break;
+    comments.push(...page);
+    if (comments.length >= total) break;
+    startIndex += page.length;
+  }
+
+  return comments;
 }
 
 // ─── XML export (offline) ───────────────────────────────────────
@@ -159,12 +226,14 @@ export function parseBloggerXmlExport(xml: string): BloggerImport {
 
   const blogTitle = $("feed > title").first().text().trim();
   const posts: BloggerPost[] = [];
+  const comments: BloggerComment[] = [];
 
   $("feed > entry").each((_, el) => {
     const entry = $(el);
 
     // Determine the entry kind from its #kind category.
     let isPost = false;
+    let isComment = false;
     let isDraft = false;
     const labels: string[] = [];
 
@@ -172,6 +241,7 @@ export function parseBloggerXmlExport(xml: string): BloggerImport {
       const scheme = $(cat).attr("scheme");
       const term = $(cat).attr("term") ?? "";
       if (scheme === BLOGGER_KIND_SCHEME && term === BLOGGER_KIND_POST) isPost = true;
+      if (scheme === BLOGGER_KIND_SCHEME && term === BLOGGER_KIND_COMMENT) isComment = true;
       if (scheme === BLOGGER_LABEL_SCHEME && term) labels.push(term);
     });
 
@@ -185,6 +255,23 @@ export function parseBloggerXmlExport(xml: string): BloggerImport {
       }
     });
 
+    const authorName = entry.children("author").first().children("name").first().text().trim();
+    const publishedAt = parseDate(entry.children("published").first().text());
+
+    if (isComment) {
+      // Link the comment to its post via thr:in-reply-to (namespaced tag).
+      let postPermalink: string | null = null;
+      entry.find("*").each((__, node) => {
+        const tag = ("tagName" in node ? node.tagName : (node as { name?: string }).name) || "";
+        if (tag === "in-reply-to" || tag.endsWith(":in-reply-to")) {
+          postPermalink = $(node).attr("href") ?? postPermalink;
+        }
+      });
+      const body = htmlToText(entry.children("content").first().text());
+      if (body) comments.push({ author: authorName || null, body, publishedAt, postPermalink });
+      return;
+    }
+
     if (!isPost || isDraft) return;
 
     const title = entry.children("title").first().text().trim();
@@ -195,16 +282,12 @@ export function parseBloggerXmlExport(xml: string): BloggerImport {
       if ($(l).attr("rel") === "alternate") permalink = $(l).attr("href") ?? null;
     });
 
-    const publishedAt = parseDate(entry.children("published").first().text());
     const imageUrl = upgradeBloggerImage(firstImageFromHtml(contentHtml));
 
-    const authorName = entry.children("author").first().children("name").first().text().trim();
-    const author = authorName || null;
-
-    posts.push({ title, contentHtml, permalink, publishedAt, labels, imageUrl, author });
+    posts.push({ title, contentHtml, permalink, publishedAt, labels, imageUrl, author: authorName || null });
   });
 
-  return { blogTitle, posts };
+  return { blogTitle, posts, comments };
 }
 
 // ─── Content normalization ──────────────────────────────────────

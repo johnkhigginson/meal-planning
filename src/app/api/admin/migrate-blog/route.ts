@@ -131,8 +131,10 @@ export async function POST(request: NextRequest) {
     select: { id: true, name: true, slug: true, sourceUrl: true, publishedAt: true },
   });
   const existingByKey = new Map<string, number>();
+  const recipeIdByUrl = new Map<string, number>(); // permalink → recipe id, for comment matching
   for (const r of existingRecipes) {
     existingByKey.set(postKey(r.name, r.sourceUrl, r.publishedAt), r.id);
+    if (r.sourceUrl) recipeIdByUrl.set(r.sourceUrl, r.id);
   }
   const takenSlugs = new Set(
     existingRecipes.map((r) => r.slug).filter((s): s is string => !!s)
@@ -243,10 +245,39 @@ export async function POST(request: NextRequest) {
         },
       });
       existingByKey.set(key, recipe.id);
+      if (post.permalink) recipeIdByUrl.set(post.permalink, recipe.id);
       await applyTagsAndBook(recipe.id, post.labels);
       imported++;
     } catch (err) {
       errors.push(`${post.title}: ${err instanceof Error ? err.message : "import failed"}`);
+    }
+  }
+
+  // Import the original Blogger comments onto the matching recipes.
+  let importedComments = 0;
+  const recipeIds = Array.from(new Set(recipeIdByUrl.values()));
+  if (data.comments.length > 0 && recipeIds.length > 0) {
+    const existing = await prisma.comment.findMany({
+      where: { recipeId: { in: recipeIds } },
+      select: { recipeId: true, authorName: true, body: true },
+    });
+    const seen = new Set(existing.map((c) => `${c.recipeId}|${c.authorName}|${c.body}`));
+    for (const c of data.comments) {
+      if (!c.postPermalink || !c.body.trim()) continue;
+      const recipeId = recipeIdByUrl.get(c.postPermalink);
+      if (!recipeId) continue;
+      const authorName = (c.author || "Anonymous").slice(0, 120);
+      const dedupeKey = `${recipeId}|${authorName}|${c.body}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      try {
+        await prisma.comment.create({
+          data: { recipeId, authorName, body: c.body, createdAt: c.publishedAt ?? new Date() },
+        });
+        importedComments++;
+      } catch {
+        // skip a bad comment row without failing the import
+      }
     }
   }
 
@@ -258,6 +289,7 @@ export async function POST(request: NextRequest) {
     imported,
     updated,
     skipped,
+    importedComments,
     errors: errors.slice(0, 20),
   });
 }

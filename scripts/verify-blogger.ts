@@ -84,10 +84,26 @@ const xml = `<?xml version="1.0"?>
     <title>About Page</title>
     <content type="html">about</content>
   </entry>
+  <entry xmlns:thr="http://purl.org/syndication/thread/1.0">
+    <category scheme="http://schemas.google.com/g/2005#kind" term="http://schemas.google.com/blogger/2008/kind#comment"/>
+    <title>Comment on Roast Chicken</title>
+    <content type="html">&lt;p&gt;So &lt;b&gt;good&lt;/b&gt;!&lt;/p&gt;</content>
+    <published>2018-05-06T12:00:00.000-07:00</published>
+    <author><name>Bob</name></author>
+    <thr:in-reply-to ref="tag:blogger.com,1999:blog-1.post-2" href="https://therecipesociety.blogspot.com/2018/05/roast-chicken.html" type="text/html"/>
+  </entry>
 </feed>`;
 const x = parseBloggerXmlExport(xml);
 check("xml blog title", x.blogTitle === "The Recipe Society", x.blogTitle);
-check("only the 1 published post (draft + page skipped)", x.posts.length === 1, x.posts.length);
+check("only the 1 published post (draft + page + comment skipped)", x.posts.length === 1, x.posts.length);
+check("xml comment parsed", x.comments.length === 1, x.comments.length);
+check("xml comment author", x.comments[0]?.author === "Bob", x.comments[0]?.author);
+check("xml comment body is plain text", x.comments[0]?.body === "So good!", JSON.stringify(x.comments[0]?.body));
+check(
+  "xml comment linked to post permalink",
+  x.comments[0]?.postPermalink === "https://therecipesociety.blogspot.com/2018/05/roast-chicken.html",
+  x.comments[0]?.postPermalink
+);
 check("xml title", x.posts[0]?.title === "Roast Chicken", x.posts[0]?.title);
 check("xml permalink", x.posts[0]?.permalink === "https://therecipesociety.blogspot.com/2018/05/roast-chicken.html", x.posts[0]?.permalink);
 check("xml label", JSON.stringify(x.posts[0]?.labels) === JSON.stringify(["Dinner"]));

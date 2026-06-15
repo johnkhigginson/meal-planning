@@ -24,6 +24,7 @@ interface MigrateResult {
   imported: number;
   updated: number;
   skipped: number;
+  importedComments: number;
   errors: string[];
 }
 
@@ -307,6 +308,7 @@ export default function MigratePage() {
             </div>
             <p className="text-muted-foreground">
               Added to <span className="font-medium text-foreground">{result.bookName}</span>.
+              {result.importedComments > 0 && ` Imported ${result.importedComments} comment${result.importedComments === 1 ? "" : "s"}.`}
               {" "}Next, run AI extraction below to pull structured ingredients from the posts.
             </p>
             <div className="flex gap-2">
