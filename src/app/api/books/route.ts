@@ -7,7 +7,7 @@ export async function GET() {
   const books = await prisma.recipeBook.findMany({
     where: { householdId },
     include: { _count: { select: { entries: true } } },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
   });
   return NextResponse.json(books);
 }

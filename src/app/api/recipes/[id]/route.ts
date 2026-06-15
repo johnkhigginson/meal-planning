@@ -9,8 +9,10 @@ type RouteParams = { params: Promise<{ id: string }> };
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
+  const recipeId = parseInt(id, 10);
+  if (Number.isNaN(recipeId)) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
   const recipe = await prisma.recipe.findFirst({
-    where: { id: parseInt(id, 10), householdId },
+    where: { id: recipeId, householdId },
     include: {
       ingredients: { include: { ingredient: true, unit: true }, orderBy: { sortOrder: "asc" } },
       tags: { include: { tag: true } },
@@ -25,6 +27,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const householdId = user.householdId;
   const { id } = await params;
   const recipeId = parseInt(id, 10);
+  if (Number.isNaN(recipeId)) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
   const body = await request.json();
   const parsed = updateRecipeSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -88,6 +91,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const householdId = user.householdId;
   const { id } = await params;
   const recipeId = parseInt(id, 10);
+  if (Number.isNaN(recipeId)) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
   const existing = await prisma.recipe.findFirst({ where: { id: recipeId, householdId } });
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 

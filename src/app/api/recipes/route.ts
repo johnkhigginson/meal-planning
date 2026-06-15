@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         ingredients: { include: { ingredient: true, unit: true }, orderBy: { sortOrder: "asc" } },
         tags: { include: { tag: true } },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
     }),

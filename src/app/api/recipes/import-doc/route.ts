@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { parseIngredientLines } from "@/lib/ingredient-parse";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a document that contains one or more recipes, extract each recipe as structured data.
 
@@ -104,21 +105,14 @@ export async function POST(request: NextRequest) {
         let ingredients: { ingredientId: number; quantity: number; unitId: number; notes: string; optional: boolean }[] = [];
         if (recipe.ingredients?.length) {
           try {
-            const parseRes = await fetch(new URL("/api/ingredients/parse", request.url).toString(), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ingredients: recipe.ingredients }),
-            });
-            if (parseRes.ok) {
-              const parsedIngs = await parseRes.json();
-              ingredients = parsedIngs.map((p: { ingredientId: number; quantity: number; unitId: number; notes: string; optional: boolean }) => ({
-                ingredientId: p.ingredientId,
-                quantity: p.quantity,
-                unitId: p.unitId,
-                notes: p.notes,
-                optional: p.optional,
-              }));
-            }
+            const parsedIngs = await parseIngredientLines(recipe.ingredients);
+            ingredients = parsedIngs.map((p) => ({
+              ingredientId: p.ingredientId,
+              quantity: p.quantity,
+              unitId: p.unitId,
+              notes: p.notes,
+              optional: p.optional,
+            }));
           } catch {}
         }
 
@@ -167,21 +161,14 @@ export async function POST(request: NextRequest) {
     let ingredients: { ingredientId: number; quantity: number; unitId: number; notes: string; optional: boolean }[] = [];
     if (recipe.ingredients?.length) {
       try {
-        const parseRes = await fetch(new URL("/api/ingredients/parse", request.url).toString(), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ingredients: recipe.ingredients }),
-        });
-        if (parseRes.ok) {
-          const parsedIngs = await parseRes.json();
-          ingredients = parsedIngs.map((p: { ingredientId: number; quantity: number; unitId: number; notes: string; optional: boolean }) => ({
-            ingredientId: p.ingredientId,
-            quantity: p.quantity,
-            unitId: p.unitId,
-            notes: p.notes,
-            optional: p.optional,
-          }));
-        }
+        const parsedIngs = await parseIngredientLines(recipe.ingredients);
+        ingredients = parsedIngs.map((p) => ({
+          ingredientId: p.ingredientId,
+          quantity: p.quantity,
+          unitId: p.unitId,
+          notes: p.notes,
+          optional: p.optional,
+        }));
       } catch {}
     }
 

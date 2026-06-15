@@ -26,8 +26,10 @@ async function resolveBookSlug(desired: string, bookId: number): Promise<string>
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
+  const bookId = parseInt(id, 10);
+  if (Number.isNaN(bookId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const book = await prisma.recipeBook.findFirst({
-    where: { id: parseInt(id, 10), householdId },
+    where: { id: bookId, householdId },
     include: {
       entries: {
         include: {
@@ -50,6 +52,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
   const bookId = parseInt(id, 10);
+  if (Number.isNaN(bookId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await request.json();
 
   const existing = await prisma.recipeBook.findFirst({ where: { id: bookId, householdId } });
@@ -104,6 +107,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
   const bookId = parseInt(id, 10);
+  if (Number.isNaN(bookId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const existing = await prisma.recipeBook.findFirst({ where: { id: bookId, householdId } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
