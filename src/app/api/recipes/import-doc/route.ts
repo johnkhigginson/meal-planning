@@ -32,6 +32,21 @@ Rules:
 - For servings, extract the number only
 - Separate multiple recipes into separate objects in the array`;
 
+const MAX_IMPORT_RECIPES = 50;
+
+// Safely parse the model's JSON and cap how many recipes a single import can
+// create (defends against malformed output and prompt-injection floods).
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+function safeParseRecipes(jsonStr: string): { recipes: any[] } | null {
+  try {
+    const parsed = JSON.parse(jsonStr);
+    const recipes = Array.isArray(parsed?.recipes) ? parsed.recipes.slice(0, MAX_IMPORT_RECIPES) : [];
+    return { recipes };
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const householdId = await requireHouseholdId();
   const limited = enforceRateLimit("ai-doc", householdId, 10, 60_000);
@@ -39,6 +54,13 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("document") as File | null;
   const text = formData.get("text") as string | null;
+
+  if (file && file.size > 10 * 1024 * 1024) {
+    return NextResponse.json({ error: "Document is too large (max 10MB)" }, { status: 400 });
+  }
+  if (text && text.length > 200_000) {
+    return NextResponse.json({ error: "Text is too long" }, { status: 400 });
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -71,7 +93,10 @@ export async function POST(request: NextRequest) {
       let jsonStr = response.text?.trim() || "";
       if (jsonStr.startsWith("```")) jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
 
-      const parsed = JSON.parse(jsonStr);
+      const parsed = safeParseRecipes(jsonStr);
+      if (!parsed) {
+        return NextResponse.json({ error: "Could not read recipes from that document" }, { status: 502 });
+      }
 
       // Auto-parse ingredients for each recipe
       const results = [];
@@ -132,7 +157,10 @@ export async function POST(request: NextRequest) {
   let jsonStr = response.text?.trim() || "";
   if (jsonStr.startsWith("```")) jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
 
-  const parsed = JSON.parse(jsonStr);
+  const parsed = safeParseRecipes(jsonStr);
+  if (!parsed) {
+    return NextResponse.json({ error: "Could not read recipes from that text" }, { status: 502 });
+  }
 
   const results = [];
   for (const recipe of parsed.recipes || []) {

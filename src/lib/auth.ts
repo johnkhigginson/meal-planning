@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { normalizeEmail } from "./email-normalize";
 import { verifyTurnstile } from "./turnstile";
-import { verifyImpersonationToken } from "./impersonation";
+import { verifyImpersonationToken, consumeImpersonationJti } from "./impersonation";
 import { audit } from "./audit";
 import { checkRateLimit } from "./rate-limit";
 
@@ -86,6 +86,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         const payload = verifyImpersonationToken(credentials?.token as string | undefined);
         if (!payload) return null;
+        // Single-use: reject a replayed token within its TTL window.
+        if (!consumeImpersonationJti(payload.jti)) return null;
 
         const user = await prisma.user.findUnique({ where: { id: payload.targetUserId } });
         if (!user) return null;

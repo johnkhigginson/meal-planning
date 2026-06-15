@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
   if (!file) {
     return NextResponse.json({ error: "Photo is required" }, { status: 400 });
   }
+  if (file.size > 10 * 1024 * 1024) {
+    return NextResponse.json({ error: "Photo is too large (max 10MB)" }, { status: 400 });
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
