@@ -27,6 +27,7 @@ export async function getPublishedBookBySlug(slug: string) {
       id: true,
       householdId: true,
       name: true,
+      tagline: true,
       description: true,
       slug: true,
       coverImageUrl: true,

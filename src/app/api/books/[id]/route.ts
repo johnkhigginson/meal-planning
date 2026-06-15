@@ -65,6 +65,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const data: {
     name?: string;
+    tagline?: string | null;
     description?: string | null;
     coverImageUrl?: string | null;
     isPublished?: boolean;
@@ -73,6 +74,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   } = {};
 
   if (body.name !== undefined) data.name = body.name;
+  if (body.tagline !== undefined) data.tagline = body.tagline?.trim() ? body.tagline.trim() : null;
   if (body.description !== undefined) data.description = body.description ?? null;
   if (body.coverImageUrl !== undefined) data.coverImageUrl = body.coverImageUrl || null;
 

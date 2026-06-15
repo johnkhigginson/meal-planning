@@ -66,6 +66,7 @@ export default async function CookbookPage({ params }: PageProps) {
         bookId={book.id}
         canEdit={canEdit}
         name={book.name}
+        tagline={book.tagline}
         description={book.description}
         coverImageUrl={book.coverImageUrl}
       />

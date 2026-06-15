@@ -11,15 +11,50 @@ interface Props {
   bookId: number;
   canEdit: boolean;
   name: string;
+  tagline: string | null;
   description: string | null;
   coverImageUrl: string | null;
 }
 
+// An intro longer than this is treated as "an article" rather than a one-line
+// lead: it gets a left-aligned, readable column and a collapse toggle so a wall
+// of centered text never dominates the masthead.
+const LONG_INTRO = 240;
+
+// Renders the cookbook's intro/description. Short intros read as a centered
+// lead; long ones become a readable, left-aligned column that starts collapsed.
+function IntroBlock({ text, onDark = false }: { text: string; onDark?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const muted = onDark ? "text-white/85" : "text-muted-foreground";
+  const link = onDark ? "text-white" : "text-primary";
+
+  if (text.length <= LONG_INTRO) {
+    return <p className={`mx-auto mt-3 max-w-2xl ${muted}`}>{text}</p>;
+  }
+
+  return (
+    <div className="mx-auto mt-4 max-w-prose text-left">
+      <p className={`whitespace-pre-line text-[15px] leading-7 ${muted} ${expanded ? "" : "line-clamp-4"}`}>
+        {text}
+      </p>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className={`mt-1.5 text-sm font-medium underline-offset-2 hover:underline ${link}`}
+      >
+        {expanded ? "Show less" : "Read more"}
+      </button>
+    </div>
+  );
+}
+
 // The published cookbook's header. Owners (and admins) get an inline editor to
-// set the title, intro text, and cover image; everyone else sees the result.
-export function BlogHeaderEditor({ bookId, canEdit, name, description, coverImageUrl }: Props) {
+// set the title, subtitle, intro text, and cover image; everyone else sees the
+// rendered result.
+export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, coverImageUrl }: Props) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(name);
+  const [subtitle, setSubtitle] = useState(tagline ?? "");
   const [intro, setIntro] = useState(description ?? "");
   const [cover, setCover] = useState(coverImageUrl);
   const [saving, setSaving] = useState(false);
@@ -54,7 +89,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, description, coverImag
       const res = await fetch(`/api/books/${bookId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: title, description: intro, coverImageUrl: cover }),
+        body: JSON.stringify({ name: title, tagline: subtitle, description: intro, coverImageUrl: cover }),
       });
       if (res.ok) setEditing(false);
       else setError("Could not save the header");
@@ -73,8 +108,23 @@ export function BlogHeaderEditor({ bookId, canEdit, name, description, coverImag
           <Input id="hdr-title" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <div className="space-y-2">
+          <Label htmlFor="hdr-subtitle">Subtitle</Label>
+          <Input
+            id="hdr-subtitle"
+            value={subtitle}
+            placeholder="A short tagline shown under the title (optional)"
+            onChange={(e) => setSubtitle(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="hdr-intro">Intro</Label>
-          <Textarea id="hdr-intro" rows={3} value={intro} onChange={(e) => setIntro(e.target.value)} />
+          <Textarea
+            id="hdr-intro"
+            rows={5}
+            value={intro}
+            placeholder="A longer welcome or story. Long intros collapse with a “Read more” link."
+            onChange={(e) => setIntro(e.target.value)}
+          />
         </div>
         <div className="space-y-2">
           <Label>Cover image</Label>
@@ -107,29 +157,36 @@ export function BlogHeaderEditor({ bookId, canEdit, name, description, coverImag
     );
   }
 
-  // Cover image → immersive hero with the title overlaid; otherwise a clean,
-  // centered editorial masthead.
+  // Cover image → immersive hero with the title + subtitle overlaid, and the
+  // longer intro rendered below where it stays readable.
   if (cover) {
     return (
-      <div className="relative mb-8 overflow-hidden rounded-3xl">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={cover} alt={title} className="h-72 w-full object-cover sm:h-80" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
-          <h1 className="font-display text-4xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-5xl">
-            {title}
-          </h1>
-          {intro && <p className="mt-2 max-w-2xl text-sm text-white/85">{intro}</p>}
+      <div className="mb-8">
+        <div className="relative overflow-hidden rounded-3xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={cover} alt={title} className="h-72 w-full object-cover sm:h-80" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+            <h1 className="font-display text-4xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-5xl">
+              {title}
+            </h1>
+            {subtitle && <p className="mt-2 max-w-2xl text-base text-white/90 sm:text-lg">{subtitle}</p>}
+          </div>
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute right-4 top-4 border-white/40 bg-white/85 hover:bg-white"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit header
+            </Button>
+          )}
         </div>
-        {canEdit && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="absolute right-4 top-4 border-white/40 bg-white/85 hover:bg-white"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit header
-          </Button>
+        {intro && (
+          <div className="text-center">
+            <IntroBlock text={intro} />
+          </div>
         )}
       </div>
     );
@@ -145,7 +202,10 @@ export function BlogHeaderEditor({ bookId, canEdit, name, description, coverImag
         </div>
       )}
       <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
-      {intro && <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">{intro}</p>}
+      {subtitle && (
+        <p className="mx-auto mt-3 max-w-2xl font-display text-lg text-muted-foreground sm:text-xl">{subtitle}</p>
+      )}
+      {intro && <IntroBlock text={intro} />}
       <div className="mx-auto mt-5 h-px w-16 bg-primary/40" />
     </div>
   );

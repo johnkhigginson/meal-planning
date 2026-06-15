@@ -5,8 +5,12 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Clock, Users, Search } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+
+// How many recipes to reveal per "Load more" click on the public blog.
+const PER_PAGE = 12;
 
 export interface BrowserPost {
   id: number;
@@ -31,6 +35,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
   const [query, setQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [sort, setSort] = useState<"new" | "az">("new");
+  const [visible, setVisible] = useState(PER_PAGE);
 
   // Category counts across all posts.
   const categories = useMemo(() => {
@@ -56,6 +61,18 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
     );
     return list;
   }, [posts, query, activeTag, sort]);
+
+  // Collapse back to the first page whenever the result set changes, so a new
+  // search/filter doesn't keep a stale "load more" depth. Adjusting state during
+  // render (rather than in an effect) avoids a flash of the old page length.
+  const filterKey = `${query}|${activeTag ?? ""}|${sort}`;
+  const [prevKey, setPrevKey] = useState(filterKey);
+  if (filterKey !== prevKey) {
+    setPrevKey(filterKey);
+    setVisible(PER_PAGE);
+  }
+
+  const shown = filtered.slice(0, visible);
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row-reverse lg:gap-8">
@@ -127,7 +144,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
           {query ? ` matching “${query}”` : ""}
         </p>
         <div className="space-y-5">
-          {filtered.map((recipe) => {
+          {shown.map((recipe) => {
             const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
             const href = `/blog/${bookSlug}/${recipe.slug ?? recipe.id}`;
             return (
@@ -183,6 +200,23 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
             <div className="py-12 text-center text-muted-foreground">No recipes match your search.</div>
           )}
         </div>
+
+        {shown.length < filtered.length && (
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setVisible((v) => v + PER_PAGE);
+                trackEvent("blog_load_more", { shown: shown.length, total: filtered.length });
+              }}
+            >
+              Load more recipes
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Showing {shown.length} of {filtered.length}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

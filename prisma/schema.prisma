@@ -382,6 +382,7 @@ model RecipeBook {
   id            Int       @id @default(autoincrement())
   householdId   Int
   name          String    @db.NVarChar(300)
+  tagline       String?   @db.NVarChar(500) // optional subtitle shown beneath the blog title
   description   String?   @db.NVarChar(Max)
   slug          String?   @db.NVarChar(350) // public blog URL segment; app-enforced unique when published
   coverImageUrl String?   @db.NVarChar(2000)
