@@ -182,6 +182,7 @@ model UploadedImage {
 model Comment {
   id         Int      @id @default(autoincrement())
   recipeId   Int
+  userId     Int?     // the signed-in commenter; null for imported Blogger comments
   authorName String   @db.NVarChar(120)
   body       String   @db.NVarChar(Max)
   approved   Boolean  @default(true)

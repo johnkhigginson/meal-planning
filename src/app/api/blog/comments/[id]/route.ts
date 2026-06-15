@@ -16,11 +16,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
   const comment = await prisma.comment.findUnique({
     where: { id: commentId },
-    select: { id: true, recipe: { select: { householdId: true } } },
+    select: { id: true, userId: true, recipe: { select: { householdId: true } } },
   });
   if (!comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (!user.isAdmin && comment.recipe.householdId !== user.householdId) {
+  // Allowed: an admin, the recipe owner's household, or the comment's author.
+  const isAuthor = comment.userId != null && comment.userId === user.userId;
+  if (!user.isAdmin && comment.recipe.householdId !== user.householdId && !isAuthor) {
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
