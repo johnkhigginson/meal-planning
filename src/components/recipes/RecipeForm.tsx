@@ -21,7 +21,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { IngredientInput, type RecipeIngredientRow } from "./IngredientInput";
-import { Plus, Loader2, Globe, Upload, Camera } from "lucide-react";
+import { Plus, Loader2, Globe, Upload, Camera, X } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { trackEvent } from "@/lib/analytics";
 
 interface Unit {
@@ -34,6 +35,7 @@ interface Unit {
 interface Tag {
   id: number;
   name: string;
+  householdId: number | null;
 }
 
 interface Member {
@@ -83,6 +85,10 @@ function newIngredientRow(): RecipeIngredientRow {
 
 export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
   const router = useRouter();
+  const { data: session } = useSession();
+  const myHouseholdId = session?.user
+    ? (session.user as { householdId?: string }).householdId ?? null
+    : null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoUploadRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -205,6 +211,21 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       );
       if (!form.tagIds.includes(tag.id)) updateForm("tagIds", [...form.tagIds, tag.id]);
       setNewTagName("");
+    }
+  }
+
+  // A custom category owned by my household can be deleted. Standard categories
+  // (householdId null) and other households' categories cannot.
+  function canDeleteTag(tag: Tag) {
+    return tag.householdId != null && myHouseholdId != null && String(tag.householdId) === myHouseholdId;
+  }
+
+  async function deleteTag(tag: Tag) {
+    if (!confirm(`Delete the category “${tag.name}”? It will be removed from all your recipes.`)) return;
+    const res = await fetch(`/api/tags/${tag.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setAllTags((prev) => prev.filter((t) => t.id !== tag.id));
+      if (form.tagIds.includes(tag.id)) updateForm("tagIds", form.tagIds.filter((id) => id !== tag.id));
     }
   }
 
@@ -743,13 +764,30 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               <Badge
                 key={tag.id}
                 variant={form.tagIds.includes(tag.id) ? "default" : "outline"}
-                className="cursor-pointer"
+                className="cursor-pointer gap-1"
                 onClick={() => toggleTag(tag.id)}
               >
                 {tag.name}
+                {canDeleteTag(tag) && (
+                  <button
+                    type="button"
+                    aria-label={`Delete category ${tag.name}`}
+                    className="-mr-0.5 ml-0.5 rounded-full opacity-60 hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteTag(tag);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </Badge>
             ))}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Standard categories are shared by everyone. Categories you add belong to your
+            household — the ✕ removes one of your own.
+          </p>
           <div className="flex gap-2">
             <Input
               placeholder="New tag name"
