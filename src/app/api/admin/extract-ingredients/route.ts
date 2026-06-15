@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const DEFAULT_BATCH = 6;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Batched AI pass that fills in structured ingredients (and refines steps/times)
 // for imported blog recipes. Processes a small batch per call so it never times
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
       }
 
       const ai = await extractRecipeFromText(text);
+      await sleep(700); // pace requests to stay under Gemini rate limits
 
       if (ai?.isRecipe && ai.ingredients.length > 0) {
         const rows = await parseIngredientLines(ai.ingredients);

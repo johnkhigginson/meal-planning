@@ -35,12 +35,41 @@ export function isAiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Rate limits (429) and transient overloads (503) are common on the Gemini
+// free tier; retry those a few times with exponential backoff instead of
+// failing the whole extraction run.
+function isTransient(err: unknown): boolean {
+  const e = err as { status?: number; code?: number; message?: string };
+  const status = e?.status ?? e?.code;
+  if (status === 429 || status === 503 || status === 500) return true;
+  const m = (e?.message || String(err)).toLowerCase();
+  return /rate limit|quota|overload|unavailable|temporarily|try again|timeout|429|503/.test(m);
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function generateWithRetry(ai: GoogleGenAI, req: any, attempts = 4): Promise<any> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await ai.models.generateContent(req);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransient(err) || i === attempts - 1) throw err;
+      await sleep(1500 * Math.pow(2, i)); // 1.5s, 3s, 6s
+    }
+  }
+  throw lastErr;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 export async function extractRecipeFromText(text: string): Promise<AiRecipe | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || !text.trim()) return null;
 
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry(ai, {
     model: "gemini-2.5-flash-lite",
     contents: [
       {

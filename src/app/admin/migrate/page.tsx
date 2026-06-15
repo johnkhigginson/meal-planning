@@ -140,8 +140,17 @@ export default function MigratePage() {
           remaining: d.remaining,
           done: d.done,
         });
-        // Stop when finished, or when a batch made no progress (persistent errors).
-        if (d.done || d.processed === 0) break;
+        if (d.done) break;
+        // A batch with no progress means every recipe in it errored (usually a
+        // rate/quota limit). Surface the reason instead of stopping silently —
+        // re-running later resumes where it left off.
+        if (d.processed === 0) {
+          const reason = d.errors?.length
+            ? `Stopped after a batch of errors (likely an AI rate/quota limit): ${d.errors[0]}. ${d.remaining} recipe(s) left — try again in a minute.`
+            : `Stopped with ${d.remaining} recipe(s) left. Try again.`;
+          setAiError(reason);
+          break;
+        }
       }
     } catch {
       setAiError("Something went wrong during AI extraction.");
