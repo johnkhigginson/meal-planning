@@ -27,8 +27,11 @@ interface Recipe {
   tags: { tag: Tag }[];
 }
 
+const PAGE_SIZE = 24;
+
 export default function RecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [total, setTotal] = useState(0);
   const [tags, setTags] = useState<Tag[]>([]);
   const [search, setSearch] = useState("");
   const [importingDoc, setImportingDoc] = useState(false);
@@ -37,22 +40,44 @@ export default function RecipesPage() {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const buildParams = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams();
+      if (search) params.set("q", search);
+      if (sourceType !== "ALL") params.set("sourceType", sourceType);
+      if (selectedTagIds.length > 0) params.set("tagIds", selectedTagIds.join(","));
+      if (favoritesOnly) params.set("favorites", "true");
+      params.set("page", String(page));
+      params.set("limit", String(PAGE_SIZE));
+      return params;
+    },
+    [search, sourceType, selectedTagIds, favoritesOnly]
+  );
 
   const fetchRecipes = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("q", search);
-    if (sourceType !== "ALL") params.set("sourceType", sourceType);
-    if (selectedTagIds.length > 0) params.set("tagIds", selectedTagIds.join(","));
-    if (favoritesOnly) params.set("favorites", "true");
-
-    const res = await fetch(`/api/recipes?${params}`);
+    const res = await fetch(`/api/recipes?${buildParams(1)}`);
     if (res.ok) {
       const data = await res.json();
       setRecipes(data.recipes);
+      setTotal(data.total ?? data.recipes.length);
     }
     setLoading(false);
-  }, [search, sourceType, selectedTagIds, favoritesOnly]);
+  }, [buildParams]);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const nextPage = Math.floor(recipes.length / PAGE_SIZE) + 1;
+    const res = await fetch(`/api/recipes?${buildParams(nextPage)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setRecipes((prev) => [...prev, ...data.recipes]);
+      if (typeof data.total === "number") setTotal(data.total);
+    }
+    setLoadingMore(false);
+  }
 
   useEffect(() => {
     fetch("/api/tags").then((r) => r.json()).then(setTags);
@@ -155,11 +180,24 @@ export default function RecipesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {recipes.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} />
-          ))}
-        </div>
+        <>
+          <p className="text-xs text-muted-foreground">
+            Showing {recipes.length} of {total} recipe{total === 1 ? "" : "s"}
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {recipes.map((recipe) => (
+              <RecipeCard key={recipe.id} recipe={recipe} />
+            ))}
+          </div>
+          {recipes.length < total && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Load more
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

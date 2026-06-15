@@ -46,9 +46,8 @@ interface Member {
 export default function MigratePage() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as { systemRole?: string } | undefined)?.systemRole === "ADMIN";
-  const currentUserId = session?.user?.id ?? "";
 
-  const [blogUrl, setBlogUrl] = useState("therecipesociety.blogspot.com");
+  const [blogUrl, setBlogUrl] = useState("");
   const [bookName, setBookName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -66,26 +65,45 @@ export default function MigratePage() {
 
   // Load all users (admin scope) so the importer can hand ownership to any
   // account — including someone in their own separate household, e.g. Mom.
-  // The cookbook and recipes are created in the chosen owner's household.
+  // The owner must be chosen explicitly (no default).
   useEffect(() => {
     fetch("/api/admin/users")
       .then((r) => r.json())
-      .then((data: { users?: Member[] }) => {
-        setMembers(data.users ?? []);
-        setOwnerId((prev) => prev || currentUserId);
-      })
+      .then((data: { users?: Member[] }) => setMembers(data.users ?? []))
       .catch(() => {});
-  }, [currentUserId]);
+  }, []);
 
   const selectedOwner = members.find((m) => String(m.id) === ownerId);
 
+  // Basic blog-address sanity check (host-like, http/https only).
+  function isLikelyBlogUrl(value: string): boolean {
+    const v = value.trim();
+    if (!v) return false;
+    try {
+      const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+      return (u.protocol === "http:" || u.protocol === "https:") && u.hostname.includes(".");
+    } catch {
+      return false;
+    }
+  }
+
   async function runImport() {
-    setRunning(true);
     setError(null);
     setResult(null);
 
+    // Validation: explicit owner, and a valid source.
+    const owner = ownerId ? parseInt(ownerId, 10) : undefined;
+    if (!owner) {
+      setError("Choose who the recipes belong to (Owner).");
+      return;
+    }
+    if (!file && !isLikelyBlogUrl(blogUrl)) {
+      setError("Enter a valid blog address (e.g. yourblog.blogspot.com) or upload an XML export.");
+      return;
+    }
+
+    setRunning(true);
     try {
-      const owner = ownerId ? parseInt(ownerId, 10) : undefined;
       let res: Response;
       if (file) {
         // Offline path: send the Blogger XML export as multipart.
@@ -348,7 +366,7 @@ export default function MigratePage() {
             place (description, full post content, photo) rather than duplicated.
           </p>
 
-          <Button onClick={runImport} disabled={running || (!file && !blogUrl.trim())}>
+          <Button onClick={runImport} disabled={running || !ownerId || (!file && !blogUrl.trim())}>
             {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rss className="mr-2 h-4 w-4" />}
             {running ? "Importing…" : "Start import"}
           </Button>
