@@ -40,12 +40,27 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Rate limits (429) and transient overloads (503) are common on the Gemini
 // free tier; retry those a few times with exponential backoff instead of
 // failing the whole extraction run.
+// A per-day free-tier quota cap (vs a transient per-minute spike). Retrying
+// these is pointless — they only reset after ~24h or by enabling billing.
+export function isDailyQuotaError(err: unknown): boolean {
+  const m = ((err as { message?: string })?.message || String(err)).toLowerCase();
+  return m.includes("perday") || m.includes("per day") || m.includes("free_tier_requests");
+}
+
 function isTransient(err: unknown): boolean {
+  if (isDailyQuotaError(err)) return false; // don't retry a daily cap
   const e = err as { status?: number; code?: number; message?: string };
   const status = e?.status ?? e?.code;
   if (status === 429 || status === 503 || status === 500) return true;
   const m = (e?.message || String(err)).toLowerCase();
   return /rate limit|quota|overload|unavailable|temporarily|try again|timeout|429|503/.test(m);
+}
+
+export function isQuotaError(err: unknown): boolean {
+  const e = err as { status?: number; code?: number; message?: string };
+  if ((e?.status ?? e?.code) === 429) return true;
+  const m = (e?.message || String(err)).toLowerCase();
+  return m.includes("resource_exhausted") || m.includes("quota") || m.includes("429");
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

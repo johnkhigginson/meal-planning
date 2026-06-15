@@ -117,8 +117,9 @@ export default function MigratePage() {
     }
   }
 
-  // Loop the batched AI pass until every imported recipe has been processed.
-  async function runAiExtraction() {
+  // Loop the batched extraction pass. mode "ai" uses Gemini; "heuristic" is the
+  // free, no-AI parse.
+  async function runExtraction(mode: "ai" | "heuristic") {
     setAiRunning(true);
     setAiError(null);
     setAiProgress(null);
@@ -130,7 +131,7 @@ export default function MigratePage() {
         const res = await fetch("/api/admin/extract-ingredients", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ownerUserId: owner, limit: 6 }),
+          body: JSON.stringify({ ownerUserId: owner, limit: 6, mode }),
         });
         const d = await res.json();
         if (!res.ok) {
@@ -146,15 +147,22 @@ export default function MigratePage() {
           done: d.done,
         });
         if (d.done) {
-          trackEvent("ai_extraction", { total: processedTotal });
+          trackEvent(mode === "ai" ? "ai_extraction" : "heuristic_extraction", { total: processedTotal });
           break;
         }
-        // A batch with no progress means every recipe in it errored (usually a
-        // rate/quota limit). Surface the reason instead of stopping silently —
-        // re-running later resumes where it left off.
+        // Quota hit (AI mode) — billing/daily-cap issue, not transient.
+        if (d.quotaExceeded) {
+          setAiError(
+            d.dailyQuota
+              ? `Gemini's free-tier daily limit (20 requests/day) is exhausted. Enable billing on your Google AI project to lift it (extracting all recipes costs only cents), or try again tomorrow. Added ingredients to ${ingredientsTotal} so far; ${d.remaining} left. You can also use Quick extract (no AI) below.`
+              : `Gemini quota/rate limit hit. Wait a minute and run again, or enable billing. ${d.remaining} recipe(s) left.`
+          );
+          break;
+        }
+        // A batch with no progress (non-quota errors).
         if (d.processed === 0) {
           const reason = d.errors?.length
-            ? `Stopped after a batch of errors (likely an AI rate/quota limit): ${d.errors[0]}. ${d.remaining} recipe(s) left — try again in a minute.`
+            ? `Stopped after a batch of errors: ${d.errors[0]}. ${d.remaining} recipe(s) left — try again.`
             : `Stopped with ${d.remaining} recipe(s) left. Try again.`;
           setAiError(reason);
           break;
@@ -407,10 +415,19 @@ export default function MigratePage() {
             processes recipes it hasn&apos;t handled yet.
           </p>
 
-          <Button onClick={runAiExtraction} disabled={aiRunning} variant="outline">
-            {aiRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            {aiRunning ? "Extracting…" : "Run AI extraction"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => runExtraction("ai")} disabled={aiRunning} variant="outline">
+              {aiRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {aiRunning ? "Extracting…" : "Run AI extraction"}
+            </Button>
+            <Button onClick={() => runExtraction("heuristic")} disabled={aiRunning} variant="ghost">
+              Quick extract (no AI)
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            AI gives the best results (needs Gemini billing past the free tier&apos;s 20/day).
+            Quick extract is free and instant but rougher — it reads the post&apos;s ingredient list directly.
+          </p>
 
           {aiProgress && (
             <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
