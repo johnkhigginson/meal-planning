@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, UtensilsCrossed, Store, ArrowRight } from "lucide-react";
+import { Users, UtensilsCrossed, Store, ArrowRight, Rss } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface UserData {
@@ -135,6 +135,22 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </Link>
+        {isAdmin && (
+          <Link href="/admin/migrate">
+            <Card className="group transition-all hover:shadow-md">
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5">
+                  <Rss className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold">Import from Blogger</div>
+                  <div className="text-xs text-muted-foreground">Migrate a blog into a cookbook</div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
 
       {isAdmin && <div>

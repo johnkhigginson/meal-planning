@@ -5,13 +5,12 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { PageLoader } from "@/components/shared/PageLoader";
-import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink } from "lucide-react";
 
 interface BookRecipe {
   id: number;
@@ -20,6 +19,7 @@ interface BookRecipe {
   servings: number;
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
+  imageUrl: string | null;
   tags: { tag: { id: number; name: string } }[];
 }
 
@@ -27,6 +27,8 @@ interface RecipeBook {
   id: number;
   name: string;
   description: string | null;
+  isPublished: boolean;
+  slug: string | null;
   entries: { id: number; recipe: BookRecipe }[];
 }
 
@@ -47,6 +49,9 @@ export default function BookDetailPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Publish to public blog
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     fetch(`/api/books/${bookId}`).then((r) => r.json()).then((data) => { setBook(data); setLoading(false); });
@@ -102,6 +107,23 @@ export default function BookDetailPage() {
     }
   }
 
+  async function togglePublish() {
+    if (!book) return;
+    setPublishing(true);
+    const res = await fetch(`/api/books/${bookId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isPublished: !book.isPublished }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setBook((prev) =>
+        prev ? { ...prev, isPublished: updated.isPublished, slug: updated.slug } : prev
+      );
+    }
+    setPublishing(false);
+  }
+
   if (loading) return <PageLoader />;
   if (!book) return <div className="text-muted-foreground">Book not found</div>;
 
@@ -119,7 +141,16 @@ export default function BookDetailPage() {
             {book.description && <p className="text-sm text-muted-foreground">{book.description}</p>}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={book.isPublished ? "secondary" : "outline"}
+            size="sm"
+            onClick={togglePublish}
+            disabled={publishing}
+          >
+            {publishing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Globe className="mr-2 h-3.5 w-3.5" />}
+            {book.isPublished ? "Published" : "Publish"}
+          </Button>
           <Button variant="outline" size="sm" onClick={shareBook} disabled={sharing}>
             {sharing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Share2 className="mr-2 h-3.5 w-3.5" />}
             Share
@@ -130,6 +161,23 @@ export default function BookDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* Public blog link */}
+      {book.isPublished && book.slug && (
+        <div className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <Globe className="h-4 w-4 text-primary" />
+            <span className="text-muted-foreground">Live publicly at</span>
+            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/blog/{book.slug}</code>
+          </div>
+          <a href={`/blog/${book.slug}`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline">
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+              View blog
+            </Button>
+          </a>
+        </div>
+      )}
 
       {/* Share URL */}
       {shareUrl && (
@@ -153,7 +201,13 @@ export default function BookDetailPage() {
             const recipe = entry.recipe;
             const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
             return (
-              <Card key={entry.id} className="group transition-all hover:shadow-md">
+              <Card key={entry.id} className="group overflow-hidden transition-all hover:shadow-md">
+                {recipe.imageUrl && (
+                  <Link href={`/recipes/${recipe.id}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={recipe.imageUrl} alt={recipe.name} className="h-32 w-full object-cover" />
+                  </Link>
+                )}
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/recipes/${recipe.id}`} className="flex-1">

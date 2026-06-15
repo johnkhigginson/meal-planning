@@ -31,6 +31,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 
   const { ingredients, tagIds, ...recipeData } = parsed.data;
+
+  // An author must be a member of the same household.
+  if (recipeData.authorId != null) {
+    const member = await prisma.user.findFirst({
+      where: { id: recipeData.authorId, householdId },
+      select: { id: true },
+    });
+    if (!member) {
+      return NextResponse.json({ error: "Author must be a household member" }, { status: 400 });
+    }
+  }
+
   await prisma.recipe.update({ where: { id: recipeId }, data: recipeData });
 
   if (ingredients) {

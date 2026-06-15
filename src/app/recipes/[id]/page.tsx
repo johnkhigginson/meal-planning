@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Clock, Users, Pencil, Heart, BookOpen, Globe } from "lucide-react";
+import { Clock, Users, Pencil, Heart, BookOpen, Globe, UserRound } from "lucide-react";
 import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
 import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
 import { RecipeNotes } from "@/components/recipes/RecipeNotes";
@@ -30,6 +30,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
       },
       tags: { include: { tag: true } },
       notes: { orderBy: { createdAt: "desc" } },
+      author: { select: { name: true } },
     },
   });
 
@@ -65,6 +66,16 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Photo */}
+      {recipe.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={recipe.imageUrl}
+          alt={recipe.name}
+          className="max-h-96 w-full rounded-2xl object-cover"
+        />
+      )}
+
       {/* Meta info */}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         {totalTime > 0 && (
@@ -79,7 +90,13 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           <Users className="h-4 w-4" />
           {recipe.servings} servings
         </span>
-        {recipe.sourceType === "WEBSITE" && recipe.sourceUrl && (
+        {recipe.author?.name && (
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <UserRound className="h-4 w-4" />
+            {recipe.author.name}
+          </span>
+        )}
+        {(recipe.sourceType === "WEBSITE" || recipe.sourceType === "BLOG") && recipe.sourceUrl && (
           <a
             href={recipe.sourceUrl}
             target="_blank"

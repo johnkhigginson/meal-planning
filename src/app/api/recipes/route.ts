@@ -55,6 +55,17 @@ export async function POST(request: NextRequest) {
 
   const { ingredients, tagIds, ...recipeData } = parsed.data;
 
+  // An author, if set, must be a member of the same household (mirrors PUT).
+  if (recipeData.authorId != null) {
+    const member = await prisma.user.findFirst({
+      where: { id: recipeData.authorId, householdId },
+      select: { id: true },
+    });
+    if (!member) {
+      return NextResponse.json({ error: "Author must be a household member" }, { status: 400 });
+    }
+  }
+
   const recipe = await prisma.recipe.create({
     data: {
       ...recipeData,

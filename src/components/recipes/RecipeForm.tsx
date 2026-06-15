@@ -35,6 +35,11 @@ interface Tag {
   name: string;
 }
 
+interface Member {
+  id: number;
+  name: string;
+}
+
 interface RecipeFormData {
   name: string;
   description: string;
@@ -46,6 +51,8 @@ interface RecipeFormData {
   sourceUrl: string;
   sourceBookTitle: string;
   sourceBookPage: string;
+  authorId: number | null;
+  imageUrl: string;
   isFavorite: boolean;
   ingredients: RecipeIngredientRow[];
   tagIds: number[];
@@ -79,6 +86,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
   const [importError, setImportError] = useState<string | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [newTagName, setNewTagName] = useState("");
   // Raw ingredient strings from scrape/photo that haven't been matched to DB ingredients yet
   const [rawIngredients, setRawIngredients] = useState<string[]>([]);
@@ -95,6 +103,8 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       sourceUrl: "",
       sourceBookTitle: "",
       sourceBookPage: "",
+      authorId: null,
+      imageUrl: "",
       isFavorite: false,
       ingredients: [newIngredientRow()],
       tagIds: [],
@@ -104,6 +114,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
   useEffect(() => {
     fetch("/api/units").then((r) => r.json()).then(setUnits);
     fetch("/api/tags").then((r) => r.json()).then(setAllTags);
+    fetch("/api/household/members").then((r) => r.json()).then(setMembers).catch(() => {});
   }, []);
 
   function updateForm<K extends keyof RecipeFormData>(
@@ -170,6 +181,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       servings: data.servings || prev.servings,
       prepTimeMinutes: data.prepTimeMinutes ?? prev.prepTimeMinutes,
       cookTimeMinutes: data.cookTimeMinutes ?? prev.cookTimeMinutes,
+      imageUrl: data.imageUrl || prev.imageUrl,
     }));
 
     // Auto-parse ingredient strings into structured rows
@@ -278,6 +290,8 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       sourceUrl: form.sourceType === "WEBSITE" ? form.sourceUrl || undefined : undefined,
       sourceBookTitle: form.sourceType === "BOOK" ? form.sourceBookTitle || undefined : undefined,
       sourceBookPage: form.sourceType === "BOOK" ? form.sourceBookPage || undefined : undefined,
+      authorId: form.authorId,
+      imageUrl: form.imageUrl.trim() || undefined,
       isFavorite: form.isFavorite,
       ingredients: form.ingredients
         .filter((ing) => ing.ingredientId > 0 && ing.quantity > 0 && ing.unitId > 0)
@@ -323,7 +337,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
           >
             <SelectTrigger>
               <SelectValue>
-                {{ PERSONAL: "Personal Recipe", WEBSITE: "Website", BOOK: "Cookbook / Book" }[form.sourceType] ?? "Personal Recipe"}
+                {{ PERSONAL: "Personal Recipe", WEBSITE: "Website", BOOK: "Cookbook / Book", BLOG: "Blog Post" }[form.sourceType] ?? "Personal Recipe"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -499,6 +513,56 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
               rows={2}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl">Photo URL</Label>
+            <div className="flex items-start gap-3">
+              {form.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.imageUrl}
+                  alt="Recipe preview"
+                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                />
+              )}
+              <Input
+                id="imageUrl"
+                type="url"
+                value={form.imageUrl}
+                onChange={(e) => updateForm("imageUrl", e.target.value)}
+                placeholder="https://…/photo.jpg"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A link to a photo for this recipe. Auto-filled when importing from a website.
+            </p>
+          </div>
+
+          {members.length > 0 && (
+            <div className="space-y-2">
+              <Label>Author</Label>
+              <Select
+                value={form.authorId != null ? String(form.authorId) : "none"}
+                onValueChange={(v) =>
+                  updateForm("authorId", v && v !== "none" ? parseInt(v, 10) : null)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {members.find((m) => m.id === form.authorId)?.name ?? "Unassigned"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
