@@ -53,6 +53,10 @@ export const updateRecipeSchema = createRecipeSchema.omit({ bookId: true }).part
 
 export const createTagSchema = z.object({
   name: z.string().min(1).max(100),
+  // Optional target so a category created while tagging a recipe in someone
+  // else's cookbook is scoped to that cookbook's household, not the creator's.
+  bookId: z.number().int().positive().optional(),
+  recipeId: z.number().int().positive().optional(),
 });
 
 // ─── Inventory ──────────────────────────────────────────────────

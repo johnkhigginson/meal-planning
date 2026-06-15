@@ -22,6 +22,7 @@ model Household {
   stores         Store[]
   invites        HouseholdInvite[]
   recipeBooks    RecipeBook[]
+  tags           Tag[]
 }
 
 model User {
@@ -218,10 +219,18 @@ model Comment {
 // ─── Tags ───────────────────────────────────────────────────────
 
 model Tag {
-  id   Int    @id @default(autoincrement())
-  name String @unique @db.NVarChar(100)
+  id          Int    @id @default(autoincrement())
+  householdId Int?   // null = standard category visible to everyone; otherwise owned by one household
+  name        String @db.NVarChar(100)
 
-  recipes RecipeTag[]
+  // NoAction (not Cascade) so we don't create a second cascade path to RecipeTag
+  // alongside Recipe→RecipeTag, which SQL Server rejects. Household deletion is
+  // an admin/rare op that removes a household's tags explicitly.
+  household Household?  @relation(fields: [householdId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recipes   RecipeTag[]
+
+  // App-enforced uniqueness on (householdId, name); index supports scoped lookups.
+  @@index([householdId, name])
 }
 
 model RecipeTag {

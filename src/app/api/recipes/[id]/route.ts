@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { updateRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
 import { isValidAuthor } from "@/lib/collab";
+import { tagsAllowedForHousehold } from "@/lib/tags";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -60,6 +61,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (!(await isValidAuthor(recipeData.authorId, existing.householdId, bookIds))) {
       return NextResponse.json({ error: "Author must be a household member or cookbook collaborator" }, { status: 400 });
     }
+  }
+
+  // Every category must be standard or owned by the recipe's household.
+  if (tagIds && !(await tagsAllowedForHousehold(tagIds, existing.householdId))) {
+    return NextResponse.json({ error: "A selected category isn't available for this recipe" }, { status: 400 });
   }
 
   await prisma.recipe.update({ where: { id: recipeId }, data: recipeData });

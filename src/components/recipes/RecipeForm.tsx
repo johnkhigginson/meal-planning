@@ -189,15 +189,21 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
   async function createTag() {
     if (!newTagName.trim()) return;
+    // Scope the new category to the recipe's household: the target cookbook when
+    // contributing as a collaborator, or the recipe being edited.
     const res = await fetch("/api/tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newTagName.trim() }),
+      body: JSON.stringify({ name: newTagName.trim(), bookId, recipeId }),
     });
     if (res.ok) {
       const tag = await res.json();
-      setAllTags((prev) => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)));
-      updateForm("tagIds", [...form.tagIds, tag.id]);
+      setAllTags((prev) =>
+        prev.some((t) => t.id === tag.id)
+          ? prev
+          : [...prev, tag].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      if (!form.tagIds.includes(tag.id)) updateForm("tagIds", [...form.tagIds, tag.id]);
       setNewTagName("");
     }
   }

@@ -12,6 +12,7 @@ import {
 import { uniqueSlug } from "@/lib/slug";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { audit } from "@/lib/audit";
+import { findOrCreateHouseholdTag } from "@/lib/tags";
 
 export const runtime = "nodejs";
 // A full blog can have hundreds of posts; give the import room to run.
@@ -148,18 +149,15 @@ export async function POST(request: NextRequest) {
   const entryRecipeIds = new Set(existingEntries.map((e) => e.recipeId));
   let sortOrder = existingEntries.length;
 
-  // Cache tag ids so repeated labels don't re-query.
+  // Cache tag ids so repeated labels don't re-query. Imported labels become
+  // categories owned by the destination household (or reuse a standard one).
   const tagCache = new Map<string, number>();
   async function getTagId(name: string): Promise<number> {
     const key = name.trim();
     if (tagCache.has(key)) return tagCache.get(key)!;
-    const tag = await prisma.tag.upsert({
-      where: { name: key },
-      update: {},
-      create: { name: key },
-    });
-    tagCache.set(key, tag.id);
-    return tag.id;
+    const id = await findOrCreateHouseholdTag(key, householdId);
+    tagCache.set(key, id);
+    return id;
   }
 
   let imported = 0;

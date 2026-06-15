@@ -4,6 +4,7 @@ import { requireHouseholdId, requireUser } from "@/lib/auth";
 import { createRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
 import { isValidAuthor } from "@/lib/collab";
+import { tagsAllowedForHousehold } from "@/lib/tags";
 
 export async function GET(request: NextRequest) {
   const householdId = await requireHouseholdId();
@@ -84,6 +85,11 @@ export async function POST(request: NextRequest) {
     if (!(await isValidAuthor(recipeData.authorId, targetHouseholdId, targetBookId ? [targetBookId] : []))) {
       return NextResponse.json({ error: "Author must be a household member or cookbook collaborator" }, { status: 400 });
     }
+  }
+
+  // Every category must be standard or owned by the recipe's household.
+  if (!(await tagsAllowedForHousehold(tagIds, targetHouseholdId))) {
+    return NextResponse.json({ error: "A selected category isn't available for this recipe" }, { status: 400 });
   }
 
   const recipe = await prisma.recipe.create({

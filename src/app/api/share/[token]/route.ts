@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { findOrCreateHouseholdTag } from "@/lib/tags";
 
 type RouteParams = { params: Promise<{ token: string }> };
+
+// Source tags may belong to another household. When copying a shared recipe in,
+// keep standard categories as-is but re-home custom ones in the importer's
+// household so we don't reference another household's private categories.
+type SourceTag = { tag: { id: number; name: string; householdId: number | null } };
+async function mapTagsToHousehold(tags: SourceTag[], householdId: number): Promise<{ tagId: number }[]> {
+  const ids: number[] = [];
+  for (const { tag } of tags) {
+    ids.push(tag.householdId === null ? tag.id : await findOrCreateHouseholdTag(tag.name, householdId));
+  }
+  return Array.from(new Set(ids)).map((tagId) => ({ tagId }));
+}
 
 // Get shared content (public — no auth required for viewing)
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -63,10 +76,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   if (link.shareType === "RECIPE" && link.recipeId) {
     const source = await prisma.recipe.findUnique({
       where: { id: link.recipeId },
-      include: { ingredients: true, tags: true },
+      include: { ingredients: true, tags: { include: { tag: true } } },
     });
     if (!source) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 
+    const mappedTags = await mapTagsToHousehold(source.tags, user.householdId);
     const recipe = await prisma.recipe.create({
       data: {
         householdId: user.householdId,
@@ -90,7 +104,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             sortOrder: i.sortOrder,
           })),
         },
-        tags: { create: source.tags.map((t) => ({ tagId: t.tagId })) },
+        tags: { create: mappedTags },
       },
     });
     return NextResponse.json({ imported: 1, recipeId: recipe.id });
@@ -100,7 +114,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const source = await prisma.recipeBook.findUnique({
       where: { id: link.recipeBookId },
       include: {
-        entries: { include: { recipe: { include: { ingredients: true, tags: true } } } },
+        entries: { include: { recipe: { include: { ingredients: true, tags: { include: { tag: true } } } } } },
       },
     });
     if (!source) return NextResponse.json({ error: "Book not found" }, { status: 404 });
@@ -114,6 +128,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     let imported = 0;
     for (const entry of source.entries) {
       const r = entry.recipe;
+      const mappedTags = await mapTagsToHousehold(r.tags, user.householdId);
       const recipe = await prisma.recipe.create({
         data: {
           householdId: user.householdId,
@@ -137,7 +152,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               sortOrder: i.sortOrder,
             })),
           },
-          tags: { create: r.tags.map((t) => ({ tagId: t.tagId })) },
+          tags: { create: mappedTags },
         },
       });
       await prisma.recipeBookEntry.create({

@@ -101,26 +101,19 @@ async function main() {
     });
   }
 
-  // ─── Tags ───────────────────────────────────────────────────
-  const tagNames = [
-    "Italian",
-    "Mexican",
-    "Asian",
-    "Quick",
-    "Vegetarian",
-    "Vegan",
-    "Gluten-Free",
-    "Comfort Food",
-    "Healthy",
-    "Dessert",
+  // ─── Standard categories ────────────────────────────────────
+  // Standard (householdId = null) categories everyone sees. Keep in sync with
+  // STANDARD_TAGS in src/lib/tags.ts. `name` is no longer globally unique, so
+  // find-or-create against the standard scope rather than upserting by name.
+  const standardTags = [
+    "Breakfast", "Lunch", "Dinner", "Appetizer", "Side Dish", "Salad", "Soup",
+    "Bread", "Dessert", "Snack", "Drink", "Sauce", "Vegetarian", "Vegan",
+    "Gluten-Free", "Quick", "Healthy", "Comfort Food", "Italian", "Mexican", "Asian",
   ];
 
-  for (const name of tagNames) {
-    await prisma.tag.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
+  for (const name of standardTags) {
+    const existing = await prisma.tag.findFirst({ where: { name, householdId: null } });
+    if (!existing) await prisma.tag.create({ data: { name, householdId: null } });
   }
 
   console.log("Seed completed: units, conversions, and tags created.");
