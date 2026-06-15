@@ -9,6 +9,7 @@
 // Both normalize to the same `BloggerPost` shape.
 
 import * as cheerio from "cheerio";
+import { safeFetch } from "@/lib/ssrf";
 
 export interface BloggerPost {
   title: string;
@@ -114,7 +115,8 @@ export function normalizeBlogUrl(input: string): string {
   return `${url.protocol}//${url.host}`;
 }
 
-type FetchImpl = typeof fetch;
+// Defaults to the SSRF-guarded fetch; tests can inject a mock.
+type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>;
 
 /**
  * Paginate the Blogger JSON feed to pull every published post. The feed caps
@@ -122,7 +124,7 @@ type FetchImpl = typeof fetch;
  */
 export async function fetchAllBloggerPosts(
   blogUrl: string,
-  fetchImpl: FetchImpl = fetch
+  fetchImpl: FetchImpl = safeFetch
 ): Promise<BloggerImport> {
   const origin = normalizeBlogUrl(blogUrl);
   const pageSize = 150;
@@ -188,7 +190,7 @@ export function parseBloggerJsonComments(json: any): { comments: BloggerComment[
 // Paginate the blog-wide comments feed.
 export async function fetchAllBloggerComments(
   blogUrl: string,
-  fetchImpl: FetchImpl = fetch
+  fetchImpl: FetchImpl = safeFetch
 ): Promise<BloggerComment[]> {
   const origin = normalizeBlogUrl(blogUrl);
   const pageSize = 150;

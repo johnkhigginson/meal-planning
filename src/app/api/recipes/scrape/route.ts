@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
+import { safeFetch } from "@/lib/ssrf";
 
 function cleanText(text: string): string {
   return text
@@ -240,7 +241,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

@@ -90,7 +90,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const recipeId = parseInt(id, 10);
   const existing = await prisma.recipe.findFirst({ where: { id: recipeId, householdId } });
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
-  await prisma.recipe.delete({ where: { id: recipeId } });
+
+  // Remove rows that reference this recipe with onDelete: NoAction (book
+  // entries, meal-plan entries, share links) before deleting it — otherwise the
+  // FK constraint blocks the delete. Ingredients/tags/notes/comments cascade.
+  await prisma.$transaction([
+    prisma.recipeBookEntry.deleteMany({ where: { recipeId } }),
+    prisma.mealPlanEntry.deleteMany({ where: { recipeId } }),
+    prisma.shareLink.deleteMany({ where: { recipeId } }),
+    prisma.recipe.delete({ where: { id: recipeId } }),
+  ]);
 
   await audit({
     category: "RECIPE",

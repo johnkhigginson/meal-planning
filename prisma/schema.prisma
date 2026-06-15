@@ -124,8 +124,9 @@ model Recipe {
   sourceBookPage  String?  @db.NVarChar(50)
   imageUrl        String?  @db.NVarChar(2000)
   isFavorite      Boolean  @default(false)
-  publishedAt     DateTime? // original publish date (for migrated blog posts); drives blog ordering
-  aiProcessedAt   DateTime? // when the AI ingredient-extraction pass last handled this recipe
+  publishedAt        DateTime? // original publish date (for migrated blog posts); drives blog ordering
+  aiProcessedAt      DateTime? // when the AI ingredient-extraction pass last handled this recipe
+  imageLocalizeFailed Boolean  @default(false) // self-hosting this recipe's photo failed; don't retry
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

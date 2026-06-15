@@ -108,6 +108,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const existing = await prisma.recipeBook.findFirst({ where: { id: bookId, householdId } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.recipeBook.delete({ where: { id: bookId } });
+  // Share links reference the book with onDelete: NoAction — remove them first.
+  await prisma.$transaction([
+    prisma.shareLink.deleteMany({ where: { recipeBookId: bookId } }),
+    prisma.recipeBook.delete({ where: { id: bookId } }),
+  ]);
   return NextResponse.json({ success: true });
 }

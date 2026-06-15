@@ -30,12 +30,12 @@ export async function POST(request: NextRequest) {
     householdId = owner.householdId;
   }
 
-  // External = has an imageUrl that isn't one of our /api/images paths.
+  // External = an http(s) imageUrl we haven't already self-hosted or given up on.
   const where = {
     householdId,
     sourceType: "BLOG",
     imageUrl: { startsWith: "http" },
-    NOT: { imageUrl: { startsWith: "/api/images/" } },
+    imageLocalizeFailed: false,
   } as const;
 
   const batch = await prisma.recipe.findMany({
@@ -46,20 +46,33 @@ export async function POST(request: NextRequest) {
   });
 
   let converted = 0;
+  let failed = 0;
   const errors: string[] = [];
 
   for (const recipe of batch) {
     if (!recipe.imageUrl) continue;
-    const localUrl = await fetchAndStoreImage(recipe.imageUrl, admin.userId);
-    if (localUrl) {
-      await prisma.recipe.update({ where: { id: recipe.id }, data: { imageUrl: localUrl } });
+    const result = await fetchAndStoreImage(recipe.imageUrl, admin.userId);
+    if ("url" in result) {
+      await prisma.recipe.update({ where: { id: recipe.id }, data: { imageUrl: result.url } });
       converted++;
     } else {
-      errors.push(`recipe ${recipe.id}: could not fetch image`);
+      // Couldn't download — keep the original link, mark it so we don't retry
+      // forever, and keep processing the rest.
+      await prisma.recipe.update({ where: { id: recipe.id }, data: { imageLocalizeFailed: true } });
+      failed++;
+      errors.push(`recipe ${recipe.id}: ${result.error}`);
     }
   }
 
   const remaining = await prisma.recipe.count({ where });
-
-  return NextResponse.json({ processed: converted, converted, remaining, done: remaining === 0, errors: errors.slice(0, 10) });
+  // `processed` counts work done this batch (success or given-up) so the client
+  // loop always makes progress and never halts on a run of un-fetchable images.
+  return NextResponse.json({
+    processed: converted + failed,
+    converted,
+    failed,
+    remaining,
+    done: remaining === 0,
+    errors: errors.slice(0, 10),
+  });
 }

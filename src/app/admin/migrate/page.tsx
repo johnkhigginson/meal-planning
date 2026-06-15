@@ -61,7 +61,7 @@ export default function MigratePage() {
   const [aiProgress, setAiProgress] = useState<AiProgress | null>(null);
   const [imgRunning, setImgRunning] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
-  const [imgProgress, setImgProgress] = useState<{ converted: number; remaining: number; done: boolean } | null>(null);
+  const [imgProgress, setImgProgress] = useState<{ converted: number; failed: number; remaining: number; done: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Load all users (admin scope) so the importer can hand ownership to any
@@ -182,6 +182,8 @@ export default function MigratePage() {
     setImgProgress(null);
     const owner = ownerId ? parseInt(ownerId, 10) : undefined;
     let convertedTotal = 0;
+    let failedTotal = 0;
+    let lastError = "";
     try {
       for (let i = 0; i < 1000; i++) {
         const res = await fetch("/api/admin/localize-images", {
@@ -195,17 +197,18 @@ export default function MigratePage() {
           break;
         }
         convertedTotal += d.converted;
-        setImgProgress({ converted: convertedTotal, remaining: d.remaining, done: d.done });
+        failedTotal += d.failed ?? 0;
+        if (d.errors?.length) lastError = d.errors[0];
+        setImgProgress({ converted: convertedTotal, failed: failedTotal, remaining: d.remaining, done: d.done });
         if (d.done) {
-          trackEvent("photos_localized", { total: convertedTotal });
+          trackEvent("photos_localized", { total: convertedTotal, failed: failedTotal });
+          if (failedTotal > 0) {
+            setImgError(`${failedTotal} photo(s) couldn't be downloaded and kept their original link (e.g. ${lastError}).`);
+          }
           break;
         }
         if (d.processed === 0) {
-          setImgError(
-            d.errors?.length
-              ? `Stopped — some images couldn't be downloaded (${d.remaining} left): ${d.errors[0]}`
-              : `Stopped with ${d.remaining} image(s) left.`
-          );
+          setImgError(`Stopped with ${d.remaining} image(s) left.`);
           break;
         }
       }
@@ -464,7 +467,8 @@ export default function MigratePage() {
           </Button>
           {imgProgress && (
             <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
-              Self-hosted <span className="font-medium">{imgProgress.converted}</span> ·{" "}
+              Self-hosted <span className="font-medium">{imgProgress.converted}</span>
+              {imgProgress.failed > 0 && <> · {imgProgress.failed} kept original link</>} ·{" "}
               {imgProgress.remaining} remaining{imgProgress.done && " · done ✓"}
             </div>
           )}
