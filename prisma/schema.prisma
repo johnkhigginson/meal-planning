@@ -406,8 +406,26 @@ model RecipeBook {
   shares        ShareLink[]
   collaborators RecipeBookCollaborator[]
   subscribers   BlogSubscriber[]
+  invites       CookbookInvite[]
 
   @@index([slug])
+}
+
+// A pending invitation to collaborate on a cookbook for someone who doesn't yet
+// have an account. They get an email with a tokenized link to sign up and accept.
+model CookbookInvite {
+  id            Int       @id @default(autoincrement())
+  recipeBookId  Int
+  email         String    @db.NVarChar(320)
+  token         String    @unique @db.NVarChar(100)
+  invitedByName String?   @db.NVarChar(200)
+  createdAt     DateTime  @default(now())
+  acceptedAt    DateTime?
+
+  recipeBook RecipeBook @relation(fields: [recipeBookId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeBookId, email])
+  @@index([token])
 }
 
 // A logged-in visitor following a published cookbook (blog). Followers are

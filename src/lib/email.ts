@@ -84,6 +84,51 @@ export async function sendNewRecipeEmail(opts: {
   });
 }
 
+// Invite someone WITHOUT an account to collaborate on a cookbook. The link
+// takes them to sign up and accept the invitation.
+export async function sendCookbookInviteEmail(opts: {
+  toEmail: string;
+  inviterName: string;
+  bookName: string;
+  acceptUrl: string;
+}) {
+  const client = getClient();
+  const { toEmail, inviterName, bookName, acceptUrl } = opts;
+
+  await client.sendEmail({
+    From: "hello@mylemonkitchen.com",
+    To: toEmail,
+    Subject: `${inviterName} invited you to collaborate on “${bookName}”`,
+    HtmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <span style="font-size: 24px; font-weight: 700;">My Lemon Kitchen</span>
+        </div>
+        <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 16px;">You've been invited to collaborate!</h1>
+        <p style="color: #555; line-height: 1.6; margin: 0 0 24px;">
+          <strong>${inviterName}</strong> invited you to help with the cookbook
+          <strong>${bookName}</strong> on My Lemon Kitchen. You'll be able to add and edit
+          recipes and be credited as an author — all while keeping your own kitchen separate.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${acceptUrl}" style="display: inline-block; background: #000; color: #FFF700; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Create your account &amp; accept
+          </a>
+        </div>
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          Already have an account? Open the link above while signed in and you can accept right away.
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+        <p style="color: #bbb; font-size: 12px; text-align: center;">
+          My Lemon Kitchen — Meal planning, squeezed simple.
+        </p>
+      </div>
+    `,
+    TextBody: `${inviterName} invited you to collaborate on the cookbook "${bookName}" on My Lemon Kitchen.\n\nCreate your account and accept: ${acceptUrl}\n\nAlready have an account? Open the link while signed in to accept.`,
+    MessageStream: "outbound",
+  });
+}
+
 export async function sendHouseholdInviteEmail(
   toEmail: string,
   inviterName: string,

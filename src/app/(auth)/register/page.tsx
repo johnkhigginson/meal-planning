@@ -45,6 +45,21 @@ export default function RegisterPage() {
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Prefilled email and post-signup destination (e.g. a cookbook invite link).
+  // Read from window to avoid wrapping the page in a Suspense boundary.
+  const [callbackUrl, setCallbackUrl] = useState("/");
+
+  useEffect(() => {
+    // Read once after mount (browser-only) to avoid a hydration mismatch.
+    const sp = new URLSearchParams(window.location.search);
+    const prefill = sp.get("email");
+    const cb = sp.get("callbackUrl");
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (prefill) setEmail(prefill);
+    // Only honor same-site relative paths.
+    if (cb && cb.startsWith("/") && !cb.startsWith("//")) setCallbackUrl(cb);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -135,7 +150,7 @@ export default function RegisterPage() {
       setError("Account created but sign-in failed. Please try logging in.");
       setLoading(false);
     } else {
-      window.location.href = "/";
+      window.location.href = callbackUrl;
     }
   }
 
@@ -209,7 +224,10 @@ export default function RegisterPage() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link
+              href={`/login${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+              className="text-primary hover:underline"
+            >
               Sign in
             </Link>
           </p>

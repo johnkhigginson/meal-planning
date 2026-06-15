@@ -43,6 +43,16 @@ export default function LoginPage() {
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Where to go after sign-in (e.g. back to a blog or an invite link). Read
+  // from the URL; only same-site relative paths are honored.
+  const [callbackUrl, setCallbackUrl] = useState("/");
+
+  useEffect(() => {
+    // Read once after mount (browser-only) to avoid a hydration mismatch.
+    const cb = new URLSearchParams(window.location.search).get("callbackUrl");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (cb && cb.startsWith("/") && !cb.startsWith("//")) setCallbackUrl(cb);
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -119,7 +129,7 @@ export default function LoginPage() {
     } else {
       trackEvent("login");
       // Successful login — full page navigation to pick up the session
-      window.location.href = "/";
+      window.location.href = callbackUrl;
     }
   }
 
@@ -167,7 +177,10 @@ export default function LoginPage() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link
+              href={`/register${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+              className="text-primary hover:underline"
+            >
               Sign up
             </Link>
           </p>

@@ -15,11 +15,13 @@ export default auth((req) => {
   if (
     publicPaths.includes(pathname) ||
     pathname.startsWith("/share/") ||
+    pathname.startsWith("/invite/") ||
     pathname === "/blog" ||
     pathname.startsWith("/blog/") ||
     pathname.startsWith("/api/images") ||
     pathname.startsWith("/api/blog/") ||
-    pathname.startsWith("/api/share/")
+    pathname.startsWith("/api/share/") ||
+    pathname.startsWith("/api/invite/")
   ) {
     return NextResponse.next();
   }

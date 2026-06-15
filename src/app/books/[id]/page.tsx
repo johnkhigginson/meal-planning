@@ -68,13 +68,21 @@ export default function BookDetailPage() {
 
   // Collaborators
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [invites, setInvites] = useState<{ email: string }[]>([]);
   const [collabEmail, setCollabEmail] = useState("");
   const [collabBusy, setCollabBusy] = useState(false);
   const [collabError, setCollabError] = useState("");
+  const [collabNotice, setCollabNotice] = useState("");
 
   useEffect(() => {
     fetch(`/api/books/${bookId}`).then((r) => r.json()).then((data) => { setBook(data); setLoading(false); });
-    fetch(`/api/books/${bookId}/collaborators`).then((r) => r.json()).then((d) => setCollaborators(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/books/${bookId}/collaborators`)
+      .then((r) => r.json())
+      .then((d) => {
+        setCollaborators(Array.isArray(d?.collaborators) ? d.collaborators : []);
+        setInvites(Array.isArray(d?.invites) ? d.invites : []);
+      })
+      .catch(() => {});
   }, [bookId]);
 
   const isOwner = !!book && !!myHouseholdId && String(book.householdId) === myHouseholdId;
@@ -83,6 +91,7 @@ export default function BookDetailPage() {
     if (!collabEmail.trim()) return;
     setCollabBusy(true);
     setCollabError("");
+    setCollabNotice("");
     const res = await fetch(`/api/books/${bookId}/collaborators`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -90,7 +99,13 @@ export default function BookDetailPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setCollaborators((prev) => [...prev.filter((c) => c.id !== data.id), data]);
+      if (data.invited) {
+        // No account yet — an invitation email was sent.
+        setInvites((prev) => [...prev.filter((i) => i.email !== data.email), { email: data.email }]);
+        setCollabNotice(`Invitation emailed to ${data.email}. They can create an account and accept.`);
+      } else {
+        setCollaborators((prev) => [...prev.filter((c) => c.id !== data.id), data]);
+      }
       setCollabEmail("");
     } else {
       setCollabError(data.error || "Could not add collaborator");
@@ -101,6 +116,11 @@ export default function BookDetailPage() {
   async function removeCollaborator(userId: number) {
     await fetch(`/api/books/${bookId}/collaborators?userId=${userId}`, { method: "DELETE" });
     setCollaborators((prev) => prev.filter((c) => c.id !== userId));
+  }
+
+  async function removeInvite(email: string) {
+    await fetch(`/api/books/${bookId}/collaborators?email=${encodeURIComponent(email)}`, { method: "DELETE" });
+    setInvites((prev) => prev.filter((i) => i.email !== email));
   }
 
   useEffect(() => {
@@ -251,7 +271,8 @@ export default function BookDetailPage() {
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Invite people from other households to help with this cookbook. They keep their own
-            kitchen and can be credited as recipe authors.
+            kitchen and can be credited as recipe authors. No account yet? They&apos;ll get an email
+            inviting them to sign up and accept.
           </p>
           {collaborators.length > 0 && (
             <div className="mt-3 space-y-1.5">
@@ -259,6 +280,18 @@ export default function BookDetailPage() {
                 <div key={c.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-1.5 text-sm">
                   <span>{c.name} <span className="text-muted-foreground">· {c.email}</span></span>
                   <button onClick={() => removeCollaborator(c.id)} className="text-muted-foreground hover:text-destructive" title="Remove">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {invites.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {invites.map((i) => (
+                <div key={i.email} className="flex items-center justify-between rounded-lg border border-dashed border-border/60 px-3 py-1.5 text-sm">
+                  <span className="text-muted-foreground">{i.email} · invited (pending)</span>
+                  <button onClick={() => removeInvite(i.email)} className="text-muted-foreground hover:text-destructive" title="Cancel invite">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -280,6 +313,7 @@ export default function BookDetailPage() {
             </Button>
           </div>
           {collabError && <p className="mt-1.5 text-xs text-destructive">{collabError}</p>}
+          {collabNotice && <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">{collabNotice}</p>}
         </div>
       )}
 
