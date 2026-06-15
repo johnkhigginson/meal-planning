@@ -11,6 +11,8 @@ import { Clock, Users, Pencil, Heart, BookOpen, Globe, UserRound } from "lucide-
 import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
 import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
 import { RecipeNotes } from "@/components/recipes/RecipeNotes";
+import { sanitizeBlogHtml } from "@/lib/sanitize";
+import { PROSE_CLASS } from "@/components/blog/BlogShell";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -128,44 +130,58 @@ export default async function RecipeDetailPage({ params }: PageProps) {
 
       <Separator />
 
-      {/* Ingredients */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Ingredients</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {recipe.ingredients.map((ri) => (
-              <li key={ri.id} className="flex items-baseline gap-2">
-                <span className="font-medium">
-                  {ri.quantity} {ri.unit.abbreviation}
-                </span>
-                <span>{ri.ingredient.name}</span>
-                {ri.notes && (
-                  <span className="text-sm text-muted-foreground">
-                    ({ri.notes})
+      {/* Ingredients (hidden when none have been added yet) */}
+      {recipe.ingredients.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ingredients</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {recipe.ingredients.map((ri) => (
+                <li key={ri.id} className="flex items-baseline gap-2">
+                  <span className="font-medium">
+                    {ri.quantity} {ri.unit.abbreviation}
                   </span>
-                )}
-                {ri.optional && (
-                  <Badge variant="secondary" className="text-xs">
-                    optional
-                  </Badge>
-                )}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+                  <span>{ri.ingredient.name}</span>
+                  {ri.notes && (
+                    <span className="text-sm text-muted-foreground">
+                      ({ri.notes})
+                    </span>
+                  )}
+                  {ri.optional && (
+                    <Badge variant="secondary" className="text-xs">
+                      optional
+                    </Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Instructions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Instructions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="whitespace-pre-wrap">{recipe.instructions}</div>
-        </CardContent>
-      </Card>
+      {/* For migrated blog posts, render the full preserved post so no content
+          is lost. Otherwise show the structured instructions. */}
+      {recipe.bodyHtml ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recipe</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={PROSE_CLASS} dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(recipe.bodyHtml) }} />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Instructions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="whitespace-pre-wrap">{recipe.instructions}</div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notes */}
       {recipe.notes.length > 0 && (

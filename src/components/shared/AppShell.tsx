@@ -15,18 +15,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = authPages.includes(pathname);
   const isLandingPage = pathname === "/";
+  // The public blog is fully standalone: no app chrome for anyone (including
+  // logged-in users), and it must render immediately without the session
+  // loading gate (which otherwise swaps the page for a spinner — breaking
+  // back-navigation between the recipe list and a recipe).
+  const isBlog = pathname === "/blog" || pathname.startsWith("/blog/");
 
   // Don't show loading spinner on public pages
-  if (status === "loading" && !isAuthPage && !isLandingPage) {
+  if (status === "loading" && !isAuthPage && !isLandingPage && !isBlog) {
     return <PageLoader />;
   }
 
-  const showNav = session && !isAuthPage && !(isLandingPage && !session);
+  const showNav = session && !isAuthPage && !isBlog && !(isLandingPage && !session);
 
   if (!showNav) {
     return (
       <div className="flex-1">
-        <ImpersonationBanner />
+        {!isBlog && <ImpersonationBanner />}
         {children}
       </div>
     );

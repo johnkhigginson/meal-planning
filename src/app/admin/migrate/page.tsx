@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Rss, Loader2, Upload, CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Rss, Loader2, Upload, CheckCircle2, AlertTriangle, ExternalLink, Sparkles } from "lucide-react";
 
 interface MigrateResult {
   blogTitle: string;
@@ -22,8 +22,16 @@ interface MigrateResult {
   bookName: string;
   totalPosts: number;
   imported: number;
+  updated: number;
   skipped: number;
   errors: string[];
+}
+
+interface AiProgress {
+  processed: number;
+  withIngredients: number;
+  remaining: number;
+  done: boolean;
 }
 
 interface Member {
@@ -46,6 +54,9 @@ export default function MigratePage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MigrateResult | null>(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiProgress, setAiProgress] = useState<AiProgress | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Load all users (admin scope) so the importer can hand ownership to any
@@ -97,6 +108,44 @@ export default function MigratePage() {
       setError("Something went wrong running the import.");
     } finally {
       setRunning(false);
+    }
+  }
+
+  // Loop the batched AI pass until every imported recipe has been processed.
+  async function runAiExtraction() {
+    setAiRunning(true);
+    setAiError(null);
+    setAiProgress(null);
+    const owner = ownerId ? parseInt(ownerId, 10) : undefined;
+    let processedTotal = 0;
+    let ingredientsTotal = 0;
+    try {
+      for (let i = 0; i < 1000; i++) {
+        const res = await fetch("/api/admin/extract-ingredients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ownerUserId: owner, limit: 6 }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setAiError(d.error || "Extraction failed");
+          break;
+        }
+        processedTotal += d.processed;
+        ingredientsTotal += d.withIngredients;
+        setAiProgress({
+          processed: processedTotal,
+          withIngredients: ingredientsTotal,
+          remaining: d.remaining,
+          done: d.done,
+        });
+        // Stop when finished, or when a batch made no progress (persistent errors).
+        if (d.done || d.processed === 0) break;
+      }
+    } catch {
+      setAiError("Something went wrong during AI extraction.");
+    } finally {
+      setAiRunning(false);
     }
   }
 
@@ -224,6 +273,11 @@ export default function MigratePage() {
             </div>
           )}
 
+          <p className="text-xs text-muted-foreground">
+            Re-running is safe: posts already imported are <span className="font-medium">updated</span> in
+            place (description, full post content, photo) rather than duplicated.
+          </p>
+
           <Button onClick={runImport} disabled={running || (!file && !blogUrl.trim())}>
             {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rss className="mr-2 h-4 w-4" />}
             {running ? "Importing…" : "Start import"}
@@ -247,13 +301,13 @@ export default function MigratePage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="grid grid-cols-3 gap-3">
-              <Stat label="Imported" value={result.imported} />
-              <Stat label="Skipped" value={result.skipped} />
+              <Stat label="New" value={result.imported} />
+              <Stat label="Updated" value={result.updated} />
               <Stat label="Total posts" value={result.totalPosts} />
             </div>
             <p className="text-muted-foreground">
               Added to <span className="font-medium text-foreground">{result.bookName}</span>.
-              {result.skipped > 0 && " Skipped posts were already imported."}
+              {" "}Next, run AI extraction below to pull structured ingredients from the posts.
             </p>
             <div className="flex gap-2">
               <Link href={`/books/${result.bookId}`}>
@@ -276,6 +330,44 @@ export default function MigratePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Step 2 — AI ingredient extraction. Runnable any time for the selected
+          owner; processes in batches and loops until done. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" /> Extract ingredients with AI
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Reads each imported post and pulls out structured ingredients and steps
+            {selectedOwner ? <> for <span className="font-medium text-foreground">{selectedOwner.name}</span></> : null}.
+            Posts without a real recipe are skipped. Safe to run repeatedly — it only
+            processes recipes it hasn&apos;t handled yet.
+          </p>
+
+          <Button onClick={runAiExtraction} disabled={aiRunning} variant="outline">
+            {aiRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            {aiRunning ? "Extracting…" : "Run AI extraction"}
+          </Button>
+
+          {aiProgress && (
+            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
+              Processed <span className="font-medium">{aiProgress.processed}</span> · added ingredients to{" "}
+              <span className="font-medium">{aiProgress.withIngredients}</span> · {aiProgress.remaining} remaining
+              {aiProgress.done && " · done ✓"}
+            </div>
+          )}
+
+          {aiError && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{aiError}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
