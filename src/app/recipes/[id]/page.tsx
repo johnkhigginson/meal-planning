@@ -11,6 +11,8 @@ import { Clock, Users, Pencil, Heart, BookOpen, Globe, UserRound } from "lucide-
 import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
 import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
 import { RecipeNotes } from "@/components/recipes/RecipeNotes";
+import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
+import { PrintButton } from "@/components/recipes/PrintButton";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { PROSE_CLASS } from "@/components/blog/BlogShell";
 
@@ -56,7 +58,8 @@ export default async function RecipeDetailPage({ params }: PageProps) {
             <p className="text-muted-foreground">{recipe.description}</p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 print:hidden">
+          <PrintButton />
           <ShareRecipeButton recipeId={recipe.id} />
           <Link href={`/recipes/${recipe.id}/edit`}>
             <Button variant="outline" size="sm">
@@ -130,35 +133,18 @@ export default async function RecipeDetailPage({ params }: PageProps) {
 
       <Separator />
 
-      {/* Ingredients (hidden when none have been added yet) */}
+      {/* Ingredients (hidden when none have been added yet) — scalable by servings */}
       {recipe.ingredients.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Ingredients</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {recipe.ingredients.map((ri) => (
-                <li key={ri.id} className="flex items-baseline gap-2">
-                  <span className="font-medium">
-                    {ri.quantity} {ri.unit.abbreviation}
-                  </span>
-                  <span>{ri.ingredient.name}</span>
-                  {ri.notes && (
-                    <span className="text-sm text-muted-foreground">
-                      ({ri.notes})
-                    </span>
-                  )}
-                  {ri.optional && (
-                    <Badge variant="secondary" className="text-xs">
-                      optional
-                    </Badge>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <ScalableIngredients
+          baseServings={recipe.servings}
+          ingredients={recipe.ingredients.map((ri) => ({
+            quantity: ri.quantity,
+            unit: ri.unit.abbreviation,
+            name: ri.ingredient.name,
+            notes: ri.notes,
+            optional: ri.optional,
+          }))}
+        />
       )}
 
       {/* For migrated blog posts, render the full preserved post so no content

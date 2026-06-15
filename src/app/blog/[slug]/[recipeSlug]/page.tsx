@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BlogShell, PROSE_CLASS } from "@/components/blog/BlogShell";
 import { RecipeComments } from "@/components/blog/RecipeComments";
+import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
+import { PrintButton } from "@/components/recipes/PrintButton";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Clock, Users, Globe } from "lucide-react";
 import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
@@ -104,13 +105,16 @@ export default async function BlogRecipePage({ params }: PageProps) {
       )}
       <Link
         href={`/blog/${book.slug}`}
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground print:hidden"
       >
         <ArrowLeft className="h-4 w-4" /> All recipes
       </Link>
 
       <article>
-        <h1 className="text-3xl font-bold tracking-tight">{recipe.name}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">{recipe.name}</h1>
+          <PrintButton />
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {recipe.publishedAt && formatBlogDate(recipe.publishedAt)}
           {recipe.author?.name ? ` · by ${recipe.author.name}` : ""}
@@ -154,26 +158,19 @@ export default async function BlogRecipePage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Quick ingredient reference when we have structured data. */}
+        {/* Quick ingredient reference (scalable by servings) when we have structured data. */}
         {recipe.ingredients.length > 0 && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Ingredients</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {recipe.ingredients.map((ri, i) => (
-                  <li key={i} className="flex items-baseline gap-2">
-                    <span className="font-medium">
-                      {ri.quantity} {ri.unit.abbreviation}
-                    </span>
-                    <span>{ri.ingredient.name}</span>
-                    {ri.notes && <span className="text-sm text-muted-foreground">({ri.notes})</span>}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+          <div className="mt-6">
+            <ScalableIngredients
+              baseServings={recipe.servings}
+              ingredients={recipe.ingredients.map((ri) => ({
+                quantity: ri.quantity,
+                unit: ri.unit.abbreviation,
+                name: ri.ingredient.name,
+                notes: ri.notes,
+              }))}
+            />
+          </div>
         )}
 
         {/* The full original post is always shown so nothing is lost. */}
@@ -193,7 +190,9 @@ export default async function BlogRecipePage({ params }: PageProps) {
           </div>
         )}
 
-        <RecipeComments recipeId={recipe.id} canModerate={canModerate} />
+        <div className="print:hidden">
+          <RecipeComments recipeId={recipe.id} canModerate={canModerate} />
+        </div>
       </article>
     </BlogShell>
   );

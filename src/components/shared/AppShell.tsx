@@ -39,10 +39,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <div className="hidden lg:block">
+      <div className="app-nav hidden lg:block">
         <Navbar />
       </div>
-      <div className="lg:hidden">
+      <div className="app-nav lg:hidden">
         <MobileNav />
       </div>
       <main className="flex-1 overflow-auto p-4 pb-28 lg:p-6 lg:pb-6">

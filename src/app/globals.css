@@ -145,3 +145,9 @@
     }
   }
 }
+/* Print: hide app chrome so only the recipe prints cleanly. */
+@media print {
+  .app-nav {
+    display: none !important;
+  }
+}
