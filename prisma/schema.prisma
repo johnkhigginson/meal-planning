@@ -123,6 +123,7 @@ model Recipe {
   imageUrl        String?  @db.NVarChar(2000)
   isFavorite      Boolean  @default(false)
   publishedAt     DateTime? // original publish date (for migrated blog posts); drives blog ordering
+  aiProcessedAt   DateTime? // when the AI ingredient-extraction pass last handled this recipe
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -134,6 +135,7 @@ model Recipe {
   bookEntries     RecipeBookEntry[]
   shares          ShareLink[]
   notes           RecipeNote[]
+  comments        Comment[]
 
   @@index([householdId, slug])
 }
@@ -162,6 +164,21 @@ model RecipeNote {
   createdAt       DateTime @default(now())
 
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+}
+
+// Public comments on recipes shown on the published blog. Posted anonymously
+// (no login) and gated by Turnstile + honeypot; the recipe owner can delete.
+model Comment {
+  id         Int      @id @default(autoincrement())
+  recipeId   Int
+  authorName String   @db.NVarChar(120)
+  body       String   @db.NVarChar(Max)
+  approved   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId, createdAt])
 }
 
 // ─── Tags ───────────────────────────────────────────────────────

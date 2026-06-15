@@ -21,6 +21,7 @@ interface MigrateInput {
   xml?: string;
   bookName?: string;
   ownerUserId?: number;
+  updateExisting?: boolean; // refresh already-imported posts (default true)
 }
 
 async function readInput(request: NextRequest): Promise<MigrateInput> {
@@ -30,14 +31,24 @@ async function readInput(request: NextRequest): Promise<MigrateInput> {
     const file = form.get("file") as File | null;
     const xml = file ? await file.text() : (form.get("xml") as string | null) ?? undefined;
     const ownerRaw = form.get("ownerUserId") as string | null;
+    const updateRaw = form.get("updateExisting") as string | null;
     return {
       blogUrl: (form.get("blogUrl") as string | null) ?? undefined,
       xml: xml ?? undefined,
       bookName: (form.get("bookName") as string | null) ?? undefined,
       ownerUserId: ownerRaw ? parseInt(ownerRaw, 10) : undefined,
+      updateExisting: updateRaw == null ? undefined : updateRaw === "true",
     };
   }
   return (await request.json()) as MigrateInput;
+}
+
+// Build the recipe description, leading with the original "Posted by" credit
+// from Blogger when present so authorship is preserved for future reference.
+function buildDescription(author: string | null, plain: string): string | null {
+  const attribution = author ? `Posted by ${author}` : null;
+  const ex = plain ? excerpt(plain) : null;
+  return [attribution, ex].filter(Boolean).join("\n\n") || null;
 }
 
 export async function POST(request: NextRequest) {
@@ -105,20 +116,24 @@ export async function POST(request: NextRequest) {
       data: { householdId, name: bookName, description: data.blogTitle ? `Imported from ${data.blogTitle}` : null },
     });
   }
+  const bookId = book.id;
 
   // A stable identity for a post so re-runs are idempotent. Prefer the
   // permalink; fall back to title+date for exports that omit the alternate link.
   const postKey = (name: string, permalink: string | null, published: Date | null) =>
     permalink || `${name}|${published?.toISOString() ?? ""}`;
 
-  // Build dedupe + slug-collision sets from existing household data.
+  const updateExisting = input.updateExisting !== false; // default: refresh existing
+
+  // Map existing recipes by their post identity so re-runs can update in place.
   const existingRecipes = await prisma.recipe.findMany({
     where: { householdId },
     select: { id: true, name: true, slug: true, sourceUrl: true, publishedAt: true },
   });
-  const seenKeys = new Set(
-    existingRecipes.map((r) => postKey(r.name, r.sourceUrl, r.publishedAt))
-  );
+  const existingByKey = new Map<string, number>();
+  for (const r of existingRecipes) {
+    existingByKey.set(postKey(r.name, r.sourceUrl, r.publishedAt), r.id);
+  }
   const takenSlugs = new Set(
     existingRecipes.map((r) => r.slug).filter((s): s is string => !!s)
   );
@@ -145,8 +160,26 @@ export async function POST(request: NextRequest) {
   }
 
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
   const errors: string[] = [];
+
+  async function applyTagsAndBook(recipeId: number, labels: string[]) {
+    for (const label of labels) {
+      const tagId = await getTagId(label);
+      await prisma.recipeTag.upsert({
+        where: { recipeId_tagId: { recipeId, tagId } },
+        update: {},
+        create: { recipeId, tagId },
+      });
+    }
+    if (!entryRecipeIds.has(recipeId)) {
+      await prisma.recipeBookEntry.create({
+        data: { recipeBookId: bookId, recipeId, sortOrder: sortOrder++ },
+      });
+      entryRecipeIds.add(recipeId);
+    }
+  }
 
   // Import oldest-first so blog ordering (newest first) falls out naturally
   // from the publish dates while sortOrder stays stable.
@@ -159,19 +192,38 @@ export async function POST(request: NextRequest) {
   for (const post of ordered) {
     const name = (post.title || "Untitled Recipe").slice(0, 300);
     const key = postKey(name, post.permalink, post.publishedAt);
-    if (seenKeys.has(key)) {
-      skipped++;
-      continue;
-    }
-    seenKeys.add(key);
+    const existingId = existingByKey.get(key);
 
     try {
-      const slug = uniqueSlug(name, takenSlugs, `recipe-${imported + 1}`);
       const safeHtml = sanitizeBlogHtml(post.contentHtml);
       const plain = htmlToText(post.contentHtml);
+      const description = buildDescription(post.author, plain);
+
+      if (existingId != null) {
+        if (!updateExisting) {
+          skipped++;
+          continue;
+        }
+        // Refresh import-derived fields only; leave name/slug/author/ingredients
+        // (ingredients are managed by the AI extraction pass).
+        await prisma.recipe.update({
+          where: { id: existingId },
+          data: {
+            description,
+            bodyHtml: safeHtml || undefined,
+            imageUrl: post.imageUrl ?? undefined,
+            publishedAt: post.publishedAt ?? undefined,
+          },
+        });
+        await applyTagsAndBook(existingId, post.labels);
+        updated++;
+        continue;
+      }
+
+      const slug = uniqueSlug(name, takenSlugs, `recipe-${imported + 1}`);
       const sections = extractRecipeSections(post.contentHtml);
-      // `instructions` is non-nullable; fall back to the full post text so the
-      // structured view always has something even before manual cleanup.
+      // `instructions` is non-nullable; fall back to the full post text. The AI
+      // pass refines this later.
       const instructions = sections.instructions || plain || "See original post for details.";
 
       const recipe = await prisma.recipe.create({
@@ -180,7 +232,7 @@ export async function POST(request: NextRequest) {
           authorId,
           name,
           slug,
-          description: plain ? excerpt(plain) : null,
+          description,
           instructions,
           bodyHtml: safeHtml || null,
           servings: 4,
@@ -190,24 +242,8 @@ export async function POST(request: NextRequest) {
           publishedAt: post.publishedAt ?? null,
         },
       });
-
-      // Labels → tags.
-      for (const label of post.labels) {
-        const tagId = await getTagId(label);
-        await prisma.recipeTag.upsert({
-          where: { recipeId_tagId: { recipeId: recipe.id, tagId } },
-          update: {},
-          create: { recipeId: recipe.id, tagId },
-        });
-      }
-
-      if (!entryRecipeIds.has(recipe.id)) {
-        await prisma.recipeBookEntry.create({
-          data: { recipeBookId: book.id, recipeId: recipe.id, sortOrder: sortOrder++ },
-        });
-        entryRecipeIds.add(recipe.id);
-      }
-
+      existingByKey.set(key, recipe.id);
+      await applyTagsAndBook(recipe.id, post.labels);
       imported++;
     } catch (err) {
       errors.push(`${post.title}: ${err instanceof Error ? err.message : "import failed"}`);
@@ -220,6 +256,7 @@ export async function POST(request: NextRequest) {
     bookName: book.name,
     totalPosts: data.posts.length,
     imported,
+    updated,
     skipped,
     errors: errors.slice(0, 20),
   });

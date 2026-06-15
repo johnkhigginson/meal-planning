@@ -34,6 +34,7 @@ const jsonFeed = {
         ],
         category: [{ term: "Dessert" }, { term: "Pie" }],
         "media$thumbnail": { url: "https://1.bp.blogspot.com/-x/AAA/s72-c/pie.jpg" },
+        author: [{ name: { $t: "Lisa" } }],
       },
       {
         published: { $t: "2020-01-01T10:00:00.000-08:00" },
@@ -55,6 +56,8 @@ check("publishedAt is Date", j.posts[0].publishedAt instanceof Date);
 check("labels", JSON.stringify(j.posts[0].labels) === JSON.stringify(["Dessert", "Pie"]));
 check("thumbnail upgraded to s1600", j.posts[0].imageUrl === "https://1.bp.blogspot.com/-x/AAA/s1600/pie.jpg", j.posts[0].imageUrl);
 check("post 2 image from <img> fallback = null (no img)", j.posts[1].imageUrl === null, j.posts[1].imageUrl);
+check("json author parsed (Posted by)", j.posts[0].author === "Lisa", j.posts[0].author);
+check("json missing author = null", j.posts[1].author === null, j.posts[1].author);
 
 // ── XML export fixture (Atom) ──
 console.log("XML export:");
@@ -67,6 +70,7 @@ const xml = `<?xml version="1.0"?>
     <title type="text">Roast Chicken</title>
     <content type="html">&lt;p&gt;&lt;img src="https://2.bp.blogspot.com/-y/BBB/s400/chx.jpg"/&gt;Roast it.&lt;/p&gt;</content>
     <published>2018-05-05T09:00:00.000-07:00</published>
+    <author><name>Lisa</name></author>
     <link rel="alternate" type="text/html" href="https://therecipesociety.blogspot.com/2018/05/roast-chicken.html"/>
   </entry>
   <entry>
@@ -88,6 +92,7 @@ check("xml title", x.posts[0]?.title === "Roast Chicken", x.posts[0]?.title);
 check("xml permalink", x.posts[0]?.permalink === "https://therecipesociety.blogspot.com/2018/05/roast-chicken.html", x.posts[0]?.permalink);
 check("xml label", JSON.stringify(x.posts[0]?.labels) === JSON.stringify(["Dinner"]));
 check("xml image upgraded", x.posts[0]?.imageUrl === "https://2.bp.blogspot.com/-y/BBB/s1600/chx.jpg", x.posts[0]?.imageUrl);
+check("xml author parsed", x.posts[0]?.author === "Lisa", x.posts[0]?.author);
 
 // ── section extraction + helpers ──
 console.log("Helpers:");

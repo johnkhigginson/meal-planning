@@ -17,6 +17,7 @@ export interface BloggerPost {
   publishedAt: Date | null;
   labels: string[];
   imageUrl: string | null;
+  author: string | null; // original "Posted by" name from Blogger
 }
 
 export interface BloggerImport {
@@ -69,6 +70,9 @@ function postFromJsonEntry(entry: any): BloggerPost {
   const imageUrl =
     upgradeBloggerImage(thumb) ?? upgradeBloggerImage(firstImageFromHtml(contentHtml));
 
+  const authors: any[] = entry.author ?? [];
+  const author: string | null = authors[0]?.name?.$t ?? null;
+
   return {
     title,
     contentHtml,
@@ -76,6 +80,7 @@ function postFromJsonEntry(entry: any): BloggerPost {
     publishedAt: parseDate(entry.published?.$t),
     labels,
     imageUrl,
+    author: author && author.trim() ? author.trim() : null,
   };
 }
 
@@ -193,7 +198,10 @@ export function parseBloggerXmlExport(xml: string): BloggerImport {
     const publishedAt = parseDate(entry.children("published").first().text());
     const imageUrl = upgradeBloggerImage(firstImageFromHtml(contentHtml));
 
-    posts.push({ title, contentHtml, permalink, publishedAt, labels, imageUrl });
+    const authorName = entry.children("author").first().children("name").first().text().trim();
+    const author = authorName || null;
+
+    posts.push({ title, contentHtml, permalink, publishedAt, labels, imageUrl, author });
   });
 
   return { blogTitle, posts };

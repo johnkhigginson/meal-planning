@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BlogShell, PROSE_CLASS } from "@/components/blog/BlogShell";
+import { RecipeComments } from "@/components/blog/RecipeComments";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Clock, Users, Globe } from "lucide-react";
 import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
+import { getCurrentUser } from "@/lib/auth";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +32,10 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
   const { book, recipe } = data;
   const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
-  const hasStructured = recipe.ingredients.length > 0;
+
+  // The recipe owner (their household) or an admin may delete comments.
+  const user = await getCurrentUser();
+  const canModerate = !!user && (user.isAdmin || user.householdId === recipe.householdId);
 
   return (
     <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name}>
@@ -38,7 +43,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
         href={`/blog/${book.slug}`}
         className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> {book.name}
+        <ArrowLeft className="h-4 w-4" /> All recipes
       </Link>
 
       <article>
@@ -50,11 +55,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
         {recipe.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={recipe.imageUrl}
-            alt={recipe.name}
-            className="mt-5 w-full rounded-2xl object-cover"
-          />
+          <img src={recipe.imageUrl} alt={recipe.name} className="mt-5 w-full rounded-2xl object-cover" />
         )}
 
         <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
@@ -90,41 +91,30 @@ export default async function BlogRecipePage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Structured recipe when available; otherwise the preserved post body. */}
-        {hasStructured ? (
-          <div className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ingredients</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {recipe.ingredients.map((ri, i) => (
-                    <li key={i} className="flex items-baseline gap-2">
-                      <span className="font-medium">
-                        {ri.quantity} {ri.unit.abbreviation}
-                      </span>
-                      <span>{ri.ingredient.name}</span>
-                      {ri.notes && (
-                        <span className="text-sm text-muted-foreground">({ri.notes})</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Instructions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="whitespace-pre-wrap">{recipe.instructions}</div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : recipe.bodyHtml ? (
-          // Preserved original post HTML (migrated content). Sanitized again at
-          // render so even content stored before sanitization was added is safe.
+        {/* Quick ingredient reference when we have structured data. */}
+        {recipe.ingredients.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Ingredients</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {recipe.ingredients.map((ri, i) => (
+                  <li key={i} className="flex items-baseline gap-2">
+                    <span className="font-medium">
+                      {ri.quantity} {ri.unit.abbreviation}
+                    </span>
+                    <span>{ri.ingredient.name}</span>
+                    {ri.notes && <span className="text-sm text-muted-foreground">({ri.notes})</span>}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* The full original post is always shown so nothing is lost. */}
+        {recipe.bodyHtml ? (
           <div
             className={`mt-6 ${PROSE_CLASS}`}
             dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(recipe.bodyHtml) }}
@@ -139,6 +129,8 @@ export default async function BlogRecipePage({ params }: PageProps) {
             <p className="mt-1 text-sm text-muted-foreground">{recipe.author.bio}</p>
           </div>
         )}
+
+        <RecipeComments recipeId={recipe.id} canModerate={canModerate} />
       </article>
     </BlogShell>
   );

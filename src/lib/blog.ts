@@ -82,6 +82,7 @@ export async function getPublishedRecipe(bookSlug: string, identifier: string) {
       recipe: {
         select: {
           id: true,
+          householdId: true,
           name: true,
           slug: true,
           description: true,
@@ -113,6 +114,16 @@ export async function getPublishedRecipe(bookSlug: string, identifier: string) {
   if (!entry) return null;
 
   return { book, recipe: entry.recipe };
+}
+
+// True when the recipe is an entry in at least one published book — i.e. it is
+// publicly viewable on the blog. Gates public comment read/write.
+export async function isRecipePubliclyVisible(recipeId: number): Promise<boolean> {
+  const entry = await prisma.recipeBookEntry.findFirst({
+    where: { recipeId, recipeBook: { isPublished: true } },
+    select: { id: true },
+  });
+  return !!entry;
 }
 
 export function formatBlogDate(date: Date | null): string {
