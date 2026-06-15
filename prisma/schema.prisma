@@ -33,10 +33,12 @@ model User {
   role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER (household role)
   systemRole       String   @default("USER") @db.NVarChar(20) // USER, CONTRIBUTOR, ADMIN
   enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
+  bio              String?  @db.NVarChar(Max) // public author bio shown on the blog
   createdAt        DateTime @default(now())
   lastLogin        DateTime?
 
-  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  household        Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  authoredRecipes  Recipe[]  @relation("RecipeAuthor")
 }
 
 model HouseholdInvite {
@@ -105,28 +107,35 @@ model Ingredient {
 model Recipe {
   id              Int      @id @default(autoincrement())
   householdId     Int
+  authorId        Int?     // owner/author of the recipe (a User in the household); null = household default
   name            String   @db.NVarChar(300)
+  slug            String?  @db.NVarChar(350) // url-friendly identifier for the public blog
   description     String?  @db.NVarChar(Max)
   instructions    String   @db.NVarChar(Max)
+  bodyHtml        String?  @db.NVarChar(Max) // preserved original post HTML (e.g. migrated blog content) — lossless backup
   servings        Int
   prepTimeMinutes Int?
   cookTimeMinutes Int?
-  sourceType      String   @default("PERSONAL") @db.NVarChar(20)
+  sourceType      String   @default("PERSONAL") @db.NVarChar(20) // PERSONAL, WEBSITE, BOOK, BLOG
   sourceUrl       String?  @db.NVarChar(2000)
   sourceBookTitle String?  @db.NVarChar(300)
   sourceBookPage  String?  @db.NVarChar(50)
   imageUrl        String?  @db.NVarChar(2000)
   isFavorite      Boolean  @default(false)
+  publishedAt     DateTime? // original publish date (for migrated blog posts); drives blog ordering
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   household       Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  author          User?              @relation("RecipeAuthor", fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   ingredients     RecipeIngredient[]
   tags            RecipeTag[]
   mealPlanEntries MealPlanEntry[]
   bookEntries     RecipeBookEntry[]
   shares          ShareLink[]
   notes           RecipeNote[]
+
+  @@index([householdId, slug])
 }
 
 model RecipeIngredient {
@@ -319,16 +328,22 @@ model LibraryStore {
 // ─── Recipe Books ───────────────────────────────────────────────
 
 model RecipeBook {
-  id          Int      @id @default(autoincrement())
-  householdId Int
-  name        String   @db.NVarChar(300)
-  description String?  @db.NVarChar(Max)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int       @id @default(autoincrement())
+  householdId   Int
+  name          String    @db.NVarChar(300)
+  description   String?   @db.NVarChar(Max)
+  slug          String?   @db.NVarChar(350) // public blog URL segment; app-enforced unique when published
+  coverImageUrl String?   @db.NVarChar(2000)
+  isPublished   Boolean   @default(false) // when true, viewable publicly at /blog/[slug] without login
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  household Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  household Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
   entries   RecipeBookEntry[]
   shares    ShareLink[]
+
+  @@index([slug])
 }
 
 model RecipeBookEntry {

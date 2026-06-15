@@ -22,6 +22,7 @@ interface Recipe {
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
   sourceType: string;
+  imageUrl: string | null;
   isFavorite: boolean;
   tags: { tag: Tag }[];
 }
