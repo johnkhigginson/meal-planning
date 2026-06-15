@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, Users, Globe } from "lucide-react";
 import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
+import { absoluteUrl, getSiteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,67 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug, recipeSlug } = await params;
   const data = await getPublishedRecipe(slug, recipeSlug);
   if (!data) return { title: "Not found" };
+
+  const { recipe } = data;
+  const image = absoluteUrl(recipe.imageUrl);
+  const url = `${getSiteUrl()}/blog/${slug}/${recipe.slug ?? recipe.id}`;
   return {
-    title: data.recipe.name,
-    description: data.recipe.description ?? undefined,
+    title: recipe.name,
+    description: recipe.description ?? undefined,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      title: recipe.name,
+      description: recipe.description ?? undefined,
+      url,
+      images: image ? [image] : undefined,
+      publishedTime: recipe.publishedAt?.toISOString(),
+      authors: recipe.author?.name ? [recipe.author.name] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: recipe.name,
+      description: recipe.description ?? undefined,
+      images: image ? [image] : undefined,
+    },
   };
+}
+
+function isoDuration(min: number | null): string | undefined {
+  return min && min > 0 ? `PT${min}M` : undefined;
+}
+
+// Schema.org Recipe JSON-LD for Google rich results. Emitted when we have
+// enough to be a real recipe (ingredients or instructions).
+function recipeJsonLd(recipe: Awaited<ReturnType<typeof getPublishedRecipe>>) {
+  if (!recipe) return null;
+  const r = recipe.recipe;
+  const ingredients = r.ingredients.map(
+    (ri) => `${ri.quantity} ${ri.unit.abbreviation} ${ri.ingredient.name}`.trim()
+  );
+  const steps = (r.instructions || "")
+    .split("\n")
+    .map((s) => s.replace(/^\s*\d+\.\s*/, "").trim())
+    .filter(Boolean);
+  if (ingredients.length === 0 && steps.length === 0) return null;
+
+  const image = absoluteUrl(r.imageUrl);
+  const data: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    name: r.name,
+    description: r.description ?? undefined,
+    image: image ? [image] : undefined,
+    datePublished: r.publishedAt?.toISOString(),
+    author: r.author?.name ? { "@type": "Person", name: r.author.name } : undefined,
+    recipeYield: r.servings ? String(r.servings) : undefined,
+    prepTime: isoDuration(r.prepTimeMinutes),
+    cookTime: isoDuration(r.cookTimeMinutes),
+    recipeIngredient: ingredients.length ? ingredients : undefined,
+    recipeInstructions: steps.length ? steps.map((text) => ({ "@type": "HowToStep", text })) : undefined,
+    keywords: r.tags.length ? r.tags.map((t) => t.tag.name).join(", ") : undefined,
+  };
+  return JSON.stringify(data).replace(/</g, "\\u003c");
 }
 
 export default async function BlogRecipePage({ params }: PageProps) {
@@ -37,8 +95,13 @@ export default async function BlogRecipePage({ params }: PageProps) {
   const user = await getCurrentUser();
   const canModerate = !!user && (user.isAdmin || user.householdId === recipe.householdId);
 
+  const jsonLd = recipeJsonLd(data);
+
   return (
     <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name}>
+      {jsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+      )}
       <Link
         href={`/blog/${book.slug}`}
         className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

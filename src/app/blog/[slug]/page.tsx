@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Users } from "lucide-react";
 import { getPublishedBookBySlug, formatBlogDate } from "@/lib/blog";
+import { absoluteUrl, getSiteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,24 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
   const book = await getPublishedBookBySlug(slug);
   if (!book) return { title: "Not found" };
-  return { title: book.name, description: book.description ?? undefined };
+
+  const cover = absoluteUrl(book.coverImageUrl ?? book.posts.find((p) => p.imageUrl)?.imageUrl);
+  const url = `${getSiteUrl()}/blog/${slug}`;
+  return {
+    title: book.name,
+    description: book.description ?? undefined,
+    alternates: {
+      canonical: url,
+      types: { "application/rss+xml": `${url}/rss.xml` },
+    },
+    openGraph: {
+      type: "website",
+      title: book.name,
+      description: book.description ?? undefined,
+      url,
+      images: cover ? [cover] : undefined,
+    },
+  };
 }
 
 export default async function CookbookPage({ params }: PageProps) {
