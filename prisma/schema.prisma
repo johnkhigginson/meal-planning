@@ -43,6 +43,7 @@ model User {
   household          Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
   authoredRecipes    Recipe[]                 @relation("RecipeAuthor")
   bookCollaborations RecipeBookCollaborator[]
+  blogSubscriptions  BlogSubscriber[]
 }
 
 model HouseholdInvite {
@@ -404,8 +405,25 @@ model RecipeBook {
   entries       RecipeBookEntry[]
   shares        ShareLink[]
   collaborators RecipeBookCollaborator[]
+  subscribers   BlogSubscriber[]
 
   @@index([slug])
+}
+
+// A logged-in visitor following a published cookbook (blog). Followers are
+// emailed when a new recipe is posted to the cookbook.
+model BlogSubscriber {
+  id           Int      @id @default(autoincrement())
+  recipeBookId Int
+  userId       Int
+  createdAt    DateTime @default(now())
+
+  recipeBook RecipeBook @relation(fields: [recipeBookId], references: [id], onDelete: Cascade)
+  // NoAction to avoid a second cascade path to this table via the user/household.
+  user       User       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([recipeBookId, userId])
+  @@index([recipeBookId])
 }
 
 // Lets a user from ANOTHER household help with a cookbook (the blog) without

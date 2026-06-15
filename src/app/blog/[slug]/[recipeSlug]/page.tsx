@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BlogShell, PROSE_CLASS } from "@/components/blog/BlogShell";
+import { FollowButton } from "@/components/blog/FollowButton";
 import { RecipeComments } from "@/components/blog/RecipeComments";
 import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
 import { PrintButton } from "@/components/recipes/PrintButton";
@@ -99,7 +100,12 @@ export default async function BlogRecipePage({ params }: PageProps) {
   const jsonLd = recipeJsonLd(data);
 
   return (
-    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name} aboutHref={`/blog/${book.slug}/about`}>
+    <BlogShell
+      homeHref={`/blog/${book.slug}`}
+      homeLabel={book.name}
+      aboutHref={`/blog/${book.slug}/about`}
+      headerAction={book.slug ? <FollowButton bookId={book.id} slug={book.slug} /> : undefined}
+    >
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       )}

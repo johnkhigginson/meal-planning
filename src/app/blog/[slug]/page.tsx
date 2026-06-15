@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { BlogShell } from "@/components/blog/BlogShell";
 import { BlogHeaderEditor } from "@/components/blog/BlogHeaderEditor";
 import { CookbookBrowser, type BrowserPost } from "@/components/blog/CookbookBrowser";
+import { FollowButton } from "@/components/blog/FollowButton";
 import { getPublishedBookBySlug } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
@@ -61,7 +62,13 @@ export default async function CookbookPage({ params }: PageProps) {
   }));
 
   return (
-    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name} aboutHref={`/blog/${book.slug}/about`} wide>
+    <BlogShell
+      homeHref={`/blog/${book.slug}`}
+      homeLabel={book.name}
+      aboutHref={`/blog/${book.slug}/about`}
+      headerAction={<FollowButton bookId={book.id} slug={book.slug!} />}
+      wide
+    >
       <BlogHeaderEditor
         bookId={book.id}
         canEdit={canEdit}

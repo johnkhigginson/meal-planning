@@ -9,12 +9,15 @@ export function BlogShell({
   homeHref = "/blog",
   homeLabel = "Recipe Blog",
   aboutHref,
+  headerAction,
   wide = false,
 }: {
   children: React.ReactNode;
   homeHref?: string;
   homeLabel?: string;
   aboutHref?: string;
+  // Optional control rendered in the masthead (e.g. a Follow button).
+  headerAction?: React.ReactNode;
   wide?: boolean;
 }) {
   const width = wide ? "max-w-5xl" : "max-w-3xl";
@@ -35,6 +38,7 @@ export function BlogShell({
                 About
               </Link>
             )}
+            {headerAction}
           </nav>
         </div>
       </header>

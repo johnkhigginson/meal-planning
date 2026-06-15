@@ -5,6 +5,8 @@ import { createRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
 import { isValidAuthor } from "@/lib/collab";
 import { tagsAllowedForHousehold } from "@/lib/tags";
+import { sendNewRecipeEmail } from "@/lib/email";
+import { absoluteUrl, getSiteUrl } from "@/lib/site";
 
 export async function GET(request: NextRequest) {
   const householdId = await requireHouseholdId();
@@ -65,17 +67,19 @@ export async function POST(request: NextRequest) {
   // credited to the contributor by default.
   let targetHouseholdId = householdId;
   let targetBookId: number | null = null;
+  let targetBook: { name: string; slug: string | null; isPublished: boolean } | null = null;
   if (bookId != null) {
     const book = await prisma.recipeBook.findFirst({
       where: {
         id: bookId,
         OR: [{ householdId: user.householdId }, { collaborators: { some: { userId: user.userId } } }],
       },
-      select: { id: true, householdId: true },
+      select: { id: true, householdId: true, name: true, slug: true, isPublished: true },
     });
     if (!book) return NextResponse.json({ error: "Cookbook not found" }, { status: 404 });
     targetHouseholdId = book.householdId;
     targetBookId = book.id;
+    targetBook = { name: book.name, slug: book.slug, isPublished: book.isPublished };
     if (recipeData.authorId == null) recipeData.authorId = user.userId;
   }
 
@@ -137,5 +141,46 @@ export async function POST(request: NextRequest) {
     targetId: recipe.id,
   });
 
+  // Posting a new recipe to a PUBLISHED cookbook notifies its followers. Bulk
+  // blog imports go through a different route, so they never trigger this.
+  if (targetBookId != null && targetBook?.isPublished && targetBook.slug) {
+    await notifyFollowers(targetBookId, targetBook.name, targetBook.slug, recipe).catch((e) =>
+      console.error("follower notification failed", e)
+    );
+  }
+
   return NextResponse.json(recipe, { status: 201 });
+}
+
+// Email every follower of a published cookbook about a newly posted recipe.
+// Best-effort: never blocks or fails recipe creation.
+async function notifyFollowers(
+  bookId: number,
+  bookName: string,
+  bookSlug: string,
+  recipe: { id: number; name: string; slug: string | null; imageUrl: string | null }
+) {
+  const subscribers = await prisma.blogSubscriber.findMany({
+    where: { recipeBookId: bookId },
+    select: { user: { select: { email: true } } },
+  });
+  if (subscribers.length === 0) return;
+
+  const site = getSiteUrl();
+  const recipeUrl = `${site}/blog/${bookSlug}/${recipe.slug ?? recipe.id}`;
+  const blogUrl = `${site}/blog/${bookSlug}`;
+  const imageUrl = absoluteUrl(recipe.imageUrl) ?? null;
+
+  await Promise.allSettled(
+    subscribers.map((s) =>
+      sendNewRecipeEmail({
+        toEmail: s.user.email,
+        blogName: bookName,
+        recipeName: recipe.name,
+        recipeUrl,
+        blogUrl,
+        imageUrl,
+      })
+    )
+  );
 }

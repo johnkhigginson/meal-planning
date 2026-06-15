@@ -43,6 +43,47 @@ export async function sendCommentNotificationEmail(opts: {
   });
 }
 
+// Notify a blog follower that a new recipe was posted to a cookbook they follow.
+export async function sendNewRecipeEmail(opts: {
+  toEmail: string;
+  blogName: string;
+  recipeName: string;
+  recipeUrl: string;
+  blogUrl: string;
+  imageUrl?: string | null;
+}) {
+  const client = getClient();
+  const { toEmail, blogName, recipeName, recipeUrl, blogUrl, imageUrl } = opts;
+
+  await client.sendEmail({
+    From: "hello@mylemonkitchen.com",
+    To: toEmail,
+    Subject: `New recipe on ${blogName}: “${recipeName}”`,
+    HtmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 24px; font-weight: 700;">${blogName}</span>
+        </div>
+        <h1 style="font-size: 18px; font-weight: 600; margin: 0 0 8px;">New recipe: “${recipeName}”</h1>
+        ${imageUrl ? `<img src="${imageUrl}" alt="${recipeName}" style="width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; margin: 8px 0 16px;" />` : ""}
+        <p style="color: #555; margin: 0 0 16px;">A new recipe was just posted to ${blogName}.</p>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${recipeUrl}" style="display: inline-block; background: #000; color: #FFF700; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            View recipe
+          </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+        <p style="color: #bbb; font-size: 12px; text-align: center;">
+          You're receiving this because you follow ${blogName}.
+          <br />Manage your follows at <a href="${blogUrl}" style="color:#999;">${blogName}</a>.
+        </p>
+      </div>
+    `,
+    TextBody: `New recipe on ${blogName}: "${recipeName}"\n\n${recipeUrl}\n\nYou're receiving this because you follow ${blogName}. Manage your follows at ${blogUrl}.`,
+    MessageStream: "outbound",
+  });
+}
+
 export async function sendHouseholdInviteEmail(
   toEmail: string,
   inviterName: string,
