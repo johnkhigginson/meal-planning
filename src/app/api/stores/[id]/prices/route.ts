@@ -5,10 +5,22 @@ import { storePriceSchema } from "@/lib/validators";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+// Confirms the store belongs to the caller's household; returns its id or null.
+async function ownedStoreId(id: string, householdId: number): Promise<number | null> {
+  const storeId = parseInt(id, 10);
+  if (Number.isNaN(storeId)) return null;
+  const store = await prisma.store.findFirst({ where: { id: storeId, householdId }, select: { id: true } });
+  return store ? storeId : null;
+}
+
 export async function GET(_request: NextRequest, { params }: RouteParams) {
+  const householdId = await requireHouseholdId();
   const { id } = await params;
+  const storeId = await ownedStoreId(id, householdId);
+  if (storeId === null) return NextResponse.json({ error: "Store not found" }, { status: 404 });
+
   const prices = await prisma.storePrice.findMany({
-    where: { storeId: parseInt(id, 10) },
+    where: { storeId },
     include: { ingredient: true, unit: true },
     orderBy: { ingredient: { name: "asc" } },
   });
@@ -16,8 +28,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const householdId = await requireHouseholdId();
   const { id } = await params;
-  const storeId = parseInt(id, 10);
+  const storeId = await ownedStoreId(id, householdId);
+  if (storeId === null) return NextResponse.json({ error: "Store not found" }, { status: 404 });
+
   const body = await request.json();
   const parsed = storePriceSchema.safeParse(body);
   if (!parsed.success) {
@@ -25,12 +40,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const price = await prisma.storePrice.upsert({
-    where: {
-      storeId_ingredientId: {
-        storeId,
-        ingredientId: parsed.data.ingredientId,
-      },
-    },
+    where: { storeId_ingredientId: { storeId, ingredientId: parsed.data.ingredientId } },
     update: {
       price: parsed.data.price,
       quantity: parsed.data.quantity,
@@ -51,11 +61,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(request: NextRequest) {
-  await requireHouseholdId();
+  const householdId = await requireHouseholdId();
   const { searchParams } = new URL(request.url);
   const priceId = parseInt(searchParams.get("priceId") || "0", 10);
   if (!priceId) return NextResponse.json({ error: "Price ID required" }, { status: 400 });
 
-  await prisma.storePrice.delete({ where: { id: priceId } });
+  // Only delete a price whose store belongs to the caller's household.
+  const result = await prisma.storePrice.deleteMany({
+    where: { id: priceId, store: { householdId } },
+  });
+  if (result.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }

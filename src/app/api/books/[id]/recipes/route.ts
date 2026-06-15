@@ -10,8 +10,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const bookId = parseInt(id, 10);
   const { recipeId } = await request.json();
 
+  if (typeof recipeId !== "number" || !Number.isInteger(recipeId)) {
+    return NextResponse.json({ error: "Valid recipeId required" }, { status: 400 });
+  }
+
   const book = await prisma.recipeBook.findFirst({ where: { id: bookId, householdId } });
   if (!book) return NextResponse.json({ error: "Book not found" }, { status: 404 });
+
+  // The recipe must belong to the same household (no cross-household linking).
+  const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, householdId }, select: { id: true } });
+  if (!recipe) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 
   const maxSort = await prisma.recipeBookEntry.findFirst({
     where: { recipeBookId: bookId },
