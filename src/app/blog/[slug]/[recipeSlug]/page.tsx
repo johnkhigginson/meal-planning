@@ -117,7 +117,14 @@ export default async function BlogRecipePage({ params }: PageProps) {
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {recipe.publishedAt && formatBlogDate(recipe.publishedAt)}
-          {recipe.author?.name ? ` · by ${recipe.author.name}` : ""}
+          {recipe.author?.name ? (
+            <>
+              {" · by "}
+              <Link href={`/blog/${book.slug}/about`} className="text-primary hover:underline">
+                {recipe.author.name}
+              </Link>
+            </>
+          ) : null}
         </p>
 
         {recipe.imageUrl && (

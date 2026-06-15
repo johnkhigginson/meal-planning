@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Save, UserPlus, X, Users, LayoutDashboard } from "lucide-react";
+import { Loader2, Save, UserPlus, X, Users, LayoutDashboard, Upload } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { OPTIONAL_NAV_ITEMS, parseHiddenNav } from "@/lib/nav";
@@ -44,6 +45,8 @@ interface UserSettings {
   email: string;
   enabledMealSlots: string;
   hiddenNavItems: string;
+  bio: string | null;
+  avatarUrl: string | null;
   role: string;
   household: {
     id: number;
@@ -59,6 +62,10 @@ export default function SettingsPage() {
   const [enabledSlots, setEnabledSlots] = useState<string[]>([]);
   const [hiddenNav, setHiddenNav] = useState<Set<string>>(new Set());
   const [householdName, setHouseholdName] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -78,6 +85,8 @@ export default function SettingsPage() {
         setHouseholdName(data.household?.name || "");
         setEnabledSlots(data.enabledMealSlots.split(",").filter(Boolean));
         setHiddenNav(parseHiddenNav(data.hiddenNavItems));
+        setBio(data.bio ?? "");
+        setAvatarUrl(data.avatarUrl ?? null);
       });
     fetch("/api/household/invites")
       .then((r) => r.json())
@@ -102,6 +111,25 @@ export default function SettingsPage() {
     setSaved(false);
   }
 
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/images", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setAvatarUrl(data.url);
+        setSaved(false);
+      }
+    } finally {
+      setAvatarUploading(false);
+      if (avatarRef.current) avatarRef.current.value = "";
+    }
+  }
+
   async function handleSave() {
     if (enabledSlots.length === 0) return;
     setSaving(true);
@@ -109,7 +137,7 @@ export default function SettingsPage() {
     const res = await fetch("/api/user/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, enabledMealSlots: enabledSlots.join(","), householdName, hiddenNavItems }),
+      body: JSON.stringify({ name, enabledMealSlots: enabledSlots.join(","), householdName, hiddenNavItems, bio, avatarUrl }),
     });
     if (res.ok) {
       setSaved(true);
@@ -173,6 +201,42 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <Label>Email</Label>
             <Input value={settings.email} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bio">Bio</Label>
+            <Textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => { setBio(e.target.value); setSaved(false); }}
+              rows={3}
+              placeholder="A short bio shown on your published blog's About page."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Photo</Label>
+            <div className="flex items-center gap-3">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-muted-foreground">
+                  {name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={uploadAvatar} />
+              <Button type="button" variant="outline" size="sm" onClick={() => avatarRef.current?.click()} disabled={avatarUploading}>
+                {avatarUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                {avatarUrl ? "Change photo" : "Upload photo"}
+              </Button>
+              {avatarUrl && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => { setAvatarUrl(null); setSaved(false); }}>
+                  <X className="mr-1 h-3.5 w-3.5" /> Remove
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Shown on your published blog&apos;s About page.</p>
           </div>
         </CardContent>
       </Card>

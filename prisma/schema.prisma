@@ -35,6 +35,7 @@ model User {
   enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
   hiddenNavItems   String   @default("") @db.NVarChar(400) // nav hrefs this user hides from their menu
   bio              String?  @db.NVarChar(Max) // public author bio shown on the blog
+  avatarUrl        String?  @db.NVarChar(2000) // public author photo
   createdAt        DateTime @default(now())
   lastLogin        DateTime?
 

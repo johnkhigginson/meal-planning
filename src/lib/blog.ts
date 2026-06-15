@@ -117,6 +117,27 @@ export async function getPublishedRecipe(bookSlug: string, identifier: string) {
   return { book, recipe: entry.recipe };
 }
 
+// Distinct authors of the recipes in a published cookbook, for its About page.
+export async function getPublishedBookAuthors(slug: string) {
+  const book = await prisma.recipeBook.findFirst({
+    where: { isPublished: true, slug },
+    select: { id: true, name: true, slug: true, description: true },
+  });
+  if (!book) return null;
+
+  const entries = await prisma.recipeBookEntry.findMany({
+    where: { recipeBookId: book.id },
+    select: { recipe: { select: { author: { select: { id: true, name: true, bio: true, avatarUrl: true } } } } },
+  });
+
+  const byId = new Map<number, { id: number; name: string; bio: string | null; avatarUrl: string | null }>();
+  for (const e of entries) {
+    const a = e.recipe.author;
+    if (a && !byId.has(a.id)) byId.set(a.id, a);
+  }
+  return { book, authors: Array.from(byId.values()) };
+}
+
 // True when the recipe is an entry in at least one published book — i.e. it is
 // publicly viewable on the blog. Gates public comment read/write.
 export async function isRecipePubliclyVisible(recipeId: number): Promise<boolean> {

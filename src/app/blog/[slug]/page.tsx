@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BlogShell } from "@/components/blog/BlogShell";
 import { BlogHeaderEditor } from "@/components/blog/BlogHeaderEditor";
@@ -69,6 +70,11 @@ export default async function CookbookPage({ params }: PageProps) {
         description={book.description}
         coverImageUrl={book.coverImageUrl}
       />
+      <div className="-mt-3 mb-4">
+        <Link href={`/blog/${book.slug}/about`} className="text-sm text-primary hover:underline">
+          About the {book.name === "The Recipe Society" ? "Society" : "cooks"} →
+        </Link>
+      </div>
       <CookbookBrowser bookSlug={book.slug!} posts={posts} />
     </BlogShell>
   );
