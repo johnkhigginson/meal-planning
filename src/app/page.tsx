@@ -11,5 +11,5 @@ export default async function HomePage() {
     return <LandingPage />;
   }
 
-  return <Dashboard householdId={user.householdId} />;
+  return <Dashboard userId={user.userId} householdId={user.householdId} name={user.name} />;
 }
