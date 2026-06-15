@@ -80,8 +80,10 @@ function newIngredientRow(): RecipeIngredientRow {
 export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoUploadRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [parsingPhoto, setParsingPhoto] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -122,6 +124,29 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
     value: RecipeFormData[K]
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handlePhotoFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    setImportError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/images", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        updateForm("imageUrl", data.url);
+      } else {
+        setImportError(data.error || "Failed to upload photo");
+      }
+    } catch {
+      setImportError("Failed to upload photo");
+    } finally {
+      setUploadingPhoto(false);
+      if (photoUploadRef.current) photoUploadRef.current.value = "";
+    }
   }
 
   function updateIngredient(index: number, row: RecipeIngredientRow) {
@@ -515,7 +540,7 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">Photo URL</Label>
+            <Label htmlFor="imageUrl">Photo</Label>
             <div className="flex items-start gap-3">
               {form.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -525,16 +550,38 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
                   className="h-16 w-16 shrink-0 rounded-lg object-cover"
                 />
               )}
-              <Input
-                id="imageUrl"
-                type="url"
-                value={form.imageUrl}
-                onChange={(e) => updateForm("imageUrl", e.target.value)}
-                placeholder="https://…/photo.jpg"
-              />
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={photoUploadRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoFileUpload}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => photoUploadRef.current?.click()}
+                  disabled={uploadingPhoto}
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  {uploadingPhoto ? "Uploading…" : form.imageUrl ? "Change photo" : "Upload photo"}
+                </Button>
+                <Input
+                  id="imageUrl"
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={(e) => updateForm("imageUrl", e.target.value)}
+                  placeholder="…or paste an image URL"
+                />
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              A link to a photo for this recipe. Auto-filled when importing from a website.
+              Upload a photo from your device, or paste an image link. Auto-filled when importing from a website.
             </p>
           </div>
 

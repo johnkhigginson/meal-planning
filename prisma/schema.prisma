@@ -167,6 +167,16 @@ model RecipeNote {
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
 }
 
+// Recipe photos uploaded from a device. Stored in the DB (rather than the
+// filesystem) so they survive rsync-based deploys, and served via /api/images.
+model UploadedImage {
+  id          Int      @id @default(autoincrement())
+  data        Bytes
+  contentType String   @db.NVarChar(100)
+  uploadedBy  Int?
+  createdAt   DateTime @default(now())
+}
+
 // Public comments on recipes shown on the published blog. Posted anonymously
 // (no login) and gated by Turnstile + honeypot; the recipe owner can delete.
 model Comment {

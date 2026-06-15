@@ -30,7 +30,13 @@ export const createRecipeSchema = z.object({
   sourceUrl: z.string().url().max(2000).optional(),
   sourceBookTitle: z.string().max(300).optional(),
   sourceBookPage: z.string().max(50).optional(),
-  imageUrl: z.string().url().max(2000).optional(),
+  // Absolute URL (external image) or an app-relative path (e.g. an uploaded
+  // photo served from /api/images/123).
+  imageUrl: z
+    .string()
+    .max(2000)
+    .refine((v) => /^https?:\/\//.test(v) || v.startsWith("/"), "Invalid image URL")
+    .optional(),
   authorId: z.number().int().positive().nullable().optional(),
   isFavorite: z.boolean().default(false),
   ingredients: z.array(recipeIngredientSchema).default([]),
