@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BlogShell } from "@/components/blog/BlogShell";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Clock, Users } from "lucide-react";
-import { getPublishedBookBySlug, formatBlogDate } from "@/lib/blog";
+import { BlogHeaderEditor } from "@/components/blog/BlogHeaderEditor";
+import { CookbookBrowser, type BrowserPost } from "@/components/blog/CookbookBrowser";
+import { getPublishedBookBySlug } from "@/lib/blog";
+import { getCurrentUser } from "@/lib/auth";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -42,75 +41,35 @@ export default async function CookbookPage({ params }: PageProps) {
   const book = await getPublishedBookBySlug(slug);
   if (!book) notFound();
 
-  return (
-    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name}>
-      {book.coverImageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={book.coverImageUrl}
-          alt={book.name}
-          className="mb-6 h-56 w-full rounded-2xl object-cover"
-        />
-      )}
-      <h1 className="text-3xl font-bold tracking-tight">{book.name}</h1>
-      {book.description && <p className="mt-2 text-muted-foreground">{book.description}</p>}
-      <p className="mt-2 text-sm text-muted-foreground">{book.posts.length} recipes</p>
+  // Only the owning household can edit the header (matches the book PUT's
+  // authorization, which is household-scoped).
+  const user = await getCurrentUser();
+  const canEdit = !!user && user.householdId === book.householdId;
 
-      <div className="mt-8 space-y-5">
-        {book.posts.map((recipe) => {
-          const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
-          const href = recipe.slug
-            ? `/blog/${book.slug}/${recipe.slug}`
-            : `/blog/${book.slug}/${recipe.id}`;
-          return (
-            <Link key={recipe.id} href={href} className="block">
-              <Card className="group overflow-hidden transition-all hover:shadow-md">
-                <div className="flex flex-col sm:flex-row">
-                  {recipe.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={recipe.imageUrl}
-                      alt={recipe.name}
-                      className="h-44 w-full object-cover sm:h-auto sm:w-48"
-                    />
-                  )}
-                  <CardContent className="flex-1 p-5">
-                    <h2 className="text-lg font-semibold group-hover:text-primary">{recipe.name}</h2>
-                    {recipe.publishedAt && (
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatBlogDate(recipe.publishedAt)}
-                        {recipe.author?.name ? ` · by ${recipe.author.name}` : ""}
-                      </p>
-                    )}
-                    {recipe.description && (
-                      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                        {recipe.description}
-                      </p>
-                    )}
-                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      {totalTime > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {totalTime}m
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {recipe.servings}
-                      </span>
-                      {recipe.tags.slice(0, 3).map(({ tag }) => (
-                        <Badge key={tag.name} variant="outline" className="text-[10px]">
-                          {tag.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
+  const posts: BrowserPost[] = book.posts.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    description: r.description,
+    imageUrl: r.imageUrl,
+    prepTimeMinutes: r.prepTimeMinutes,
+    cookTimeMinutes: r.cookTimeMinutes,
+    servings: r.servings,
+    publishedAt: r.publishedAt ? r.publishedAt.toISOString() : null,
+    authorName: r.author?.name ?? null,
+    tags: r.tags.map((t) => t.tag.name),
+  }));
+
+  return (
+    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name} wide>
+      <BlogHeaderEditor
+        bookId={book.id}
+        canEdit={canEdit}
+        name={book.name}
+        description={book.description}
+        coverImageUrl={book.coverImageUrl}
+      />
+      <CookbookBrowser bookSlug={book.slug!} posts={posts} />
     </BlogShell>
   );
 }

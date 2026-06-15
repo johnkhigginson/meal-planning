@@ -25,6 +25,7 @@ export async function getPublishedBookBySlug(slug: string) {
     where: { isPublished: true, slug },
     select: {
       id: true,
+      householdId: true,
       name: true,
       description: true,
       slug: true,

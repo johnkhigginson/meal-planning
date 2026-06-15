@@ -8,15 +8,18 @@ export function BlogShell({
   children,
   homeHref = "/blog",
   homeLabel = "Recipe Blog",
+  wide = false,
 }: {
   children: React.ReactNode;
   homeHref?: string;
   homeLabel?: string;
+  wide?: boolean;
 }) {
+  const width = wide ? "max-w-5xl" : "max-w-3xl";
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border/60 bg-card/50">
-        <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-4">
+        <div className={`mx-auto flex ${width} items-center gap-2 px-4 py-4`}>
           <Link href={homeHref} className="flex items-center gap-2">
             <LemonLogo className="h-7 w-7" />
             <span className="text-base font-bold tracking-tight">{homeLabel}</span>
@@ -24,10 +27,10 @@ export function BlogShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">{children}</main>
+      <main className={`mx-auto w-full ${width} flex-1 px-4 py-8`}>{children}</main>
 
       <footer className="border-t border-border/60 py-6">
-        <div className="mx-auto max-w-3xl px-4 text-xs text-muted-foreground">
+        <div className={`mx-auto ${width} px-4 text-xs text-muted-foreground`}>
           Powered by My Lemon Kitchen
         </div>
       </footer>
