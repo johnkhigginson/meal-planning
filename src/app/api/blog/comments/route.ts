@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { isRecipePubliclyVisible } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { audit, clientIp } from "@/lib/audit";
+import { sendCommentNotificationEmail } from "@/lib/email";
+import { getSiteUrl } from "@/lib/site";
 
 // Comments on a published blog recipe. Anyone can read; posting requires being
 // signed in.
@@ -55,7 +57,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Comments are not available for this recipe." }, { status: 404 });
   }
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.userId }, select: { name: true } });
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.userId },
+    select: { name: true, email: true },
+  });
 
   const comment = await prisma.comment.create({
     data: { recipeId, userId: user.userId, authorName: dbUser?.name ?? "Member", body: text },
@@ -73,5 +78,48 @@ export async function POST(request: NextRequest) {
     ip: clientIp(request),
   });
 
+  // Notify the recipe owner (its author, or the household owner) — best-effort.
+  notifyOwner(recipeId, comment.authorName, comment.body, dbUser?.email ?? null).catch((e) =>
+    console.error("[comment] notify failed", e)
+  );
+
   return NextResponse.json({ comment: { ...comment, mine: true } }, { status: 201 });
+}
+
+async function notifyOwner(
+  recipeId: number,
+  commenterName: string,
+  body: string,
+  commenterEmail: string | null
+) {
+  const recipe = await prisma.recipe.findUnique({
+    where: { id: recipeId },
+    select: {
+      name: true,
+      slug: true,
+      author: { select: { email: true } },
+      household: { select: { members: { where: { role: "OWNER" }, select: { email: true } } } },
+    },
+  });
+  if (!recipe) return;
+
+  const recipient = recipe.author?.email ?? recipe.household.members[0]?.email ?? null;
+  // Don't email the owner about their own comment, or if there's no recipient.
+  if (!recipient || recipient === commenterEmail) return;
+
+  const entry = await prisma.recipeBookEntry.findFirst({
+    where: { recipeId, recipeBook: { isPublished: true } },
+    select: { recipeBook: { select: { slug: true } } },
+  });
+  const bookSlug = entry?.recipeBook.slug;
+  if (!bookSlug) return;
+
+  const recipeUrl = `${getSiteUrl()}/blog/${bookSlug}/${recipe.slug ?? recipeId}`;
+  await sendCommentNotificationEmail({
+    toEmail: recipient,
+    commenterName,
+    recipeName: recipe.name,
+    commentBody: body,
+    recipeUrl,
+  });
 }

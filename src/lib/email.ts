@@ -6,6 +6,43 @@ function getClient() {
   return new ServerClient(apiKey);
 }
 
+export async function sendCommentNotificationEmail(opts: {
+  toEmail: string;
+  commenterName: string;
+  recipeName: string;
+  commentBody: string;
+  recipeUrl: string;
+}) {
+  const client = getClient();
+  const { toEmail, commenterName, recipeName, commentBody, recipeUrl } = opts;
+  const safeBody = commentBody.length > 600 ? commentBody.slice(0, 600) + "…" : commentBody;
+
+  await client.sendEmail({
+    From: "hello@mylemonkitchen.com",
+    To: toEmail,
+    Subject: `New comment on “${recipeName}”`,
+    HtmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 24px; font-weight: 700;">My Lemon Kitchen</span>
+        </div>
+        <h1 style="font-size: 18px; font-weight: 600; margin: 0 0 8px;">New comment on “${recipeName}”</h1>
+        <p style="color: #555; margin: 0 0 16px;"><strong>${commenterName}</strong> wrote:</p>
+        <blockquote style="margin: 0 0 24px; padding: 12px 16px; background: #f7f7f7; border-left: 3px solid #ddd; color: #333; white-space: pre-wrap;">${safeBody}</blockquote>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${recipeUrl}" style="display: inline-block; background: #000; color: #FFF700; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            View &amp; reply
+          </a>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+        <p style="color: #bbb; font-size: 12px; text-align: center;">My Lemon Kitchen</p>
+      </div>
+    `,
+    TextBody: `New comment on "${recipeName}" by ${commenterName}:\n\n${safeBody}\n\nView & reply: ${recipeUrl}`,
+    MessageStream: "outbound",
+  });
+}
+
 export async function sendHouseholdInviteEmail(
   toEmail: string,
   inviterName: string,
