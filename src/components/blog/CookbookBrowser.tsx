@@ -132,11 +132,18 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
             const href = `/blog/${bookSlug}/${recipe.slug ?? recipe.id}`;
             return (
               <Link key={recipe.id} href={href} className="block">
-                <Card className="group overflow-hidden transition-all hover:shadow-md">
+                <Card className="group overflow-hidden p-0 transition-all hover:shadow-md">
                   <div className="flex flex-col sm:flex-row">
                     {recipe.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={recipe.imageUrl} alt={recipe.name} className="h-44 w-full object-cover sm:h-auto sm:w-48" />
+                      <div className="relative h-48 w-full shrink-0 overflow-hidden bg-muted sm:h-auto sm:w-52">
+                        {/* Fills the card panel: fixed height on mobile, stretches to row height on desktop. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={recipe.imageUrl}
+                          alt={recipe.name}
+                          className="h-full w-full object-cover sm:absolute sm:inset-0"
+                        />
+                      </div>
                     )}
                     <CardContent className="flex-1 p-5">
                       <h2 className="font-display text-lg font-semibold group-hover:text-primary">{recipe.name}</h2>
