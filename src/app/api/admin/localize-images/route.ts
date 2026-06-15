@@ -30,6 +30,17 @@ export async function POST(request: NextRequest) {
     householdId = owner.householdId;
   }
 
+  // "Retry failed" clears the given-up marker on previously-failed photos so the
+  // normal loop reprocesses them (now with the Wayback Machine fallback). Done
+  // once at the start of a retry run; the loop then drains them as usual.
+  if (body.reset === true) {
+    const { count } = await prisma.recipe.updateMany({
+      where: { householdId, sourceType: "BLOG", imageUrl: { startsWith: "http" }, imageLocalizeFailed: true },
+      data: { imageLocalizeFailed: false },
+    });
+    return NextResponse.json({ reset: count });
+  }
+
   // External = an http(s) imageUrl we haven't already self-hosted or given up on.
   const where = {
     householdId,

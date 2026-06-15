@@ -194,7 +194,9 @@ export default function MigratePage() {
   }
 
   // Loop the batched image-localization pass until every photo is self-hosted.
-  async function runLocalizeImages() {
+  // `retryFailed` first clears the given-up markers so previously-failed photos
+  // are reattempted (now with the Wayback Machine fallback).
+  async function runLocalizeImages(retryFailed = false) {
     setImgRunning(true);
     setImgError(null);
     setImgProgress(null);
@@ -203,6 +205,13 @@ export default function MigratePage() {
     let failedTotal = 0;
     let lastError = "";
     try {
+      if (retryFailed) {
+        await fetch("/api/admin/localize-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ownerUserId: owner, reset: true }),
+        });
+      }
       for (let i = 0; i < 1000; i++) {
         const res = await fetch("/api/admin/localize-images", {
           method: "POST",
@@ -477,12 +486,18 @@ export default function MigratePage() {
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">
             Downloads imported recipe photos that still point at Blogger/Google into the app, so
-            the blog keeps working even if those links go away. Safe to run repeatedly.
+            the blog keeps working even if those links go away. Safe to run repeatedly. Tries the
+            original link, a normalized Google size, then the Internet Archive&apos;s Wayback Machine.
           </p>
-          <Button onClick={runLocalizeImages} disabled={imgRunning} variant="outline">
-            {imgRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageDown className="mr-2 h-4 w-4" />}
-            {imgRunning ? "Downloading…" : "Download photos"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => runLocalizeImages(false)} disabled={imgRunning} variant="outline">
+              {imgRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageDown className="mr-2 h-4 w-4" />}
+              {imgRunning ? "Downloading…" : "Download photos"}
+            </Button>
+            <Button onClick={() => runLocalizeImages(true)} disabled={imgRunning} variant="ghost">
+              Retry failed (incl. Wayback)
+            </Button>
+          </div>
           {imgProgress && (
             <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
               Self-hosted <span className="font-medium">{imgProgress.converted}</span>
