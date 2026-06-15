@@ -19,6 +19,7 @@ interface BookRecipe {
   servings: number;
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
+  imageUrl: string | null;
   tags: { tag: { id: number; name: string } }[];
 }
 
@@ -200,7 +201,13 @@ export default function BookDetailPage() {
             const recipe = entry.recipe;
             const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
             return (
-              <Card key={entry.id} className="group transition-all hover:shadow-md">
+              <Card key={entry.id} className="group overflow-hidden transition-all hover:shadow-md">
+                {recipe.imageUrl && (
+                  <Link href={`/recipes/${recipe.id}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={recipe.imageUrl} alt={recipe.name} className="h-32 w-full object-cover" />
+                  </Link>
+                )}
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/recipes/${recipe.id}`} className="flex-1">
