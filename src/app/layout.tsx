@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Nunito, Nunito_Sans } from "next/font/google";
+import { Nunito, Nunito_Sans, Fraunces } from "next/font/google";
 import { Providers } from "@/components/shared/Providers";
 import { AppShell } from "@/components/shared/AppShell";
 import { ServiceWorkerRegistrar } from "@/components/shared/ServiceWorkerRegistrar";
@@ -16,6 +16,14 @@ const nunitoSans = Nunito_Sans({
   variable: "--font-nunito-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+// Warm editorial serif for the public recipe blog's display headings.
+const fraunces = Fraunces({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -45,7 +53,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${nunito.variable} ${nunitoSans.variable} h-full antialiased`}
+      className={`${nunito.variable} ${nunitoSans.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />

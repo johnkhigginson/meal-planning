@@ -107,21 +107,46 @@ export function BlogHeaderEditor({ bookId, canEdit, name, description, coverImag
     );
   }
 
-  return (
-    <div className="mb-6">
-      {cover && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={cover} alt={title} className="mb-5 h-56 w-full rounded-2xl object-cover" />
-      )}
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+  // Cover image → immersive hero with the title overlaid; otherwise a clean,
+  // centered editorial masthead.
+  if (cover) {
+    return (
+      <div className="relative mb-8 overflow-hidden rounded-3xl">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={cover} alt={title} className="h-72 w-full object-cover sm:h-80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-5xl">
+            {title}
+          </h1>
+          {intro && <p className="mt-2 max-w-2xl text-sm text-white/85">{intro}</p>}
+        </div>
         {canEdit && (
-          <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditing(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute right-4 top-4 border-white/40 bg-white/85 hover:bg-white"
+            onClick={() => setEditing(true)}
+          >
             <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit header
           </Button>
         )}
       </div>
-      {intro && <p className="mt-2 text-muted-foreground">{intro}</p>}
+    );
+  }
+
+  return (
+    <div className="mb-8 text-center">
+      {canEdit && (
+        <div className="mb-3 flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit header
+          </Button>
+        </div>
+      )}
+      <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
+      {intro && <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">{intro}</p>}
+      <div className="mx-auto mt-5 h-px w-16 bg-primary/40" />
     </div>
   );
 }

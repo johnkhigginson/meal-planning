@@ -99,7 +99,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
   const jsonLd = recipeJsonLd(data);
 
   return (
-    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name}>
+    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name} aboutHref={`/blog/${book.slug}/about`}>
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       )}
@@ -112,7 +112,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
       <article>
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">{recipe.name}</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{recipe.name}</h1>
           <PrintButton />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">

@@ -139,7 +139,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                       <img src={recipe.imageUrl} alt={recipe.name} className="h-44 w-full object-cover sm:h-auto sm:w-48" />
                     )}
                     <CardContent className="flex-1 p-5">
-                      <h2 className="text-lg font-semibold group-hover:text-primary">{recipe.name}</h2>
+                      <h2 className="font-display text-lg font-semibold group-hover:text-primary">{recipe.name}</h2>
                       {recipe.publishedAt && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {formatDate(recipe.publishedAt)}

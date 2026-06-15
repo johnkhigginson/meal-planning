@@ -31,7 +31,7 @@ export default async function AboutPage({ params }: PageProps) {
   const shown = withBio.length > 0 ? withBio : authors;
 
   return (
-    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name}>
+    <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name} aboutHref={`/blog/${book.slug}/about`}>
       <Link
         href={`/blog/${book.slug}`}
         className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -39,7 +39,7 @@ export default async function AboutPage({ params }: PageProps) {
         <ArrowLeft className="h-4 w-4" /> {book.name}
       </Link>
 
-      <h1 className="text-3xl font-bold tracking-tight">About</h1>
+      <h1 className="font-display text-4xl font-semibold tracking-tight">About</h1>
       {book.description && <p className="mt-2 text-muted-foreground">{book.description}</p>}
 
       <div className="mt-8 space-y-8">
@@ -61,7 +61,7 @@ export default async function AboutPage({ params }: PageProps) {
               </div>
             )}
             <div>
-              <h2 className="text-lg font-semibold">{author.name}</h2>
+              <h2 className="font-display text-xl font-semibold">{author.name}</h2>
               {author.bio ? (
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{author.bio}</p>
               ) : (
