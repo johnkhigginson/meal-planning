@@ -25,6 +25,7 @@ interface Recipe {
   imageUrl: string | null;
   isFavorite: boolean;
   tags: { tag: Tag }[];
+  author?: { id: number; name: string } | null;
 }
 
 const PAGE_SIZE = 24;
@@ -41,6 +42,8 @@ export default function RecipesPage() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Only surface per-recipe authorship when the household is actually shared.
+  const [multiMember, setMultiMember] = useState(false);
 
   const buildParams = useCallback(
     (page: number) => {
@@ -81,6 +84,10 @@ export default function RecipesPage() {
 
   useEffect(() => {
     fetch("/api/tags").then((r) => r.json()).then(setTags);
+    fetch("/api/household/members")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((m) => setMultiMember(Array.isArray(m) && m.length > 1))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -186,7 +193,7 @@ export default function RecipesPage() {
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {recipes.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
+              <RecipeCard key={recipe.id} recipe={recipe} showAuthor={multiMember} />
             ))}
           </div>
           {recipes.length < total && (

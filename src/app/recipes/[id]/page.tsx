@@ -40,6 +40,9 @@ export default async function RecipeDetailPage({ params }: PageProps) {
 
   if (!recipe) notFound();
 
+  // Authorship is only meaningful in a shared household.
+  const memberCount = await prisma.user.count({ where: { householdId } });
+
   const totalTime =
     (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
 
@@ -95,7 +98,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           <Users className="h-4 w-4" />
           {recipe.servings} servings
         </span>
-        {recipe.author?.name && (
+        {memberCount > 1 && recipe.author?.name && (
           <span className="flex items-center gap-1 text-muted-foreground">
             <UserRound className="h-4 w-4" />
             {recipe.author.name}

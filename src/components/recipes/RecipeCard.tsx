@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, Heart } from "lucide-react";
+import { Clock, Users, Heart, UserRound } from "lucide-react";
 
 interface RecipeCardProps {
   recipe: {
@@ -15,10 +15,13 @@ interface RecipeCardProps {
     imageUrl?: string | null;
     isFavorite: boolean;
     tags: { tag: { id: number; name: string } }[];
+    author?: { id: number; name: string } | null;
   };
+  // Show who added the recipe — only worth surfacing in shared households.
+  showAuthor?: boolean;
 }
 
-export function RecipeCard({ recipe }: RecipeCardProps) {
+export function RecipeCard({ recipe, showAuthor = false }: RecipeCardProps) {
   const totalTime =
     (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
 
@@ -63,6 +66,12 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
               {recipe.sourceType}
             </Badge>
+            {showAuthor && recipe.author?.name && (
+              <span className="flex items-center gap-1">
+                <UserRound className="h-3 w-3" />
+                {recipe.author.name}
+              </span>
+            )}
           </div>
 
           {recipe.tags.length > 0 && (
