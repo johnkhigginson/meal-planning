@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, UtensilsCrossed, Store, ArrowRight, Rss } from "lucide-react";
+import { Users, UtensilsCrossed, Store, ArrowRight, Rss, LogIn, Loader2 } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface UserData {
@@ -51,10 +52,12 @@ export default function AdminDashboard() {
   const { data: session } = useSession();
   const systemRole = (session?.user as { systemRole?: string } | undefined)?.systemRole;
   const isAdmin = systemRole === "ADMIN";
+  const currentUserId = session?.user?.id;
 
   const [users, setUsers] = useState<UserData[]>([]);
   const [stats, setStats] = useState({ totalUsers: 0, totalHouseholds: 0 });
   const [loading, setLoading] = useState(true);
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -80,6 +83,27 @@ export default function AdminDashboard() {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, systemRole } : u))
       );
+    }
+  }
+
+  async function impersonate(userId: number) {
+    setImpersonatingId(userId);
+    try {
+      const res = await fetch("/api/admin/impersonate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) {
+        setImpersonatingId(null);
+        return;
+      }
+      const { token } = await res.json();
+      await signIn("impersonate", { token, redirect: false });
+      // Full reload so the app picks up the impersonated session.
+      window.location.assign("/");
+    } catch {
+      setImpersonatingId(null);
     }
   }
 
@@ -201,21 +225,39 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-              <Select
-                value={user.systemRole}
-                onValueChange={(v) => v && changeRole(user.id, v)}
-              >
-                <SelectTrigger className="w-36 shrink-0">
-                  <SelectValue>
-                    {ROLE_LABELS[user.systemRole]}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USER">User</SelectItem>
-                  <SelectItem value="CONTRIBUTOR">Contributor</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex shrink-0 items-center gap-2">
+                {String(user.id) !== currentUserId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => impersonate(user.id)}
+                    disabled={impersonatingId !== null}
+                    title={`Log in as ${user.name}`}
+                  >
+                    {impersonatingId === user.id ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <LogIn className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    Log in as
+                  </Button>
+                )}
+                <Select
+                  value={user.systemRole}
+                  onValueChange={(v) => v && changeRole(user.id, v)}
+                >
+                  <SelectTrigger className="w-36 shrink-0">
+                    <SelectValue>
+                      {ROLE_LABELS[user.systemRole]}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USER">User</SelectItem>
+                    <SelectItem value="CONTRIBUTOR">Contributor</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           ))}
         </div>
