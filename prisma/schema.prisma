@@ -412,13 +412,15 @@ model RecipeBookEntry {
 // ─── Sharing ────────────────────────────────────────────────────
 
 model ShareLink {
-  id            Int      @id @default(autoincrement())
-  token         String   @unique @db.NVarChar(64)
-  shareType     String   @db.NVarChar(20) // RECIPE, BOOK
+  id            Int       @id @default(autoincrement())
+  token         String    @unique @db.NVarChar(64)
+  shareType     String    @db.NVarChar(20) // RECIPE, BOOK
   recipeId      Int?
   recipeBookId  Int?
   createdById   Int
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime? // null = no expiry; set to ~1yr on creation
+  revokedAt     DateTime? // set when the owner stops sharing
 
   recipe     Recipe?     @relation(fields: [recipeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   recipeBook RecipeBook? @relation(fields: [recipeBookId], references: [id], onDelete: NoAction, onUpdate: NoAction)

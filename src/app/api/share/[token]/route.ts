@@ -10,6 +10,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
   const link = await prisma.shareLink.findUnique({ where: { token } });
   if (!link) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  if (link.revokedAt || (link.expiresAt && link.expiresAt < new Date())) {
+    return NextResponse.json({ error: "This share link is no longer active" }, { status: 410 });
+  }
 
   if (link.shareType === "RECIPE" && link.recipeId) {
     const recipe = await prisma.recipe.findUnique({
@@ -53,6 +56,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const { token } = await params;
   const link = await prisma.shareLink.findUnique({ where: { token } });
   if (!link) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+  if (link.revokedAt || (link.expiresAt && link.expiresAt < new Date())) {
+    return NextResponse.json({ error: "This share link is no longer active" }, { status: 410 });
+  }
 
   if (link.shareType === "RECIPE" && link.recipeId) {
     const source = await prisma.recipe.findUnique({
