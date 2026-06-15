@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink, UserPlus, UserRound, X } from "lucide-react";
 
 interface BookRecipe {
   id: number;
@@ -21,11 +23,13 @@ interface BookRecipe {
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
   imageUrl: string | null;
+  author: { id: number; name: string } | null;
   tags: { tag: { id: number; name: string } }[];
 }
 
 interface RecipeBook {
   id: number;
+  householdId: number;
   name: string;
   description: string | null;
   isPublished: boolean;
@@ -33,9 +37,17 @@ interface RecipeBook {
   entries: { id: number; recipe: BookRecipe }[];
 }
 
+interface Collaborator {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export default function BookDetailPage() {
   const params = useParams();
   const bookId = params.id as string;
+  const { data: session } = useSession();
+  const myHouseholdId = (session?.user as { householdId?: string } | undefined)?.householdId;
 
   const [book, setBook] = useState<RecipeBook | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,9 +66,42 @@ export default function BookDetailPage() {
   // Publish to public blog
   const [publishing, setPublishing] = useState(false);
 
+  // Collaborators
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [collabEmail, setCollabEmail] = useState("");
+  const [collabBusy, setCollabBusy] = useState(false);
+  const [collabError, setCollabError] = useState("");
+
   useEffect(() => {
     fetch(`/api/books/${bookId}`).then((r) => r.json()).then((data) => { setBook(data); setLoading(false); });
+    fetch(`/api/books/${bookId}/collaborators`).then((r) => r.json()).then((d) => setCollaborators(Array.isArray(d) ? d : [])).catch(() => {});
   }, [bookId]);
+
+  const isOwner = !!book && !!myHouseholdId && String(book.householdId) === myHouseholdId;
+
+  async function addCollaborator() {
+    if (!collabEmail.trim()) return;
+    setCollabBusy(true);
+    setCollabError("");
+    const res = await fetch(`/api/books/${bookId}/collaborators`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: collabEmail.trim() }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setCollaborators((prev) => [...prev.filter((c) => c.id !== data.id), data]);
+      setCollabEmail("");
+    } else {
+      setCollabError(data.error || "Could not add collaborator");
+    }
+    setCollabBusy(false);
+  }
+
+  async function removeCollaborator(userId: number) {
+    await fetch(`/api/books/${bookId}/collaborators?userId=${userId}`, { method: "DELETE" });
+    setCollaborators((prev) => prev.filter((c) => c.id !== userId));
+  }
 
   useEffect(() => {
     if (!addOpen) return;
@@ -157,6 +202,12 @@ export default function BookDetailPage() {
             {sharing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Share2 className="mr-2 h-3.5 w-3.5" />}
             Share
           </Button>
+          <Link href={`/recipes/new?bookId=${book.id}`}>
+            <Button variant="outline" size="sm">
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              New Recipe
+            </Button>
+          </Link>
           <Button size="sm" onClick={() => { setAddOpen(true); setSearch(""); setAddedIds(new Set()); }}>
             <Plus className="mr-2 h-3.5 w-3.5" />
             Add Recipes
@@ -192,6 +243,46 @@ export default function BookDetailPage() {
         </div>
       )}
 
+      {/* Collaborators (cookbook owner only) */}
+      {isOwner && (
+        <div className="rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <UserPlus className="h-4 w-4 text-primary" /> Collaborators
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Invite people from other households to help with this cookbook. They keep their own
+            kitchen and can be credited as recipe authors.
+          </p>
+          {collaborators.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {collaborators.map((c) => (
+                <div key={c.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-1.5 text-sm">
+                  <span>{c.name} <span className="text-muted-foreground">· {c.email}</span></span>
+                  <button onClick={() => removeCollaborator(c.id)} className="text-muted-foreground hover:text-destructive" title="Remove">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex gap-2">
+            <Input
+              type="email"
+              placeholder="collaborator@email.com"
+              value={collabEmail}
+              onChange={(e) => { setCollabEmail(e.target.value); setCollabError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && addCollaborator()}
+              className="max-w-xs"
+            />
+            <Button size="sm" onClick={addCollaborator} disabled={collabBusy || !collabEmail.trim()}>
+              {collabBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+              Add
+            </Button>
+          </div>
+          {collabError && <p className="mt-1.5 text-xs text-destructive">{collabError}</p>}
+        </div>
+      )}
+
       {/* Recipe list */}
       {book.entries.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
@@ -215,9 +306,12 @@ export default function BookDetailPage() {
                     <Link href={`/recipes/${recipe.id}`} className="flex-1">
                       <h3 className="text-sm font-semibold group-hover:text-primary transition-colors">{recipe.name}</h3>
                       {recipe.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{recipe.description}</p>}
-                      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{totalTime}m</span>}
                         <span className="flex items-center gap-1"><Users className="h-3 w-3" />{recipe.servings}</span>
+                        {recipe.author?.name && (
+                          <span className="flex items-center gap-1"><UserRound className="h-3 w-3" />{recipe.author.name}</span>
+                        )}
                       </div>
                     </Link>
                     <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive" onClick={() => removeRecipe(recipe.id)}>

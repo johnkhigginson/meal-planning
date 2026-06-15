@@ -41,6 +41,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
             include: {
               tags: { include: { tag: true } },
               ingredients: { include: { ingredient: true, unit: true } },
+              author: { select: { id: true, name: true } },
             },
           },
         },
