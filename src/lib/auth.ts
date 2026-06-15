@@ -4,10 +4,12 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { normalizeEmail } from "./email-normalize";
 import { verifyTurnstile } from "./turnstile";
+import { verifyImpersonationToken } from "./impersonation";
 
 interface ExtendedUser {
   householdId?: string;
   systemRole?: string;
+  impersonatedBy?: string | null;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -53,6 +55,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       },
     }),
+    // Admin impersonation. Accepts a signed token (minted only by the admin-only
+    // /api/admin/impersonate endpoint) and issues a session for the target user.
+    // `impersonatedBy` carries the originating admin so the UI can show a banner
+    // and offer a one-click return.
+    Credentials({
+      id: "impersonate",
+      name: "Impersonate",
+      credentials: { token: {} },
+      async authorize(credentials) {
+        const payload = verifyImpersonationToken(credentials?.token as string | undefined);
+        if (!payload) return null;
+
+        const user = await prisma.user.findUnique({ where: { id: payload.targetUserId } });
+        if (!user) return null;
+
+        return {
+          id: user.id.toString(),
+          email: user.email,
+          name: user.name,
+          householdId: user.householdId.toString(),
+          systemRole: user.systemRole,
+          impersonatedBy: payload.impersonatedBy != null ? payload.impersonatedBy.toString() : null,
+        };
+      },
+    }),
   ],
   callbacks: {
     jwt({ token, user }) {
@@ -60,6 +87,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.householdId = (user as ExtendedUser).householdId;
         token.systemRole = (user as ExtendedUser).systemRole;
+        token.impersonatedBy = (user as ExtendedUser).impersonatedBy ?? null;
       }
       return token;
     },
@@ -68,6 +96,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string;
         (session.user as ExtendedUser).householdId = token.householdId as string;
         (session.user as ExtendedUser).systemRole = token.systemRole as string;
+        (session.user as ExtendedUser).impersonatedBy = (token.impersonatedBy as string | null) ?? null;
       }
       return session;
     },
