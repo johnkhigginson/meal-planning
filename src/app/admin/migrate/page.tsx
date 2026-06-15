@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Rss, Loader2, Upload, CheckCircle2, AlertTriangle, ExternalLink, Sparkles } from "lucide-react";
+import { ArrowLeft, Rss, Loader2, Upload, CheckCircle2, AlertTriangle, ExternalLink, Sparkles, ImageDown } from "lucide-react";
 
 interface MigrateResult {
   blogTitle: string;
@@ -58,6 +58,9 @@ export default function MigratePage() {
   const [aiRunning, setAiRunning] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiProgress, setAiProgress] = useState<AiProgress | null>(null);
+  const [imgRunning, setImgRunning] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
+  const [imgProgress, setImgProgress] = useState<{ converted: number; remaining: number; done: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Load all users (admin scope) so the importer can hand ownership to any
@@ -156,6 +159,44 @@ export default function MigratePage() {
       setAiError("Something went wrong during AI extraction.");
     } finally {
       setAiRunning(false);
+    }
+  }
+
+  // Loop the batched image-localization pass until every photo is self-hosted.
+  async function runLocalizeImages() {
+    setImgRunning(true);
+    setImgError(null);
+    setImgProgress(null);
+    const owner = ownerId ? parseInt(ownerId, 10) : undefined;
+    let convertedTotal = 0;
+    try {
+      for (let i = 0; i < 1000; i++) {
+        const res = await fetch("/api/admin/localize-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ownerUserId: owner, limit: 5 }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          setImgError(d.error || "Image download failed");
+          break;
+        }
+        convertedTotal += d.converted;
+        setImgProgress({ converted: convertedTotal, remaining: d.remaining, done: d.done });
+        if (d.done) break;
+        if (d.processed === 0) {
+          setImgError(
+            d.errors?.length
+              ? `Stopped — some images couldn't be downloaded (${d.remaining} left): ${d.errors[0]}`
+              : `Stopped with ${d.remaining} image(s) left.`
+          );
+          break;
+        }
+      }
+    } catch {
+      setImgError("Something went wrong downloading images.");
+    } finally {
+      setImgRunning(false);
     }
   }
 
@@ -375,6 +416,37 @@ export default function MigratePage() {
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{aiError}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Self-host photos — download externally-linked images into the app. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ImageDown className="h-4 w-4 text-primary" /> Self-host photos
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Downloads imported recipe photos that still point at Blogger/Google into the app, so
+            the blog keeps working even if those links go away. Safe to run repeatedly.
+          </p>
+          <Button onClick={runLocalizeImages} disabled={imgRunning} variant="outline">
+            {imgRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageDown className="mr-2 h-4 w-4" />}
+            {imgRunning ? "Downloading…" : "Download photos"}
+          </Button>
+          {imgProgress && (
+            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
+              Self-hosted <span className="font-medium">{imgProgress.converted}</span> ·{" "}
+              {imgProgress.remaining} remaining{imgProgress.done && " · done ✓"}
+            </div>
+          )}
+          {imgError && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{imgError}</span>
             </div>
           )}
         </CardContent>
