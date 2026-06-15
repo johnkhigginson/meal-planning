@@ -7,12 +7,19 @@ const publicPaths = ["/", "/login", "/register"];
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  // Allow public paths (including the public recipe blog)
+  // Allow public paths (including the public recipe blog) and the API routes
+  // the public blog depends on. Those API routes self-authorize (read is
+  // public; writes call getCurrentUser and 401 on their own), so letting them
+  // through middleware avoids redirecting logged-out visitors' image/comment
+  // requests to /login.
   if (
     publicPaths.includes(pathname) ||
     pathname.startsWith("/share/") ||
     pathname === "/blog" ||
-    pathname.startsWith("/blog/")
+    pathname.startsWith("/blog/") ||
+    pathname.startsWith("/api/images") ||
+    pathname.startsWith("/api/blog/") ||
+    pathname.startsWith("/api/share/")
   ) {
     return NextResponse.next();
   }

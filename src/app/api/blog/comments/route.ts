@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { audit, clientIp } from "@/lib/audit";
 import { sendCommentNotificationEmail } from "@/lib/email";
 import { getSiteUrl } from "@/lib/site";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 // Comments on a published blog recipe. Anyone can read; posting requires being
 // signed in.
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Please sign in to comment." }, { status: 401 });
   }
+
+  const limited = enforceRateLimit("comment", user.userId, 15, 60_000);
+  if (limited) return limited;
 
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });

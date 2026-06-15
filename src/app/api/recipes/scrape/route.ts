@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
+import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
 
 function cleanText(text: string): string {
   return text
@@ -230,6 +231,9 @@ function extractFallback(html: string): ScrapedRecipe | null {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = enforceRateLimit("scrape", ipKey(request), 20, 60_000);
+  if (limited) return limited;
+
   const { url } = await request.json();
   if (!url || typeof url !== "string") {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });

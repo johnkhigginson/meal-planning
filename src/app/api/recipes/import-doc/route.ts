@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a document that contains one or more recipes, extract each recipe as structured data.
 
@@ -33,6 +34,8 @@ Rules:
 
 export async function POST(request: NextRequest) {
   const householdId = await requireHouseholdId();
+  const limited = enforceRateLimit("ai-doc", householdId, 10, 60_000);
+  if (limited) return limited;
   const formData = await request.formData();
   const file = formData.get("document") as File | null;
   const text = formData.get("text") as string | null;

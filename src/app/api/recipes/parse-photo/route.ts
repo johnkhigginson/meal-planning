@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a photo of a cookbook page or recipe card, extract the recipe information and return it as JSON.
 
@@ -26,6 +27,9 @@ Rules:
 - Keep ingredient strings exactly as they appear (don't split into structured data)`;
 
 export async function POST(request: NextRequest) {
+  const limited = enforceRateLimit("ai-photo", ipKey(request), 12, 60_000);
+  if (limited) return limited;
+
   const formData = await request.formData();
   const file = formData.get("photo") as File | null;
 

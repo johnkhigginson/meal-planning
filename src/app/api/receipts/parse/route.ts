@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
 
 const SYSTEM_PROMPT = `You are a grocery receipt parser. Given a photo of a grocery receipt, extract each purchased item with structured detail.
 
@@ -51,6 +52,9 @@ Rules:
 - Skip ONLY non-item lines: tax, subtotals, totals, discounts, payment, change, coupons, member numbers`;
 
 export async function POST(request: NextRequest) {
+  const limited = enforceRateLimit("ai-receipt", ipKey(request), 12, 60_000);
+  if (limited) return limited;
+
   const formData = await request.formData();
   const file = formData.get("receipt") as File | null;
 

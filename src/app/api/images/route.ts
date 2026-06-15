@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,9 @@ const MAX_BYTES = 15 * 1024 * 1024; // 15MB pre-resize cap
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const limited = enforceRateLimit("img", user.userId, 40, 60_000);
+  if (limited) return limited;
 
   const form = await request.formData();
   const file = form.get("file");

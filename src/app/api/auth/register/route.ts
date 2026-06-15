@@ -4,8 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/email-normalize";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { audit } from "@/lib/audit";
+import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const limited = enforceRateLimit("register", ipKey(request), 5, 60 * 60_000);
+  if (limited) return limited;
+
   const body = await request.json();
   const { name, password } = body;
 

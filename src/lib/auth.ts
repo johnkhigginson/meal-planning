@@ -6,6 +6,7 @@ import { normalizeEmail } from "./email-normalize";
 import { verifyTurnstile } from "./turnstile";
 import { verifyImpersonationToken } from "./impersonation";
 import { audit } from "./audit";
+import { checkRateLimit } from "./rate-limit";
 
 interface ExtendedUser {
   householdId?: string;
@@ -22,12 +23,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: {},
         turnstileToken: {},
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const rawEmail = credentials?.email as string;
         const password = credentials?.password as string;
         if (!rawEmail || !password) return null;
 
         const email = normalizeEmail(rawEmail);
+
+        // Brute-force throttle: cap attempts per IP+email window.
+        const ip =
+          (request as Request | undefined)?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          "unknown";
+        if (!checkRateLimit(`login:${ip}:${email}`, 10, 15 * 60_000).ok) return null;
+
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
 
