@@ -11,6 +11,7 @@ export async function GET() {
       name: true,
       email: true,
       enabledMealSlots: true,
+      hiddenNavItems: true,
       role: true,
       household: {
         select: {
@@ -31,11 +32,12 @@ export async function PUT(request: NextRequest) {
   const data: Record<string, unknown> = {};
   if (body.name) data.name = body.name;
   if (body.enabledMealSlots) data.enabledMealSlots = body.enabledMealSlots;
+  if (typeof body.hiddenNavItems === "string") data.hiddenNavItems = body.hiddenNavItems;
 
   const user = await prisma.user.update({
     where: { id: userId },
     data,
-    select: { id: true, name: true, email: true, enabledMealSlots: true, role: true },
+    select: { id: true, name: true, email: true, enabledMealSlots: true, hiddenNavItems: true, role: true },
   });
 
   // Update household name if provided (owners only)

@@ -33,6 +33,7 @@ model User {
   role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER (household role)
   systemRole       String   @default("USER") @db.NVarChar(20) // USER, CONTRIBUTOR, ADMIN
   enabledMealSlots String   @default("BREAKFAST,LUNCH,DINNER,SNACK") @db.NVarChar(200)
+  hiddenNavItems   String   @default("") @db.NVarChar(400) // nav hrefs this user hides from their menu
   bio              String?  @db.NVarChar(Max) // public author bio shown on the blog
   createdAt        DateTime @default(now())
   lastLogin        DateTime?
