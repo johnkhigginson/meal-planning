@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireHouseholdId } from "@/lib/auth";
+import { requireHouseholdId, requireUser } from "@/lib/auth";
 
 export async function GET() {
-  const householdId = await requireHouseholdId();
+  const user = await requireUser();
   const books = await prisma.recipeBook.findMany({
-    where: { householdId },
+    // Own cookbooks plus ones the user collaborates on.
+    where: {
+      OR: [{ householdId: user.householdId }, { collaborators: { some: { userId: user.userId } } }],
+    },
     include: { _count: { select: { entries: true } } },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
   });
-  return NextResponse.json(books);
+  // Flag collaborator cookbooks (not owned by the caller's household).
+  return NextResponse.json(
+    books.map((b) => ({ ...b, isCollaboration: b.householdId !== user.householdId }))
+  );
 }
 
 export async function POST(request: NextRequest) {

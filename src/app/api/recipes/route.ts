@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireHouseholdId, requireUser } from "@/lib/auth";
 import { createRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
+import { isValidAuthor } from "@/lib/collab";
 
 export async function GET(request: NextRequest) {
   const householdId = await requireHouseholdId();
@@ -55,23 +56,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { ingredients, tagIds, ...recipeData } = parsed.data;
+  const { ingredients, tagIds, bookId, ...recipeData } = parsed.data;
 
-  // An author, if set, must be a member of the same household (mirrors PUT).
-  if (recipeData.authorId != null) {
-    const member = await prisma.user.findFirst({
-      where: { id: recipeData.authorId, householdId },
-      select: { id: true },
+  // When creating directly into a cookbook (a collaborator contributing to
+  // someone else's blog), the recipe lives in that cookbook's household and is
+  // credited to the contributor by default.
+  let targetHouseholdId = householdId;
+  let targetBookId: number | null = null;
+  if (bookId != null) {
+    const book = await prisma.recipeBook.findFirst({
+      where: {
+        id: bookId,
+        OR: [{ householdId: user.householdId }, { collaborators: { some: { userId: user.userId } } }],
+      },
+      select: { id: true, householdId: true },
     });
-    if (!member) {
-      return NextResponse.json({ error: "Author must be a household member" }, { status: 400 });
+    if (!book) return NextResponse.json({ error: "Cookbook not found" }, { status: 404 });
+    targetHouseholdId = book.householdId;
+    targetBookId = book.id;
+    if (recipeData.authorId == null) recipeData.authorId = user.userId;
+  }
+
+  // An author must be a member of the recipe's household OR a collaborator on
+  // the target cookbook.
+  if (recipeData.authorId != null) {
+    if (!(await isValidAuthor(recipeData.authorId, targetHouseholdId, targetBookId ? [targetBookId] : []))) {
+      return NextResponse.json({ error: "Author must be a household member or cookbook collaborator" }, { status: 400 });
     }
   }
 
   const recipe = await prisma.recipe.create({
     data: {
       ...recipeData,
-      householdId,
+      householdId: targetHouseholdId,
       ingredients: {
         create: ingredients.map((ing, idx) => ({
           ingredientId: ing.ingredientId,
@@ -90,13 +107,25 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  // Add it to the target cookbook.
+  if (targetBookId != null) {
+    const maxSort = await prisma.recipeBookEntry.findFirst({
+      where: { recipeBookId: targetBookId },
+      orderBy: { sortOrder: "desc" },
+      select: { sortOrder: true },
+    });
+    await prisma.recipeBookEntry.create({
+      data: { recipeBookId: targetBookId, recipeId: recipe.id, sortOrder: (maxSort?.sortOrder ?? -1) + 1 },
+    });
+  }
+
   await audit({
     category: "RECIPE",
     action: "RECIPE_CREATED",
     summary: `${user.name} added recipe “${recipe.name}”`,
     actorUserId: user.userId,
     actorName: user.name,
-    householdId,
+    householdId: targetHouseholdId,
     targetType: "RECIPE",
     targetId: recipe.id,
   });

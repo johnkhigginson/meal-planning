@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireHouseholdId, requireUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { updateRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
+import { isValidAuthor } from "@/lib/collab";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+// A recipe is accessible to its household, or to a collaborator on a cookbook
+// that contains it.
+function recipeAccessWhere(recipeId: number, user: { userId: number; householdId: number }) {
+  return {
+    id: recipeId,
+    OR: [
+      { householdId: user.householdId },
+      { bookEntries: { some: { recipeBook: { collaborators: { some: { userId: user.userId } } } } } },
+    ],
+  };
+}
+
 export async function GET(_request: NextRequest, { params }: RouteParams) {
-  const householdId = await requireHouseholdId();
+  const user = await requireUser();
   const { id } = await params;
   const recipeId = parseInt(id, 10);
   if (Number.isNaN(recipeId)) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
   const recipe = await prisma.recipe.findFirst({
-    where: { id: recipeId, householdId },
+    where: recipeAccessWhere(recipeId, user),
     include: {
       ingredients: { include: { ingredient: true, unit: true }, orderBy: { sortOrder: "asc" } },
       tags: { include: { tag: true } },
@@ -24,7 +37,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const user = await requireUser();
-  const householdId = user.householdId;
   const { id } = await params;
   const recipeId = parseInt(id, 10);
   if (Number.isNaN(recipeId)) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
@@ -32,19 +44,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const parsed = updateRecipeSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const existing = await prisma.recipe.findFirst({ where: { id: recipeId, householdId } });
+  // Editable by the owning household or a collaborator on a containing cookbook.
+  const existing = await prisma.recipe.findFirst({
+    where: recipeAccessWhere(recipeId, user),
+    select: { id: true, householdId: true, name: true, bookEntries: { select: { recipeBookId: true } } },
+  });
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 
   const { ingredients, tagIds, ...recipeData } = parsed.data;
 
-  // An author must be a member of the same household.
+  // The author must be a member of the recipe's household OR a collaborator on
+  // one of its cookbooks (so cross-household contributors can be credited).
   if (recipeData.authorId != null) {
-    const member = await prisma.user.findFirst({
-      where: { id: recipeData.authorId, householdId },
-      select: { id: true },
-    });
-    if (!member) {
-      return NextResponse.json({ error: "Author must be a household member" }, { status: 400 });
+    const bookIds = existing.bookEntries.map((e) => e.recipeBookId);
+    if (!(await isValidAuthor(recipeData.authorId, existing.householdId, bookIds))) {
+      return NextResponse.json({ error: "Author must be a household member or cookbook collaborator" }, { status: 400 });
     }
   }
 
@@ -78,7 +92,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     summary: `${user.name} edited recipe “${updated?.name ?? existing.name}”`,
     actorUserId: user.userId,
     actorName: user.name,
-    householdId,
+    householdId: existing.householdId,
     targetType: "RECIPE",
     targetId: recipeId,
   });

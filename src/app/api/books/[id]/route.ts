@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireHouseholdId, getCurrentUser } from "@/lib/auth";
+import { requireHouseholdId, requireUser, getCurrentUser } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 import { audit } from "@/lib/audit";
 
@@ -24,12 +24,16 @@ async function resolveBookSlug(desired: string, bookId: number): Promise<string>
 }
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
-  const householdId = await requireHouseholdId();
+  const user = await requireUser();
   const { id } = await params;
   const bookId = parseInt(id, 10);
   if (Number.isNaN(bookId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const book = await prisma.recipeBook.findFirst({
-    where: { id: bookId, householdId },
+    // Owner household OR a cookbook collaborator may view/manage it.
+    where: {
+      id: bookId,
+      OR: [{ householdId: user.householdId }, { collaborators: { some: { userId: user.userId } } }],
+    },
     include: {
       entries: {
         include: {

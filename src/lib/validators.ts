@@ -38,12 +38,16 @@ export const createRecipeSchema = z.object({
     .refine((v) => /^https?:\/\//.test(v) || v.startsWith("/"), "Invalid image URL")
     .optional(),
   authorId: z.number().int().positive().nullable().optional(),
+  // Optional: create this recipe directly into a cookbook (used by cookbook
+  // collaborators contributing to someone else's blog).
+  bookId: z.number().int().positive().optional(),
   isFavorite: z.boolean().default(false),
   ingredients: z.array(recipeIngredientSchema).default([]),
   tagIds: z.array(z.number().int().positive()).default([]),
 });
 
-export const updateRecipeSchema = createRecipeSchema.partial();
+// bookId is creation-only; the update form never reassigns a recipe's cookbook.
+export const updateRecipeSchema = createRecipeSchema.omit({ bookId: true }).partial();
 
 // ─── Tags ───────────────────────────────────────────────────────
 

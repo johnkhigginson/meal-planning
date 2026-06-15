@@ -62,6 +62,9 @@ interface RecipeFormData {
 interface RecipeFormProps {
   initialData?: RecipeFormData;
   recipeId?: number;
+  // When set, a newly-created recipe is added to this cookbook (collaborator
+  // contribution). The recipe is created in the cookbook's household.
+  bookId?: number;
 }
 
 let ingredientKeyCounter = 0;
@@ -78,7 +81,7 @@ function newIngredientRow(): RecipeIngredientRow {
   };
 }
 
-export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
+export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoUploadRef = useRef<HTMLInputElement>(null);
@@ -117,8 +120,19 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
   useEffect(() => {
     fetch("/api/units").then((r) => r.json()).then(setUnits);
     fetch("/api/tags").then((r) => r.json()).then(setAllTags);
-    fetch("/api/household/members").then((r) => r.json()).then(setMembers).catch(() => {});
-  }, []);
+    // For an existing recipe, the eligible authors are its household members
+    // plus collaborators on any cookbook it's in; for a new recipe, household
+    // members (or the target cookbook's people when contributing to one).
+    const authorsUrl = recipeId
+      ? `/api/recipes/${recipeId}/authors`
+      : bookId
+        ? `/api/books/${bookId}/authors`
+        : "/api/household/members";
+    fetch(authorsUrl)
+      .then((r) => r.json())
+      .then((d) => setMembers(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [recipeId, bookId]);
 
   function updateForm<K extends keyof RecipeFormData>(
     key: K,
@@ -319,6 +333,8 @@ export function RecipeForm({ initialData, recipeId }: RecipeFormProps) {
       sourceBookPage: form.sourceType === "BOOK" ? form.sourceBookPage || undefined : undefined,
       authorId: form.authorId,
       imageUrl: form.imageUrl.trim() || undefined,
+      // Only on create: contribute the new recipe into a cookbook.
+      bookId: !recipeId && bookId ? bookId : undefined,
       isFavorite: form.isFavorite,
       ingredients: form.ingredients
         .filter((ing) => ing.ingredientId > 0 && ing.quantity > 0 && ing.unitId > 0)
