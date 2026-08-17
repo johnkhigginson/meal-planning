@@ -281,13 +281,14 @@ model MealPlan {
 model MealPlanEntry {
   id         Int      @id @default(autoincrement())
   mealPlanId Int
-  recipeId   Int
+  recipeId   Int? // null when this is a free-text meal (see customName)
+  customName String?  @db.NVarChar(200) // ad-hoc meal ("Leftovers", "Takeout") with no recipe; contributes nothing to grocery lists or pantry math
   date       DateTime @db.Date
   mealSlot   String   @db.NVarChar(20)
   servings   Int
 
   mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
-  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recipe   Recipe?  @relation(fields: [recipeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 // ─── Grocery Lists ──────────────────────────────────────────────

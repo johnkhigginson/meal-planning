@@ -55,6 +55,10 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
   >();
 
   for (const entry of mealPlan.entries) {
+    // Free-text meals ("Leftovers", "Takeout") have no recipe and therefore no
+    // ingredients to shop for — they're intentionally excluded from the list.
+    if (!entry.recipe) continue;
+
     const scaleFactor = entry.servings / entry.recipe.servings;
 
     for (const ri of entry.recipe.ingredients) {

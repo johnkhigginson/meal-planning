@@ -80,12 +80,21 @@ export const createMealPlanSchema = z.object({
   weekStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
-export const mealPlanEntrySchema = z.object({
-  recipeId: z.number().int().positive(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  mealSlot: z.enum(["BREAKFAST", "LUNCH", "DINNER", "SNACK"]),
-  servings: z.number().int().positive(),
-});
+// A planned meal is EITHER a saved recipe or a free-text name (e.g.
+// "Leftovers", "Dinner at Mom's"). Free-text meals carry no ingredients, so
+// they contribute nothing to grocery lists or pantry math.
+export const mealPlanEntrySchema = z
+  .object({
+    recipeId: z.number().int().positive().optional(),
+    customName: z.string().max(200).optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    mealSlot: z.enum(["BREAKFAST", "LUNCH", "DINNER", "SNACK"]),
+    servings: z.number().int().positive(),
+  })
+  .refine((d) => (d.recipeId != null) !== !!d.customName?.trim(), {
+    message: "Provide either a recipe or a meal name, not both",
+    path: ["customName"],
+  });
 
 export const addMealPlanEntrySchema = mealPlanEntrySchema;
 
