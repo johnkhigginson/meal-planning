@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { GEMINI_MODEL, guardAi } from "@/lib/ai";
 import { parseIngredientLines } from "@/lib/ingredient-parse";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a document that contains one or more recipes, extract each recipe as structured data.
@@ -50,8 +50,9 @@ function safeParseRecipes(jsonStr: string): { recipes: any[] } | null {
 
 export async function POST(request: NextRequest) {
   const householdId = await requireHouseholdId();
-  const limited = enforceRateLimit("ai-doc", householdId, 10, 60_000);
-  if (limited) return limited;
+  // Signed in, AI allowed on this account, and within the request budget.
+  const guard = await guardAi("ai-doc");
+  if (!guard.ok) return guard.response;
   const formData = await request.formData();
   const file = formData.get("document") as File | null;
   const text = formData.get("text") as string | null;
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       const ai = new GoogleGenAI({ apiKey });
       const base64 = Buffer.from(bytes).toString("base64");
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-lite",
+        model: GEMINI_MODEL,
         contents: [{
           role: "user",
           parts: [
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
   // Process text content with Gemini
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-lite",
+    model: GEMINI_MODEL,
     contents: [{ role: "user", parts: [{ text: `Extract all recipes from this text:\n\n${content}` }] }],
     config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 8192 },
   });
