@@ -27,11 +27,17 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface MealPlanEntry {
   id: number;
-  recipeId: number;
+  // Null for a free-text meal; `customName` holds its label instead.
+  recipeId: number | null;
+  customName: string | null;
   date: string;
   mealSlot: string;
   servings: number;
-  recipe: { id: number; name: string; servings: number };
+  recipe: { id: number; name: string; servings: number } | null;
+}
+
+function entryLabel(entry: MealPlanEntry): string {
+  return entry.recipe?.name ?? entry.customName ?? "Meal";
 }
 
 interface MealPlan {
@@ -82,6 +88,11 @@ export default function MealPlanPage() {
   const [recipeOptions, setRecipeOptions] = useState<RecipeOption[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeOption | null>(null);
   const [servings, setServings] = useState(4);
+  // "recipe" picks from the collection; "custom" is a free-text meal that
+  // deliberately contributes nothing to grocery lists or the pantry.
+  const [pickerMode, setPickerMode] = useState<"recipe" | "custom">("recipe");
+  const [customName, setCustomName] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(currentMonday);
@@ -132,16 +143,27 @@ export default function MealPlanPage() {
     setRecipeSearch("");
     setSelectedRecipe(null);
     setServings(4);
+    setPickerMode("recipe");
+    setCustomName("");
     setPickerOpen(true);
   }
 
+  const canAdd = pickerMode === "recipe" ? !!selectedRecipe : !!customName.trim();
+
   async function addEntry() {
-    if (!plan || !pickerSlot || !selectedRecipe) return;
-    await fetch(`/api/meal-plans/${plan.id}/entries`, {
+    if (!plan || !pickerSlot || !canAdd) return;
+    setSaving(true);
+    const payload =
+      pickerMode === "recipe"
+        ? { recipeId: selectedRecipe!.id, servings }
+        : { customName: customName.trim(), servings: 1 };
+    const res = await fetch(`/api/meal-plans/${plan.id}/entries`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ recipeId: selectedRecipe.id, date: pickerSlot.date, mealSlot: pickerSlot.mealSlot, servings }),
+      body: JSON.stringify({ ...payload, date: pickerSlot.date, mealSlot: pickerSlot.mealSlot }),
     });
+    setSaving(false);
+    if (!res.ok) return;
     setPickerOpen(false);
     loadPlan();
   }
@@ -181,7 +203,14 @@ export default function MealPlanPage() {
             {weekDates[6].toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={generateGroceryList} disabled={generating || !plan?.entries.length}>
+        {/* Only recipe-backed meals produce groceries, so a plan of free-text
+            meals alone has nothing to generate. */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={generateGroceryList}
+          disabled={generating || !plan?.entries.some((e) => e.recipeId)}
+        >
           {generating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <ShoppingCart className="mr-2 h-3.5 w-3.5" />}
           Grocery List
         </Button>
@@ -245,8 +274,18 @@ export default function MealPlanPage() {
                     return (
                       <div key={`${slot}-${dayIdx}`} className={`group/cell min-h-[90px] border-l p-1.5 ${slotIdx > 0 ? "border-t" : ""} ${isToday(date) ? "bg-primary/[0.02]" : ""}`}>
                         {entries.map((entry) => (
-                          <div key={entry.id} className="mb-1 flex items-start justify-between gap-1 rounded-lg bg-primary/5 px-2 py-1.5 text-xs leading-snug transition-colors hover:bg-primary/10">
-                            <span className="font-medium">{entry.recipe.name}</span>
+                          <div
+                            key={entry.id}
+                            className={`mb-1 flex items-start justify-between gap-1 rounded-lg px-2 py-1.5 text-xs leading-snug transition-colors ${
+                              entry.recipe
+                                ? "bg-primary/5 hover:bg-primary/10"
+                                : "border border-dashed border-border/70 bg-muted/40 hover:bg-muted"
+                            }`}
+                            title={entry.recipe ? undefined : "Added by name — not included in the grocery list"}
+                          >
+                            <span className={`font-medium ${entry.recipe ? "" : "text-muted-foreground"}`}>
+                              {entryLabel(entry)}
+                            </span>
                             <button onClick={() => removeEntry(entry.id)} className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/cell:opacity-100">
                               <X className="h-3 w-3" />
                             </button>
@@ -284,8 +323,17 @@ export default function MealPlanPage() {
                         {entries.length > 0 ? (
                           <div className="space-y-1.5">
                             {entries.map((entry) => (
-                              <div key={entry.id} className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm">
-                                <span className="font-medium">{entry.recipe.name}</span>
+                              <div
+                                key={entry.id}
+                                className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                                  entry.recipe
+                                    ? "bg-primary/5"
+                                    : "border border-dashed border-border/70 bg-muted/40"
+                                }`}
+                              >
+                                <span className={`font-medium ${entry.recipe ? "" : "text-muted-foreground"}`}>
+                                  {entryLabel(entry)}
+                                </span>
                                 <button onClick={() => removeEntry(entry.id)} className="shrink-0 p-1 text-muted-foreground hover:text-destructive">
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -315,39 +363,83 @@ export default function MealPlanPage() {
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Recipe</DialogTitle>
+            <DialogTitle>Add to Plan</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <SearchInput value={recipeSearch} onChange={setRecipeSearch} placeholder="Search recipes..." />
-            <div className="max-h-48 space-y-0.5 overflow-y-auto">
-              {recipeOptions.map((recipe) => (
-                <button
-                  key={recipe.id}
-                  type="button"
-                  className={`w-full cursor-pointer rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                    selectedRecipe?.id === recipe.id
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
-                  }`}
-                  onClick={() => { setSelectedRecipe(recipe); setServings(recipe.servings); }}
-                >
-                  {recipe.name}
-                </button>
-              ))}
-              {recipeOptions.length === 0 && (
-                <p className="py-6 text-center text-sm text-muted-foreground">No recipes found</p>
-              )}
+            {/* Choose a saved recipe, or just jot down a meal name. */}
+            <div className="flex gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant={pickerMode === "recipe" ? "default" : "outline"}
+                onClick={() => setPickerMode("recipe")}
+              >
+                Recipe
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={pickerMode === "custom" ? "default" : "outline"}
+                onClick={() => setPickerMode("custom")}
+              >
+                Just a name
+              </Button>
             </div>
-            {selectedRecipe && (
+
+            {pickerMode === "recipe" ? (
+              <>
+                <SearchInput value={recipeSearch} onChange={setRecipeSearch} placeholder="Search recipes..." />
+                <div className="max-h-48 space-y-0.5 overflow-y-auto">
+                  {recipeOptions.map((recipe) => (
+                    <button
+                      key={recipe.id}
+                      type="button"
+                      className={`w-full cursor-pointer rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                        selectedRecipe?.id === recipe.id
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      }`}
+                      onClick={() => { setSelectedRecipe(recipe); setServings(recipe.servings); }}
+                    >
+                      {recipe.name}
+                    </button>
+                  ))}
+                  {recipeOptions.length === 0 && (
+                    <p className="py-6 text-center text-sm text-muted-foreground">No recipes found</p>
+                  )}
+                </div>
+                {selectedRecipe && (
+                  <div className="space-y-2">
+                    <Label htmlFor="servings">Servings</Label>
+                    <Input id="servings" type="number" min={1} value={servings} onChange={(e) => setServings(parseInt(e.target.value, 10) || 1)} className="w-24" />
+                  </div>
+                )}
+              </>
+            ) : (
               <div className="space-y-2">
-                <Label htmlFor="servings">Servings</Label>
-                <Input id="servings" type="number" min={1} value={servings} onChange={(e) => setServings(parseInt(e.target.value, 10) || 1)} className="w-24" />
+                <Label htmlFor="custom-meal">Meal</Label>
+                <Input
+                  id="custom-meal"
+                  value={customName}
+                  maxLength={200}
+                  autoFocus
+                  placeholder="Leftovers, Takeout, Dinner at Mom's…"
+                  onChange={(e) => setCustomName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && canAdd) { e.preventDefault(); addEntry(); } }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Note: meals added by name aren&apos;t tied to a recipe, so they won&apos;t add
+                  anything to your grocery list or pantry.
+                </p>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
-            <Button onClick={addEntry} disabled={!selectedRecipe}>Add to Plan</Button>
+            <Button onClick={addEntry} disabled={!canAdd || saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add to Plan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -17,20 +17,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // The meal plan and the recipe must both belong to the caller's household.
+  const { recipeId, customName } = parsed.data;
+
+  // The meal plan must belong to the caller's household.
   const plan = await prisma.mealPlan.findFirst({ where: { id: mealPlanId, householdId }, select: { id: true } });
   if (!plan) return NextResponse.json({ error: "Meal plan not found" }, { status: 404 });
 
-  const recipe = await prisma.recipe.findFirst({
-    where: { id: parsed.data.recipeId, householdId },
-    select: { id: true },
-  });
-  if (!recipe) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
+  // A recipe-backed entry's recipe must belong to the household too. Free-text
+  // meals reference nothing, so there's nothing further to authorize.
+  if (recipeId != null) {
+    const recipe = await prisma.recipe.findFirst({
+      where: { id: recipeId, householdId },
+      select: { id: true },
+    });
+    if (!recipe) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
+  }
 
   const entry = await prisma.mealPlanEntry.create({
     data: {
       mealPlanId,
-      recipeId: parsed.data.recipeId,
+      recipeId: recipeId ?? null,
+      customName: recipeId != null ? null : customName!.trim(),
       date: new Date(parsed.data.date),
       mealSlot: parsed.data.mealSlot,
       servings: parsed.data.servings,
