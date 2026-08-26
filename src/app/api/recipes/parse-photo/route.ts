@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
+import { GEMINI_MODEL, guardAi } from "@/lib/ai";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a photo of a cookbook page or recipe card, extract the recipe information and return it as JSON.
 
@@ -27,8 +27,9 @@ Rules:
 - Keep ingredient strings exactly as they appear (don't split into structured data)`;
 
 export async function POST(request: NextRequest) {
-  const limited = enforceRateLimit("ai-photo", ipKey(request), 12, 60_000);
-  if (limited) return limited;
+  // Signed in, AI allowed on this account, and within the request budget.
+  const guard = await guardAi("ai-photo");
+  if (!guard.ok) return guard.response;
 
   const formData = await request.formData();
   const file = formData.get("photo") as File | null;
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
+      model: GEMINI_MODEL,
       contents: [
         {
           role: "user",

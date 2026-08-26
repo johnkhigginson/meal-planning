@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, UtensilsCrossed, Store, ArrowRight, Rss, LogIn, Loader2, ScrollText } from "lucide-react";
+import { Users, UtensilsCrossed, Store, ArrowRight, Rss, LogIn, Loader2, ScrollText, Sparkles } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { PageLoader } from "@/components/shared/PageLoader";
 
@@ -23,6 +23,7 @@ interface UserData {
   email: string;
   role: string;
   systemRole: string;
+  aiEnabled: boolean;
   enabledMealSlots: string;
   lastLogin: string | null;
   createdAt: string;
@@ -84,6 +85,19 @@ export default function AdminDashboard() {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, systemRole } : u))
       );
+    }
+  }
+
+  // Turn the AI features (photo/doc/receipt parsing, blog extraction) on or off
+  // for one account. Enforced server-side on every AI endpoint.
+  async function changeAiAccess(userId: number, aiEnabled: boolean) {
+    const res = await fetch("/api/admin/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, aiEnabled }),
+    });
+    if (res.ok) {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, aiEnabled } : u)));
     }
   }
 
@@ -214,6 +228,11 @@ export default function AdminDashboard() {
                       Household owner
                     </Badge>
                   )}
+                  {!user.aiEnabled && (
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                      AI off
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">{user.email}</div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground/70">
@@ -260,6 +279,21 @@ export default function AdminDashboard() {
                     Log in as
                   </Button>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => changeAiAccess(user.id, !user.aiEnabled)}
+                  title={
+                    user.aiEnabled
+                      ? `Turn off AI features for ${user.name}`
+                      : `Turn on AI features for ${user.name}`
+                  }
+                >
+                  <Sparkles
+                    className={`mr-1.5 h-3.5 w-3.5 ${user.aiEnabled ? "text-primary" : "text-muted-foreground/50"}`}
+                  />
+                  AI {user.aiEnabled ? "on" : "off"}
+                </Button>
                 <Select
                   value={user.systemRole}
                   onValueChange={(v) => v && changeRole(user.id, v)}

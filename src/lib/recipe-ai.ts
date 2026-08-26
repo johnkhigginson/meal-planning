@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODEL } from "@/lib/ai";
 
 // AI extraction of structured recipe data from a (messy) blog post. Used by the
 // blog importer's ingredient-extraction pass. Returns null when no API key is
@@ -85,7 +86,7 @@ export async function extractRecipeFromText(text: string): Promise<AiRecipe | nu
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await generateWithRetry(ai, {
-    model: "gemini-2.5-flash-lite",
+    model: GEMINI_MODEL,
     contents: [
       {
         role: "user",

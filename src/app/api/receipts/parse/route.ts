@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
+import { GEMINI_MODEL, guardAi } from "@/lib/ai";
 
 const SYSTEM_PROMPT = `You are a grocery receipt parser. Given a photo of a grocery receipt, extract each purchased item with structured detail.
 
@@ -52,8 +52,9 @@ Rules:
 - Skip ONLY non-item lines: tax, subtotals, totals, discounts, payment, change, coupons, member numbers`;
 
 export async function POST(request: NextRequest) {
-  const limited = enforceRateLimit("ai-receipt", ipKey(request), 12, 60_000);
-  if (limited) return limited;
+  // Signed in, AI allowed on this account, and within the request budget.
+  const guard = await guardAi("ai-receipt");
+  if (!guard.ok) return guard.response;
 
   const formData = await request.formData();
   const file = formData.get("receipt") as File | null;
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
+      model: GEMINI_MODEL,
       contents: [
         {
           role: "user",

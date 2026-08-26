@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { htmlToText, extractRecipeSections } from "@/lib/blogger";
 import { extractRecipeFromText, isAiConfigured, isQuotaError, isDailyQuotaError } from "@/lib/recipe-ai";
 import { parseIngredientLines } from "@/lib/ingredient-parse";
+import { guardAi } from "@/lib/ai";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -31,6 +32,15 @@ export async function POST(request: NextRequest) {
 
   if (mode === "ai" && !isAiConfigured()) {
     return NextResponse.json({ error: "AI is not configured (GEMINI_API_KEY missing)." }, { status: 400 });
+  }
+
+  // This route is the heaviest AI consumer (a batch of model calls per request,
+  // looped by the client), so it gets the same account toggle and budget as the
+  // rest. The burst allowance is higher because the client drives it in a loop.
+  // "heuristic" mode makes no model calls, so it's exempt.
+  if (mode === "ai") {
+    const guard = await guardAi("ai-extract", { perMin: 40 });
+    if (!guard.ok) return guard.response;
   }
 
   // Resolve the target household (the owner's), matching the importer.
