@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
               notes: r.notes || null,
               optional: r.optional,
               sortOrder: idx,
+              section: r.section,
             })),
           });
           withIngredients++;
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
               notes: r.notes || null,
               optional: r.optional,
               sortOrder: idx,
+              section: r.section,
             })),
           });
           withIngredients++;

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeImportedIngredients } from "@/lib/recipe-sections";
 
 // Parses free-text ingredient lines ("2 cups flour", "1/2 tsp salt (fine)")
 // into structured rows, matching/creating Ingredient records and resolving
@@ -12,6 +13,9 @@ export interface ParsedIngredient {
   unitName: string;
   notes: string;
   optional: boolean;
+  // Ingredient group the line came from ("Cheddar Bay Biscuits"), when the
+  // source recipe split its list into sections.
+  section: string | null;
 }
 
 const FRACTIONS: Record<string, number> = {
@@ -131,7 +135,12 @@ function extractNotes(name: string): { cleanName: string; notes: string } {
   return { cleanName: name, notes: "" };
 }
 
-export async function parseIngredientLines(rawList: string[]): Promise<ParsedIngredient[]> {
+// Accepts plain lines or `{ text, section }` rows, which is what the scraper and
+// the AI importers produce for a sectioned recipe.
+export async function parseIngredientLines(
+  rawList: (string | { text: string; section?: string | null })[]
+): Promise<ParsedIngredient[]> {
+  const lines = normalizeImportedIngredients(rawList);
   const units = await prisma.unit.findMany();
   const unitMap = new Map<string, { id: number; name: string }>();
   for (const unit of units) {
@@ -141,10 +150,9 @@ export async function parseIngredientLines(rawList: string[]): Promise<ParsedIng
 
   const results: ParsedIngredient[] = [];
 
-  for (const raw of rawList) {
-    if (typeof raw !== "string" || !raw.trim()) continue;
-
-    let text = raw.trim();
+  for (const line of lines) {
+    let text = line.text.trim();
+    if (!text) continue;
     const optional = /\boptional\b/i.test(text);
     text = text.replace(/\(?\boptional\b\)?/i, "").trim();
 
@@ -177,6 +185,7 @@ export async function parseIngredientLines(rawList: string[]): Promise<ParsedIng
       unitName,
       notes,
       optional,
+      section: line.section,
     });
   }
 

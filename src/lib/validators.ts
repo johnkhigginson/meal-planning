@@ -17,6 +17,9 @@ export const recipeIngredientSchema = z.object({
   notes: z.string().max(200).optional(),
   optional: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
+  // Ingredient group heading ("For the filling"); null or absent means the row
+  // belongs to the recipe's main list.
+  section: z.string().max(100).nullish(),
 });
 
 export const createRecipeSchema = z.object({

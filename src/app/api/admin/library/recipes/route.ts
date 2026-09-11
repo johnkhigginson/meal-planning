@@ -55,7 +55,14 @@ export async function POST(request: NextRequest) {
               )
               .map(
                 (
-                  ing: { ingredientId: number; quantity: number; unitId: number; notes?: string; optional?: boolean },
+                  ing: {
+                    ingredientId: number;
+                    quantity: number;
+                    unitId: number;
+                    notes?: string;
+                    optional?: boolean;
+                    section?: string | null;
+                  },
                   idx: number
                 ) => ({
                   ingredientId: ing.ingredientId,
@@ -64,6 +71,7 @@ export async function POST(request: NextRequest) {
                   notes: ing.notes || null,
                   optional: ing.optional || false,
                   sortOrder: idx,
+                  section: ing.section || null,
                 })
               ),
           }

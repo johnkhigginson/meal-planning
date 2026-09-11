@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL } from "@/lib/ai";
+import { normalizeImportedIngredients, type ImportedIngredient } from "@/lib/recipe-sections";
 
 // AI extraction of structured recipe data from a (messy) blog post. Used by the
 // blog importer's ingredient-extraction pass. Returns null when no API key is
@@ -13,7 +14,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this shape:
   "servings": 4,
   "prepTimeMinutes": 15,
   "cookTimeMinutes": 30,
-  "ingredients": ["2 cups all-purpose flour", "1 tsp salt"],
+  "ingredients": ["2 cups all-purpose flour", { "text": "1 cup buttermilk", "section": "Biscuit topping" }],
   "instructions": "1. Do this.\\n2. Do that."
 }
 
@@ -21,6 +22,8 @@ Rules:
 - Set "isRecipe" to false if the post does not actually contain a cookable recipe (no ingredient list). In that case other fields may be empty/null.
 - Keep each ingredient as a single human-readable line, exactly as a cook would read it (quantity + unit + item).
 - Number the instruction steps; keep them faithful to the post.
+- A recipe whose ingredients are split into groups ("For the filling", "Biscuit topping") keeps that grouping: give those lines a "section" with the group's heading. Use a plain string for lines that belong to no group, and never emit a heading as an ingredient of its own.
+- Instruction steps that are grouped the same way get a "--- Group name ---" line of their own before the steps in that group, with numbering restarting at 1 inside each group.
 - Use null for any time/servings you can't determine. servings should be a number only.`;
 
 export interface AiRecipe {
@@ -28,7 +31,9 @@ export interface AiRecipe {
   servings: number | null;
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
-  ingredients: string[];
+  // Sectioned recipes keep their ingredient groups; a flat recipe leaves every
+  // section null.
+  ingredients: ImportedIngredient[];
   instructions: string;
 }
 
@@ -102,15 +107,13 @@ export async function extractRecipeFromText(text: string): Promise<AiRecipe | nu
   }
 
   try {
-    const parsed = JSON.parse(jsonStr) as Partial<AiRecipe>;
+    const parsed = JSON.parse(jsonStr) as Partial<AiRecipe> & { ingredients?: unknown };
     return {
       isRecipe: parsed.isRecipe !== false,
       servings: typeof parsed.servings === "number" ? parsed.servings : null,
       prepTimeMinutes: typeof parsed.prepTimeMinutes === "number" ? parsed.prepTimeMinutes : null,
       cookTimeMinutes: typeof parsed.cookTimeMinutes === "number" ? parsed.cookTimeMinutes : null,
-      ingredients: Array.isArray(parsed.ingredients)
-        ? parsed.ingredients.filter((i): i is string => typeof i === "string" && i.trim().length > 0)
-        : [],
+      ingredients: normalizeImportedIngredients(parsed.ingredients),
       instructions: typeof parsed.instructions === "string" ? parsed.instructions : "",
     };
   } catch {

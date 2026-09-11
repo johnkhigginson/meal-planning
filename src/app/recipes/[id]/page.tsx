@@ -12,6 +12,7 @@ import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
 import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
 import { RecipeNotes } from "@/components/recipes/RecipeNotes";
 import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
+import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
 import { PrintButton } from "@/components/recipes/PrintButton";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { PROSE_CLASS } from "@/components/blog/BlogShell";
@@ -146,6 +147,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
             name: ri.ingredient.name,
             notes: ri.notes,
             optional: ri.optional,
+            section: ri.section,
           }))}
         />
       )}
@@ -167,7 +169,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
             <CardTitle>Instructions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="whitespace-pre-wrap">{recipe.instructions}</div>
+            <RecipeInstructions text={recipe.instructions} />
           </CardContent>
         </Card>
       )}

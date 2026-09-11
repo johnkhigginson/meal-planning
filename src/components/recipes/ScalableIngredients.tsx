@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus } from "lucide-react";
+import { groupBySection } from "@/lib/recipe-sections";
 
 export interface ScalableIngredient {
   quantity: number;
@@ -12,6 +13,8 @@ export interface ScalableIngredient {
   name: string;
   notes?: string | null;
   optional?: boolean;
+  // Ingredient group heading, for recipes with more than one component.
+  section?: string | null;
 }
 
 function formatQty(n: number): string {
@@ -60,23 +63,30 @@ export function ScalableIngredients({
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-2">
-          {ingredients.map((ri, i) => (
-            <li key={i} className="flex items-baseline gap-2">
-              <span className="font-medium">
-                {formatQty(ri.quantity * factor)} {ri.unit}
-              </span>
-              <span>{ri.name}</span>
-              {ri.notes && <span className="text-sm text-muted-foreground">({ri.notes})</span>}
-              {ri.optional && (
-                <Badge variant="secondary" className="text-xs print:hidden">
-                  optional
-                </Badge>
-              )}
-            </li>
-          ))}
-        </ul>
+      <CardContent className="space-y-4">
+        {groupBySection(ingredients).map((group, g) => (
+          <div key={g}>
+            {group.name && (
+              <h3 className="mb-1.5 text-sm font-semibold tracking-tight">{group.name}</h3>
+            )}
+            <ul className="space-y-2">
+              {group.items.map((ri, i) => (
+                <li key={i} className="flex items-baseline gap-2">
+                  <span className="font-medium">
+                    {formatQty(ri.quantity * factor)} {ri.unit}
+                  </span>
+                  <span>{ri.name}</span>
+                  {ri.notes && <span className="text-sm text-muted-foreground">({ri.notes})</span>}
+                  {ri.optional && (
+                    <Badge variant="secondary" className="text-xs print:hidden">
+                      optional
+                    </Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );

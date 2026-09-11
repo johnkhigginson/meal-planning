@@ -13,8 +13,7 @@ Return ONLY valid JSON with this structure (no markdown, no code fences):
   "cookTimeMinutes": 30,
   "ingredients": [
     "2 cups all-purpose flour",
-    "1 tsp salt",
-    "3 large eggs"
+    { "text": "1 cup buttermilk", "section": "Biscuit topping" }
   ],
   "instructions": "Step 1. Do this.\\nStep 2. Do that.\\nStep 3. Finish."
 }
@@ -24,7 +23,9 @@ Rules:
 - Number each instruction step
 - If a field is not visible or unclear, use null
 - For servings, extract the number only
-- Keep ingredient strings exactly as they appear (don't split into structured data)`;
+- Keep ingredient strings exactly as they appear (don't split into structured data)
+- A recipe whose ingredients are split into groups ("For the filling", "Biscuit topping") keeps that grouping: give those lines a "section" with the group's heading. Use a plain string for lines that belong to no group, and never emit a heading as an ingredient of its own.
+- Instruction steps that are grouped the same way get a "--- Group name ---" line of their own before the steps in that group, with numbering restarting at 1 inside each group.`;
 
 export async function POST(request: NextRequest) {
   // Signed in, AI allowed on this account, and within the request budget.

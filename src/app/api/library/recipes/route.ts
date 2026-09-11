@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
           notes: ing.notes,
           optional: ing.optional,
           sortOrder: ing.sortOrder,
+          section: ing.section,
         })),
       },
     },

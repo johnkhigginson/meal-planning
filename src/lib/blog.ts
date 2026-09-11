@@ -104,6 +104,7 @@ export async function getPublishedRecipe(bookSlug: string, identifier: string) {
               quantity: true,
               notes: true,
               optional: true,
+              section: true,
               unit: { select: { abbreviation: true } },
               ingredient: { select: { name: true } },
             },

@@ -9,6 +9,7 @@ import { PageLoader } from "@/components/shared/PageLoader";
 import { LemonLogo } from "@/components/shared/LemonLogo";
 import { Download, Check, Clock, Users, Loader2, BookOpen, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
+import { groupBySection } from "@/lib/recipe-sections";
 
 interface SharedRecipe {
   name: string;
@@ -17,7 +18,13 @@ interface SharedRecipe {
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
   instructions: string;
-  ingredients: { ingredient: { name: string }; quantity: number; unit: { abbreviation: string }; notes: string | null }[];
+  ingredients: {
+    ingredient: { name: string };
+    quantity: number;
+    unit: { abbreviation: string };
+    notes: string | null;
+    section: string | null;
+  }[];
   tags: { tag: { name: string } }[];
 }
 
@@ -120,11 +127,16 @@ export default function SharePage() {
           <CardContent className="space-y-4">
             <div>
               <h3 className="mb-2 text-sm font-semibold">Ingredients</h3>
-              <ul className="space-y-1">
-                {data.recipe.ingredients.map((i, idx) => (
-                  <li key={idx} className="text-sm">{i.quantity} {i.unit.abbreviation} {i.ingredient.name}{i.notes ? ` (${i.notes})` : ""}</li>
-                ))}
-              </ul>
+              {groupBySection(data.recipe.ingredients).map((group, g) => (
+                <div key={g} className="mb-2 last:mb-0">
+                  {group.name && <p className="text-xs font-semibold text-muted-foreground">{group.name}</p>}
+                  <ul className="space-y-1">
+                    {group.items.map((i, idx) => (
+                      <li key={idx} className="text-sm">{i.quantity} {i.unit.abbreviation} {i.ingredient.name}{i.notes ? ` (${i.notes})` : ""}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
             <div>
               <h3 className="mb-2 text-sm font-semibold">Instructions</h3>

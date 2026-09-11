@@ -4,6 +4,7 @@ import { BlogShell, PROSE_CLASS } from "@/components/blog/BlogShell";
 import { FollowButton } from "@/components/blog/FollowButton";
 import { RecipeComments } from "@/components/blog/RecipeComments";
 import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
+import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
 import { PrintButton } from "@/components/recipes/PrintButton";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, Users, Globe } from "lucide-react";
@@ -181,6 +182,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
                 unit: ri.unit.abbreviation,
                 name: ri.ingredient.name,
                 notes: ri.notes,
+                section: ri.section,
               }))}
             />
           </div>
@@ -193,7 +195,9 @@ export default async function BlogRecipePage({ params }: PageProps) {
             dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(recipe.bodyHtml) }}
           />
         ) : (
-          <div className="mt-6 whitespace-pre-wrap">{recipe.instructions}</div>
+          <div className="mt-6">
+            <RecipeInstructions text={recipe.instructions} />
+          </div>
         )}
 
         {recipe.author?.bio && (

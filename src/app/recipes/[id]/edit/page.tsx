@@ -29,6 +29,7 @@ interface RecipeData {
     unitId: number;
     notes: string | null;
     optional: boolean;
+    section: string | null;
     ingredient: { id: number; name: string };
     unit: { id: number; name: string; abbreviation: string };
   }[];
@@ -60,6 +61,7 @@ export default function EditRecipePage() {
   const initialIngredients: RecipeIngredientRow[] = recipe.ingredients.map(
     (ing, idx) => ({
       key: `edit-${ing.ingredientId}-${idx}`,
+      section: ing.section ?? "",
       ingredientId: ing.ingredientId,
       ingredientName: ing.ingredient.name,
       quantity: ing.quantity,

@@ -27,6 +27,9 @@ export interface RecipeIngredientRow {
   unitId: number;
   notes: string;
   optional: boolean;
+  // Ingredient group this row sits under ("For the filling"). Empty means the
+  // recipe's main list. Edited at the group level, not on the row itself.
+  section: string;
 }
 
 interface IngredientInputProps {

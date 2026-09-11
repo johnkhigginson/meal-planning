@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
           notes: ing.notes,
           optional: ing.optional,
           sortOrder: ing.sortOrder ?? idx,
+          section: ing.section ?? null,
         })),
       },
       tags: { create: tagIds.map((tagId) => ({ tagId })) },

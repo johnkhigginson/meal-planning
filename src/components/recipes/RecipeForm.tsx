@@ -71,7 +71,7 @@ interface RecipeFormProps {
 
 let ingredientKeyCounter = 0;
 
-function newIngredientRow(): RecipeIngredientRow {
+function newIngredientRow(section = ""): RecipeIngredientRow {
   return {
     key: `ing-${++ingredientKeyCounter}-${Date.now()}`,
     ingredientId: 0,
@@ -80,7 +80,40 @@ function newIngredientRow(): RecipeIngredientRow {
     unitId: 0,
     notes: "",
     optional: false,
+    section,
   };
+}
+
+// Consecutive rows that share a section name make up one group in the editor.
+// The form's own list stays flat, so nothing about ordering or sortOrder changes.
+interface EditorIngredientGroup {
+  section: string;
+  rows: { row: RecipeIngredientRow; index: number }[];
+}
+
+function buildIngredientGroups(rows: RecipeIngredientRow[]): EditorIngredientGroup[] {
+  const groups: EditorIngredientGroup[] = [];
+  rows.forEach((row, index) => {
+    const last = groups[groups.length - 1];
+    if (last && last.section === row.section) {
+      last.rows.push({ row, index });
+    } else {
+      groups.push({ section: row.section, rows: [{ row, index }] });
+    }
+  });
+  return groups;
+}
+
+// A placeholder the cook renames. A blank name would merge straight back into
+// the ungrouped list, so a new group needs one.
+function nextSectionName(rows: RecipeIngredientRow[]): string {
+  const taken = new Set(
+    rows.map((row) => row.section.trim().toLowerCase()).filter(Boolean)
+  );
+  if (!taken.has("new section")) return "New section";
+  let n = 2;
+  while (taken.has(`new section ${n}`)) n++;
+  return `New section ${n}`;
 }
 
 export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
@@ -184,6 +217,37 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
     );
   }
 
+  const ingredientGroups = buildIngredientGroups(form.ingredients);
+
+  function renameSection(groupIndex: number, name: string) {
+    const indexes = new Set(ingredientGroups[groupIndex].rows.map((r) => r.index));
+    updateForm(
+      "ingredients",
+      form.ingredients.map((row, i) => (indexes.has(i) ? { ...row, section: name } : row))
+    );
+  }
+
+  // Slot the new row in after the last row of its section so a section's
+  // ingredients stay together in the saved order.
+  function addIngredient(section: string) {
+    const rows = [...form.ingredients];
+    const lastOfSection = rows.reduce(
+      (found, row, i) => (row.section === section ? i : found),
+      -1
+    );
+    const row = newIngredientRow(section);
+    if (lastOfSection === -1) rows.push(row);
+    else rows.splice(lastOfSection + 1, 0, row);
+    updateForm("ingredients", rows);
+  }
+
+  function addSection() {
+    updateForm("ingredients", [
+      ...form.ingredients,
+      newIngredientRow(nextSectionName(form.ingredients)),
+    ]);
+  }
+
   function toggleTag(tagId: number) {
     updateForm(
       "tagIds",
@@ -237,7 +301,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
     servings?: number | null;
     prepTimeMinutes?: number | null;
     cookTimeMinutes?: number | null;
-    ingredients?: string[];
+    ingredients?: (string | { text: string; section?: string | null })[];
     imageUrl?: string | null;
   }) {
     setForm((prev) => ({
@@ -263,7 +327,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
           const parsed = await parseRes.json();
           if (Array.isArray(parsed) && parsed.length > 0) {
             const rows: RecipeIngredientRow[] = parsed.map(
-              (p: { ingredientId: number; ingredientName: string; quantity: number; unitId: number; notes: string; optional: boolean }, idx: number) => ({
+              (p: { ingredientId: number; ingredientName: string; quantity: number; unitId: number; notes: string; optional: boolean; section: string | null }, idx: number) => ({
                 key: `parsed-${p.ingredientId}-${idx}`,
                 ingredientId: p.ingredientId,
                 ingredientName: p.ingredientName,
@@ -271,6 +335,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                 unitId: p.unitId,
                 notes: p.notes,
                 optional: p.optional,
+                section: p.section ?? "",
               })
             );
             updateForm("ingredients", rows);
@@ -278,7 +343,9 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
         }
       } catch {
         // Fall back to showing raw strings
-        setRawIngredients(data.ingredients);
+        setRawIngredients(
+          data.ingredients.map((i) => (typeof i === "string" ? i : i.text))
+        );
       }
     }
   }
@@ -372,6 +439,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
           notes: ing.notes || undefined,
           optional: ing.optional,
           sortOrder: idx,
+          section: ing.section.trim() || null,
         })),
       tagIds: form.tagIds,
     };
@@ -705,35 +773,76 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
         </CardContent>
       </Card>
 
-      {/* Ingredients */}
+      {/* Ingredients — grouped into sections for multi-part recipes */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Ingredients</CardTitle>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              updateForm("ingredients", [
-                ...form.ingredients,
-                newIngredientRow(),
-              ])
-            }
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add Ingredient
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addSection}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add Section
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                addIngredient(form.ingredients[form.ingredients.length - 1]?.section ?? "")
+              }
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Add Ingredient
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {form.ingredients.map((row, index) => (
-            <IngredientInput
-              key={row.key}
-              row={row}
-              units={units}
-              onChange={(updated) => updateIngredient(index, updated)}
-              onRemove={() => removeIngredient(index)}
-            />
-          ))}
+        <CardContent className="space-y-3">
+          {ingredientGroups.map((group, groupIndex) => {
+            const sectioned = ingredientGroups.length > 1 || group.section !== "";
+            return (
+              <div
+                key={groupIndex}
+                className={
+                  sectioned ? "space-y-2 rounded-lg border border-dashed p-3" : "space-y-2"
+                }
+              >
+                {sectioned && (
+                  <Input
+                    value={group.section}
+                    onChange={(e) => renameSection(groupIndex, e.target.value)}
+                    placeholder="Section name (e.g. For the filling)"
+                    aria-label="Ingredient section name"
+                    className="h-8 max-w-sm text-sm font-medium"
+                  />
+                )}
+                {group.rows.map(({ row, index }) => (
+                  <IngredientInput
+                    key={row.key}
+                    row={row}
+                    units={units}
+                    onChange={(updated) => updateIngredient(index, updated)}
+                    onRemove={() => removeIngredient(index)}
+                  />
+                ))}
+                {sectioned && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => addIngredient(group.section)}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add to this section
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+          {ingredientGroups.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Sections keep a multi-part recipe readable (filling, topping, sauce). Clear a
+              section name to fold those ingredients back into the main list.
+            </p>
+          )}
         </CardContent>
       </Card>
 

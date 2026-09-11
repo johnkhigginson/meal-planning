@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
 import { GEMINI_MODEL, guardAi } from "@/lib/ai";
-import { parseIngredientLines } from "@/lib/ingredient-parse";
+import { parseIngredientLines, type ParsedIngredient } from "@/lib/ingredient-parse";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a document that contains one or more recipes, extract each recipe as structured data.
 
@@ -18,7 +18,7 @@ Return ONLY valid JSON with this structure (no markdown, no code fences):
       "cookTimeMinutes": 30,
       "ingredients": [
         "2 cups all-purpose flour",
-        "1 tsp salt"
+        { "text": "1 cup buttermilk", "section": "Biscuit topping" }
       ],
       "instructions": "Step 1. Do this.\\nStep 2. Do that."
     }
@@ -28,10 +28,33 @@ Return ONLY valid JSON with this structure (no markdown, no code fences):
 Rules:
 - Extract ALL recipes found in the document
 - Keep ingredient strings exactly as written
+- A recipe whose ingredients are split into groups ("For the filling", "Biscuit topping") keeps that grouping: give those lines a "section" with the group's heading. Use a plain string for lines that belong to no group, and never emit a heading as an ingredient of its own.
+- Instruction steps that are grouped the same way get a "--- Group name ---" line of their own before the steps in that group, with numbering restarting at 1 inside each group.
 - Number each instruction step
 - If a field is not found, use null
 - For servings, extract the number only
 - Separate multiple recipes into separate objects in the array`;
+
+interface RecipeIngredientData {
+  ingredientId: number;
+  quantity: number;
+  unitId: number;
+  notes: string;
+  optional: boolean;
+  section: string | null;
+}
+
+// Drop the display-only fields the parser returns, keeping what Prisma writes.
+function toIngredientData(parsed: ParsedIngredient[]): RecipeIngredientData[] {
+  return parsed.map((p) => ({
+    ingredientId: p.ingredientId,
+    quantity: p.quantity,
+    unitId: p.unitId,
+    notes: p.notes,
+    optional: p.optional,
+    section: p.section,
+  }));
+}
 
 const MAX_IMPORT_RECIPES = 50;
 
@@ -103,17 +126,10 @@ export async function POST(request: NextRequest) {
       // Auto-parse ingredients for each recipe
       const results = [];
       for (const recipe of parsed.recipes || []) {
-        let ingredients: { ingredientId: number; quantity: number; unitId: number; notes: string; optional: boolean }[] = [];
+        let ingredients: RecipeIngredientData[] = [];
         if (recipe.ingredients?.length) {
           try {
-            const parsedIngs = await parseIngredientLines(recipe.ingredients);
-            ingredients = parsedIngs.map((p) => ({
-              ingredientId: p.ingredientId,
-              quantity: p.quantity,
-              unitId: p.unitId,
-              notes: p.notes,
-              optional: p.optional,
-            }));
+            ingredients = toIngredientData(await parseIngredientLines(recipe.ingredients));
           } catch {}
         }
 
@@ -159,17 +175,10 @@ export async function POST(request: NextRequest) {
 
   const results = [];
   for (const recipe of parsed.recipes || []) {
-    let ingredients: { ingredientId: number; quantity: number; unitId: number; notes: string; optional: boolean }[] = [];
+    let ingredients: RecipeIngredientData[] = [];
     if (recipe.ingredients?.length) {
       try {
-        const parsedIngs = await parseIngredientLines(recipe.ingredients);
-        ingredients = parsedIngs.map((p) => ({
-          ingredientId: p.ingredientId,
-          quantity: p.quantity,
-          unitId: p.unitId,
-          notes: p.notes,
-          optional: p.optional,
-        }));
+        ingredients = toIngredientData(await parseIngredientLines(recipe.ingredients));
       } catch {}
     }
 

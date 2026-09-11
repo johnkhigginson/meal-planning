@@ -156,6 +156,10 @@ model RecipeIngredient {
   notes        String? @db.NVarChar(200)
   optional     Boolean @default(false)
   sortOrder    Int     @default(0)
+  // Ingredient group heading, e.g. "Pot Pie Filling" on a recipe whose
+  // ingredients are split into sections. Null = ungrouped. Rows with the same
+  // section are kept adjacent by sortOrder.
+  section      String? @db.NVarChar(100)
 
   recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -377,6 +381,7 @@ model LibraryRecipeIngredient {
   notes           String? @db.NVarChar(200)
   optional        Boolean @default(false)
   sortOrder       Int     @default(0)
+  section         String? @db.NVarChar(100) // ingredient group heading; see RecipeIngredient.section
 
   libraryRecipe LibraryRecipe @relation(fields: [libraryRecipeId], references: [id], onDelete: Cascade)
   ingredient    Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: NoAction, onUpdate: NoAction)

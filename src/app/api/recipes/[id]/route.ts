@@ -76,6 +76,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       data: ingredients.map((ing, idx) => ({
         recipeId, ingredientId: ing.ingredientId, quantity: ing.quantity,
         unitId: ing.unitId, notes: ing.notes, optional: ing.optional, sortOrder: ing.sortOrder ?? idx,
+        section: ing.section ?? null,
       })),
     });
   }
