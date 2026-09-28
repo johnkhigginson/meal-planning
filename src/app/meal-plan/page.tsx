@@ -369,12 +369,28 @@ export default function MealPlanPage() {
                             title={entry.recipe ? "Drag to move" : "Added by name, not included in the grocery list. Drag to move."}
                           >
                             <EntryName entry={entry} />
-                            <button onClick={() => removeEntry(entry.id)} className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/cell:opacity-100">
-                              <X className="h-3 w-3" />
-                            </button>
+                            {/* Shown on hover, and always on touch screens (a
+                                tablet gets this grid but can't hover or
+                                reliably drag). */}
+                            <div className="mt-0.5 flex shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 [@media(hover:none)]:opacity-100">
+                              <button
+                                onClick={() => setMoving({ entry, date: dateStr, mealSlot: slot })}
+                                aria-label={`Move ${entryLabel(entry)}`}
+                                className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                              >
+                                <Move className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => removeEntry(entry.id)}
+                                aria-label={`Remove ${entryLabel(entry)}`}
+                                className="rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                         ))}
-                        <button onClick={() => openPicker(formatDate(date), slot)} className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-muted-foreground group-hover/cell:opacity-100">
+                        <button onClick={() => openPicker(formatDate(date), slot)} className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-muted-foreground group-hover/cell:opacity-100 [@media(hover:none)]:opacity-100">
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -540,7 +556,7 @@ export default function MealPlanPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Move a meal (phones, where dragging through a long list is awkward) */}
+      {/* Move a meal without dragging (phones and touch tablets) */}
       <Dialog open={moving != null} onOpenChange={(open) => { if (!open) setMoving(null); }}>
         <DialogContent>
           <DialogHeader>
