@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
+import { loadGroceryList } from "@/lib/grocery";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
-  const list = await prisma.groceryList.findFirst({
-    where: { id: parseInt(id, 10), householdId },
-    include: { items: { include: { ingredient: true, unit: true }, orderBy: { ingredient: { name: "asc" } } } },
-  });
+  const listId = parseInt(id, 10);
+  if (Number.isNaN(listId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const list = await loadGroceryList(listId, householdId);
   if (!list) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(list);
 }
@@ -45,9 +46,5 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
   }
 
-  const list = await prisma.groceryList.findUnique({
-    where: { id: listId },
-    include: { items: { include: { ingredient: true, unit: true }, orderBy: { ingredient: { name: "asc" } } } },
-  });
-  return NextResponse.json(list);
+  return NextResponse.json(await loadGroceryList(listId, householdId));
 }

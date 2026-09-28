@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeImportedIngredients } from "@/lib/recipe-sections";
+import { guessIngredientCategory } from "@/lib/ingredient-category";
 
 // Parses free-text ingredient lines ("2 cups flour", "1/2 tsp salt (fine)")
 // into structured rows, matching/creating Ingredient records and resolving
@@ -174,7 +175,9 @@ export async function parseIngredientLines(
       });
     }
     if (!ingredient) {
-      ingredient = await prisma.ingredient.create({ data: { name: ingredientText } });
+      ingredient = await prisma.ingredient.create({
+        data: { name: ingredientText, category: guessIngredientCategory(ingredientText) },
+      });
     }
 
     results.push({

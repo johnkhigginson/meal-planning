@@ -15,8 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DollarSign, Loader2, MapPin, Store, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DollarSign, Loader2, MapPin, Store, Tag, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { INGREDIENT_CATEGORIES } from "@/lib/constants";
 
 interface GroceryListItem {
   id: number;
@@ -35,6 +43,68 @@ interface GroceryList {
   name: string;
   mealPlanId: number | null;
   items: GroceryListItem[];
+  // The week's planned recipes and the ingredients each one needs.
+  recipes: { id: number; name: string; ingredientIds: number[] }[];
+}
+
+type ListView = "aisle" | "recipe";
+const VIEW_STORAGE_KEY = "groceryListView";
+
+interface ListSection {
+  key: string;
+  title: string;
+  rows: { item: GroceryListItem; note?: string }[];
+}
+
+// Aisles in store-walk order. A category outside the known list sorts just
+// before "Other".
+function groupByAisle(items: GroceryListItem[]): ListSection[] {
+  const order = (c: string) => {
+    const i = (INGREDIENT_CATEGORIES as readonly string[]).indexOf(c);
+    return i === -1 ? INGREDIENT_CATEGORIES.length - 1.5 : i;
+  };
+  const byCategory = new Map<string, GroceryListItem[]>();
+  for (const item of items) {
+    const category = item.ingredient.category || "Other";
+    byCategory.set(category, [...(byCategory.get(category) ?? []), item]);
+  }
+  return [...byCategory]
+    .sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b))
+    .map(([category, rows]) => ({
+      key: `aisle-${category}`,
+      title: category,
+      rows: rows.map((item) => ({ item })),
+    }));
+}
+
+// One section per planned recipe. An item several recipes share shows under
+// each, with the total to buy and a note naming the others; checking it off
+// anywhere checks it off everywhere.
+function groupByRecipe(list: GroceryList, items: GroceryListItem[]): ListSection[] {
+  const recipesFor = new Map<number, string[]>();
+  for (const recipe of list.recipes) {
+    for (const id of recipe.ingredientIds) {
+      recipesFor.set(id, [...(recipesFor.get(id) ?? []), recipe.name]);
+    }
+  }
+  const sections: ListSection[] = list.recipes
+    .map((recipe) => ({
+      key: `recipe-${recipe.id}`,
+      title: recipe.name,
+      rows: items
+        .filter((item) => recipe.ingredientIds.includes(item.ingredientId))
+        .map((item) => {
+          const others = (recipesFor.get(item.ingredientId) ?? []).filter((n) => n !== recipe.name);
+          return { item, note: others.length > 0 ? `also for ${others.join(", ")}` : undefined };
+        }),
+    }))
+    .filter((section) => section.rows.length > 0);
+
+  const unmatched = items.filter((item) => !recipesFor.has(item.ingredientId));
+  if (unmatched.length > 0) {
+    sections.push({ key: "recipe-other", title: "Other items", rows: unmatched.map((item) => ({ item })) });
+  }
+  return sections;
 }
 
 interface GroceryListSummary {
@@ -82,6 +152,23 @@ function GroceryListContent() {
   const [lists, setLists] = useState<GroceryListSummary[] | null>(null);
   const [shopping, setShopping] = useState<ShoppingResult | null>(null);
   const [loadingShopping, setLoadingShopping] = useState(false);
+  // Remembered per browser; storage can be missing (private windows).
+  const [view, setView] = useState<ListView>(() => {
+    try {
+      return localStorage.getItem(VIEW_STORAGE_KEY) === "recipe" ? "recipe" : "aisle";
+    } catch {
+      return "aisle";
+    }
+  });
+
+  function changeView(next: ListView) {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Not remembered; the view still switches.
+    }
+  }
 
   useEffect(() => {
     fetch("/api/grocery-lists")
@@ -127,17 +214,51 @@ function GroceryListContent() {
     router.replace(remaining.length > 0 ? `/grocery-list?id=${remaining[0].id}` : "/grocery-list");
   }
 
+  // Reload the list after a failed save so the screen matches what's stored.
+  async function reloadList(id: number) {
+    const res = await fetch(`/api/grocery-lists/${id}`);
+    if (res.ok) setLoadedList(await res.json());
+  }
+
+  // Check marks change on screen at once, which matters when tapping through a
+  // list in the store. Server responses are ignored so quick taps can't
+  // overwrite each other out of order.
   async function toggleItem(itemId: number, checked: boolean) {
     if (!current) return;
-    const res = await fetch(`/api/grocery-lists/${current.id}`, {
+    const listId = current.id;
+    setLoadedList((prev) =>
+      prev && {
+        ...prev,
+        items: prev.items.map((i) => (i.id === itemId ? { ...i, checked } : i)),
+      }
+    );
+    const res = await fetch(`/api/grocery-lists/${listId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId, checked }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setLoadedList(updated);
-    }
+    }).catch(() => null);
+    if (!res?.ok) reloadList(listId);
+  }
+
+  // The aisle belongs to the ingredient, so the change also applies to future
+  // lists.
+  async function changeAisle(ingredientId: number, category: string) {
+    if (!current) return;
+    const listId = current.id;
+    setLoadedList((prev) =>
+      prev && {
+        ...prev,
+        items: prev.items.map((i) =>
+          i.ingredientId === ingredientId ? { ...i, ingredient: { ...i.ingredient, category } } : i
+        ),
+      }
+    );
+    const res = await fetch(`/api/ingredients/${ingredientId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category }),
+    }).catch(() => null);
+    if (!res?.ok) reloadList(listId);
   }
 
   async function findBestPrices() {
@@ -200,21 +321,9 @@ function GroceryListContent() {
   }
 
   const list = current;
-
-  // Group items by category
-  const grouped = list.items.reduce(
-    (acc, item) => {
-      const cat = item.ingredient.category || "Other";
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(item);
-      return acc;
-    },
-    {} as Record<string, GroceryListItem[]>
-  );
-
-  const categories = Object.keys(grouped).sort();
   const needToBuy = list.items.filter((i) => i.needed > 0);
   const alreadyHave = list.items.filter((i) => i.needed <= 0);
+  const sections = view === "recipe" ? groupByRecipe(list, needToBuy) : groupByAisle(needToBuy);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -293,51 +402,83 @@ function GroceryListContent() {
         </Card>
       )}
 
-      {/* Items to buy */}
-      {categories.map((category) => {
-        const categoryItems = grouped[category].filter((i) => i.needed > 0);
-        if (categoryItems.length === 0) return null;
+      {/* Sort by store aisle or by the recipe each item is for */}
+      {needToBuy.length > 0 && (
+        <div className="flex gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={view === "aisle" ? "default" : "outline"}
+            onClick={() => changeView("aisle")}
+          >
+            By aisle
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={view === "recipe" ? "default" : "outline"}
+            onClick={() => changeView("recipe")}
+          >
+            By recipe
+          </Button>
+        </div>
+      )}
 
-        return (
-          <Card key={category}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{category}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {categoryItems.map((item) => (
-                <label
-                  key={item.id}
-                  className="flex cursor-pointer items-center gap-3"
-                >
+      {/* Items to buy */}
+      {sections.map((section) => (
+        <Card key={section.key}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{section.title}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {section.rows.map(({ item, note }) => (
+              <div key={item.id} className="flex items-center gap-2">
+                <label className="flex flex-1 cursor-pointer items-center gap-3">
                   <Checkbox
                     checked={item.checked}
-                    onCheckedChange={(checked) =>
-                      toggleItem(item.id, checked === true)
-                    }
+                    onCheckedChange={(checked) => toggleItem(item.id, checked === true)}
                   />
-                  <span
-                    className={
-                      item.checked
-                        ? "text-muted-foreground line-through"
-                        : ""
-                    }
-                  >
+                  <span className={item.checked ? "text-muted-foreground line-through" : ""}>
                     <span className="font-medium">
                       {item.needed} {item.unit.abbreviation}
                     </span>{" "}
                     {item.ingredient.name}
+                    {item.inInventory > 0 && (
+                      <span className="ml-1.5 text-xs text-muted-foreground">
+                        (have {item.inInventory} {item.unit.abbreviation})
+                      </span>
+                    )}
+                    {note && <span className="ml-1.5 text-xs text-muted-foreground">{note}</span>}
                   </span>
-                  {item.inInventory > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      (have {item.inInventory} {item.unit.abbreviation})
-                    </span>
-                  )}
                 </label>
-              ))}
-            </CardContent>
-          </Card>
-        );
-      })}
+                {view === "aisle" && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      aria-label={`Change aisle for ${item.ingredient.name}`}
+                      title="Change aisle"
+                      className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuRadioGroup
+                        value={item.ingredient.category ?? "Other"}
+                        onValueChange={(v) => changeAisle(item.ingredientId, String(v))}
+                      >
+                        {INGREDIENT_CATEGORIES.map((category) => (
+                          <DropdownMenuRadioItem key={category} value={category}>
+                            {category}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
 
       {/* Already have section */}
       {alreadyHave.length > 0 && (

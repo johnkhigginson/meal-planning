@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { createIngredientSchema } from "@/lib/validators";
+import { guessIngredientCategory } from "@/lib/ingredient-category";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -26,11 +27,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // Upsert by unique name so duplicates return the existing row, not a 500.
+  // Upsert by unique name so duplicates return the existing row, not a 500. A
+  // new ingredient gets a best-guess aisle for the grocery list.
   const ingredient = await prisma.ingredient.upsert({
     where: { name: parsed.data.name },
     update: {},
-    create: parsed.data,
+    create: {
+      ...parsed.data,
+      category: parsed.data.category ?? guessIngredientCategory(parsed.data.name),
+    },
     include: { defaultUnit: true },
   });
   return NextResponse.json(ingredient, { status: 201 });

@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { convertQuantity, roundQuantity } from "./units";
 import type { UnitConversion } from "@/generated/prisma/client";
+import { guessIngredientCategory } from "./ingredient-category";
 
 interface AggregatedItem {
   ingredientId: number;
@@ -91,6 +92,8 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
     }
   }
 
+  await categorizeUncategorized(aggregated.values());
+
   // Build inventory lookup
   const inventoryMap = new Map(
     inventory.map((item) => [
@@ -154,6 +157,83 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
   });
 
   return { items, mealPlanId, weekStartDate: mealPlan.weekStartDate };
+}
+
+// Ingredients added before aisles were guessed have no category and would all
+// pile into "Other". Guess one for each, save it to the ingredient so it sticks,
+// and use it for this list. A category someone already set is never touched.
+async function categorizeUncategorized(
+  rows: Iterable<{ ingredientId: number; ingredientName: string; category: string | null }>
+) {
+  const byCategory = new Map<string, number[]>();
+  for (const row of rows) {
+    if (row.category) continue;
+    const guess = guessIngredientCategory(row.ingredientName);
+    if (!guess) continue;
+    row.category = guess;
+    byCategory.set(guess, [...(byCategory.get(guess) ?? []), row.ingredientId]);
+  }
+  await Promise.all(
+    [...byCategory].map(([category, ids]) =>
+      prisma.ingredient.updateMany({ where: { id: { in: ids }, category: null }, data: { category } })
+    )
+  );
+}
+
+const listInclude = {
+  items: { include: { ingredient: true, unit: true }, orderBy: { ingredient: { name: "asc" } } },
+} as const;
+
+// A saved list plus the planned recipes each item is for, so the page can group
+// by recipe. Read from the list's meal plan as it stands now. Regenerating
+// keeps the two in step; an item no current recipe uses shows under "Other items".
+export async function loadGroceryList(listId: number, householdId: number) {
+  const list = await prisma.groceryList.findFirst({
+    where: { id: listId, householdId },
+    include: listInclude,
+  });
+  if (!list) return null;
+
+  // Lists saved before aisles were guessed still point at uncategorized
+  // ingredients. Fill those in on read too; it only ever writes a null category.
+  const pending = list.items
+    .filter((item) => !item.ingredient.category)
+    .map((item) => ({
+      ingredientId: item.ingredientId,
+      ingredientName: item.ingredient.name,
+      category: null as string | null,
+      item,
+    }));
+  await categorizeUncategorized(pending);
+  for (const p of pending) if (p.category) p.item.ingredient.category = p.category;
+
+  const entries = list.mealPlanId
+    ? await prisma.mealPlanEntry.findMany({
+        where: { mealPlanId: list.mealPlanId, recipeId: { not: null } },
+        orderBy: [{ date: "asc" }, { id: "asc" }],
+        select: {
+          recipe: {
+            select: {
+              id: true,
+              name: true,
+              ingredients: { where: { optional: false }, select: { ingredientId: true } },
+            },
+          },
+        },
+      })
+    : [];
+
+  const recipes = new Map<number, { id: number; name: string; ingredientIds: number[] }>();
+  for (const { recipe } of entries) {
+    if (!recipe || recipes.has(recipe.id)) continue;
+    recipes.set(recipe.id, {
+      id: recipe.id,
+      name: recipe.name,
+      ingredientIds: [...new Set(recipe.ingredients.map((i) => i.ingredientId))],
+    });
+  }
+
+  return { ...list, recipes: [...recipes.values()] };
 }
 
 // weekStartDate is a SQL date, which arrives as UTC midnight.

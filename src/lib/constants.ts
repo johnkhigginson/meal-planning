@@ -9,17 +9,21 @@ export type SourceType = (typeof SOURCE_TYPES)[number];
 export const MEAL_SLOTS = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"] as const;
 export type MealSlot = (typeof MEAL_SLOTS)[number];
 
+// Grocery aisles, in the order a typical store walk visits them. The grocery
+// list shows its sections in this order.
 export const INGREDIENT_CATEGORIES = [
   "Produce",
-  "Dairy",
+  "Bakery",
+  "Deli",
   "Meat",
   "Seafood",
-  "Pantry",
+  "Dairy",
   "Frozen",
-  "Bakery",
-  "Beverages",
-  "Condiments",
+  "Pantry",
+  "Baking",
   "Spices",
+  "Condiments",
+  "Beverages",
   "Other",
 ] as const;
 export type IngredientCategory = (typeof INGREDIENT_CATEGORIES)[number];
