@@ -8,8 +8,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
   const mealPlanId = parseInt(id, 10);
+  if (Number.isNaN(mealPlanId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { items } = await generateGroceryList(mealPlanId, householdId);
+  // Scoped to the caller's household, so another household's plan is a 404.
+  const generated = await generateGroceryList(mealPlanId, householdId);
+  if (!generated) return NextResponse.json({ error: "Meal plan not found" }, { status: 404 });
+  const { items } = generated;
   const groceryListId = await saveGroceryList(mealPlanId, householdId, items);
 
   return NextResponse.json({ groceryListId, items }, { status: 201 });

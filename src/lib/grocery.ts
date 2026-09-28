@@ -16,10 +16,11 @@ interface AggregatedItem {
 export async function generateGroceryList(mealPlanId: number, householdId: number): Promise<{
   items: AggregatedItem[];
   mealPlanId: number;
-}> {
+  weekStartDate: Date;
+} | null> {
   const [mealPlan, inventory, conversions] = await Promise.all([
-    prisma.mealPlan.findUnique({
-      where: { id: mealPlanId },
+    prisma.mealPlan.findFirst({
+      where: { id: mealPlanId, householdId },
       include: {
         entries: {
           include: {
@@ -41,7 +42,7 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
     prisma.unitConversion.findMany(),
   ]);
 
-  if (!mealPlan) throw new Error("Meal plan not found");
+  if (!mealPlan) return null;
 
   // Aggregate ingredients across all entries
   const aggregated = new Map<
@@ -152,7 +153,7 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
     return a.ingredientName.localeCompare(b.ingredientName);
   });
 
-  return { items, mealPlanId };
+  return { items, mealPlanId, weekStartDate: mealPlan.weekStartDate };
 }
 
 export async function saveGroceryList(
