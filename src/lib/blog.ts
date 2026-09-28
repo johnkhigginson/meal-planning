@@ -45,6 +45,7 @@ export async function getPublishedBookBySlug(slug: string) {
               cookTimeMinutes: true,
               servings: true,
               publishedAt: true,
+              authorName: true,
               author: { select: { name: true } },
               tags: { select: { tag: { select: { name: true } } } },
             },
@@ -97,6 +98,7 @@ export async function getPublishedRecipe(bookSlug: string, identifier: string) {
           sourceType: true,
           sourceUrl: true,
           publishedAt: true,
+          authorName: true,
           author: { select: { name: true, bio: true } },
           ingredients: {
             orderBy: { sortOrder: "asc" },

@@ -12,6 +12,7 @@ import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
+import { recipeAuthorName } from "@/lib/recipe-author";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export async function generateMetadata({ params }: PageProps) {
       url,
       images: image ? [image] : undefined,
       publishedTime: recipe.publishedAt?.toISOString(),
-      authors: recipe.author?.name ? [recipe.author.name] : undefined,
+      authors: recipeAuthorName(recipe) ? [recipeAuthorName(recipe)!] : undefined,
     },
     twitter: {
       card: image ? "summary_large_image" : "summary",
@@ -75,7 +76,7 @@ function recipeJsonLd(recipe: Awaited<ReturnType<typeof getPublishedRecipe>>) {
     description: r.description ?? undefined,
     image: image ? [image] : undefined,
     datePublished: r.publishedAt?.toISOString(),
-    author: r.author?.name ? { "@type": "Person", name: r.author.name } : undefined,
+    author: recipeAuthorName(r) ? { "@type": "Person", name: recipeAuthorName(r) } : undefined,
     recipeYield: r.servings ? String(r.servings) : undefined,
     prepTime: isoDuration(r.prepTimeMinutes),
     cookTime: isoDuration(r.cookTimeMinutes),
@@ -124,6 +125,8 @@ export default async function BlogRecipePage({ params }: PageProps) {
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {recipe.publishedAt && formatBlogDate(recipe.publishedAt)}
+          {/* A member's byline links to the About page, which lists members.
+              A typed name has no profile to link to. */}
           {recipe.author?.name ? (
             <>
               {" · by "}
@@ -131,6 +134,8 @@ export default async function BlogRecipePage({ params }: PageProps) {
                 {recipe.author.name}
               </Link>
             </>
+          ) : recipe.authorName ? (
+            ` · by ${recipe.authorName}`
           ) : null}
         </p>
 

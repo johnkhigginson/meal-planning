@@ -16,8 +16,10 @@ interface RecipeCardProps {
     isFavorite: boolean;
     tags: { tag: { id: number; name: string } }[];
     author?: { id: number; name: string } | null;
+    authorName?: string | null;
   };
-  // Show who added the recipe — only worth surfacing in shared households.
+  // Show which household member is credited. Only worth surfacing in shared
+  // households; a typed author name ("Grandma Jean") always shows.
   showAuthor?: boolean;
 }
 
@@ -66,10 +68,10 @@ export function RecipeCard({ recipe, showAuthor = false }: RecipeCardProps) {
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
               {recipe.sourceType}
             </Badge>
-            {showAuthor && recipe.author?.name && (
+            {((showAuthor && recipe.author?.name) || recipe.authorName) && (
               <span className="flex items-center gap-1">
                 <UserRound className="h-3 w-3" />
-                {recipe.author.name}
+                {recipe.author?.name ?? recipe.authorName}
               </span>
             )}
           </div>

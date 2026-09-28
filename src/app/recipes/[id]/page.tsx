@@ -99,10 +99,10 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           <Users className="h-4 w-4" />
           {recipe.servings} servings
         </span>
-        {memberCount > 1 && recipe.author?.name && (
+        {((memberCount > 1 && recipe.author?.name) || recipe.authorName) && (
           <span className="flex items-center gap-1 text-muted-foreground">
             <UserRound className="h-4 w-4" />
-            {recipe.author.name}
+            {recipe.author?.name ?? recipe.authorName}
           </span>
         )}
         {(recipe.sourceType === "WEBSITE" || recipe.sourceType === "BLOG") && recipe.sourceUrl && (

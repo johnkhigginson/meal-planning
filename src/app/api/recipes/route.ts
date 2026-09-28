@@ -4,6 +4,7 @@ import { requireHouseholdId, requireUser } from "@/lib/auth";
 import { createRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
 import { isValidAuthor } from "@/lib/collab";
+import { normalizeRecipeAuthor } from "@/lib/recipe-author";
 import { tagsAllowedForHousehold } from "@/lib/tags";
 import { sendNewRecipeEmail } from "@/lib/email";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
@@ -80,8 +81,9 @@ export async function POST(request: NextRequest) {
     targetHouseholdId = book.householdId;
     targetBookId = book.id;
     targetBook = { name: book.name, slug: book.slug, isPublished: book.isPublished };
-    if (recipeData.authorId == null) recipeData.authorId = user.userId;
+    if (recipeData.authorId == null && !recipeData.authorName) recipeData.authorId = user.userId;
   }
+  normalizeRecipeAuthor(recipeData);
 
   // An author must be a member of the recipe's household OR a collaborator on
   // the target cookbook.

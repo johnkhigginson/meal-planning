@@ -10,7 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -55,6 +57,8 @@ interface RecipeFormData {
   sourceBookTitle: string;
   sourceBookPage: string;
   authorId: number | null;
+  // Free-text credit for someone without an account; only used when authorId is null.
+  authorName: string;
   imageUrl: string;
   isFavorite: boolean;
   ingredients: RecipeIngredientRow[];
@@ -134,6 +138,10 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [newTagName, setNewTagName] = useState("");
+  // Free-text author names already used in the household, and the name being
+  // typed while adding a new one (null when not adding).
+  const [authorNames, setAuthorNames] = useState<string[]>([]);
+  const [newAuthor, setNewAuthor] = useState<string | null>(null);
   // Raw ingredient strings from scrape/photo that haven't been matched to DB ingredients yet
   const [rawIngredients, setRawIngredients] = useState<string[]>([]);
 
@@ -150,6 +158,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       sourceBookTitle: "",
       sourceBookPage: "",
       authorId: null,
+      authorName: "",
       imageUrl: "",
       isFavorite: false,
       ingredients: [newIngredientRow()],
@@ -171,6 +180,10 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
     fetch(authorsUrl)
       .then((r) => r.json())
       .then((d) => setMembers(Array.isArray(d) ? d : []))
+      .catch(() => {});
+    fetch("/api/recipes/author-names")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setAuthorNames(Array.isArray(d) ? d : []))
       .catch(() => {});
   }, [recipeId, bookId]);
 
@@ -247,6 +260,42 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       ...form.ingredients,
       newIngredientRow(nextSectionName(form.ingredients)),
     ]);
+  }
+
+  // The author picker's values: "none", "user:<id>", "name:<text>", or "new".
+  const authorValue =
+    form.authorId != null
+      ? `user:${form.authorId}`
+      : form.authorName
+        ? `name:${form.authorName}`
+        : "none";
+  const nameOptions =
+    form.authorName && !authorNames.includes(form.authorName)
+      ? [...authorNames, form.authorName].sort((a, b) => a.localeCompare(b))
+      : authorNames;
+
+  function chooseAuthor(value: string) {
+    if (value === "new") {
+      setNewAuthor("");
+    } else if (value.startsWith("user:")) {
+      setForm((prev) => ({ ...prev, authorId: parseInt(value.slice(5), 10), authorName: "" }));
+    } else if (value.startsWith("name:")) {
+      setForm((prev) => ({ ...prev, authorId: null, authorName: value.slice(5) }));
+    } else {
+      setForm((prev) => ({ ...prev, authorId: null, authorName: "" }));
+    }
+  }
+
+  // Match an existing member or saved name case-insensitively before adding a
+  // new one, so "grandma jean" doesn't become a second Grandma Jean.
+  function addAuthor() {
+    const name = newAuthor?.trim();
+    if (!name) return;
+    const member = members.find((m) => m.name.toLowerCase() === name.toLowerCase());
+    const saved = authorNames.find((n) => n.toLowerCase() === name.toLowerCase());
+    if (member) chooseAuthor(`user:${member.id}`);
+    else chooseAuthor(`name:${saved ?? name}`);
+    setNewAuthor(null);
   }
 
   function toggleTag(tagId: number) {
@@ -485,6 +534,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       sourceBookTitle: form.sourceType === "BOOK" ? form.sourceBookTitle || undefined : undefined,
       sourceBookPage: form.sourceType === "BOOK" ? form.sourceBookPage || undefined : undefined,
       authorId: form.authorId,
+      authorName: form.authorId == null ? form.authorName.trim() || null : null,
       imageUrl: form.imageUrl.trim() || undefined,
       // Only on create: contribute the new recipe into a cookbook.
       bookId: !recipeId && bookId ? bookId : undefined,
@@ -766,31 +816,73 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
             </p>
           </div>
 
-          {members.length > 0 && (
-            <div className="space-y-2">
-              <Label>Author</Label>
-              <Select
-                value={form.authorId != null ? String(form.authorId) : "none"}
-                onValueChange={(v) =>
-                  updateForm("authorId", v && v !== "none" ? parseInt(v, 10) : null)
-                }
-              >
+          {/* Credit a person in the app, or anyone else by name ("Grandma Jean"). */}
+          <div className="space-y-2">
+            <Label>Author</Label>
+            {newAuthor == null ? (
+              <Select value={authorValue} onValueChange={(v) => chooseAuthor(v ?? "none")}>
                 <SelectTrigger>
                   <SelectValue>
-                    {members.find((m) => m.id === form.authorId)?.name ?? "Unassigned"}
+                    {form.authorId != null
+                      ? members.find((m) => m.id === form.authorId)?.name ?? "Unassigned"
+                      : form.authorName || "Unassigned"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Unassigned</SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
+                  {members.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>In the app</SelectLabel>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={`user:${m.id}`}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  {nameOptions.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Other authors</SelectLabel>
+                      {nameOptions.map((name) => (
+                        <SelectItem key={name} value={`name:${name}`}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  <SelectItem value="new">
+                    <Plus className="h-3.5 w-3.5" />
+                    Add an author…
+                  </SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  autoFocus
+                  value={newAuthor}
+                  maxLength={200}
+                  placeholder="Author's name"
+                  aria-label="New author's name"
+                  onChange={(e) => setNewAuthor(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAuthor();
+                    } else if (e.key === "Escape") {
+                      setNewAuthor(null);
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={addAuthor} disabled={!newAuthor.trim()}>
+                  Add
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setNewAuthor(null)}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">

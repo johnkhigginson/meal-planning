@@ -5,6 +5,7 @@ import { updateRecipeSchema } from "@/lib/validators";
 import { audit } from "@/lib/audit";
 import { isValidAuthor } from "@/lib/collab";
 import { tagsAllowedForHousehold } from "@/lib/tags";
+import { normalizeRecipeAuthor } from "@/lib/recipe-author";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -53,6 +54,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 
   const { ingredients, tagIds, ...recipeData } = parsed.data;
+  normalizeRecipeAuthor(recipeData);
 
   // The author must be a member of the recipe's household OR a collaborator on
   // one of its cookbooks (so cross-household contributors can be credited).

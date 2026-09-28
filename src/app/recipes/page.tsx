@@ -26,6 +26,7 @@ interface Recipe {
   isFavorite: boolean;
   tags: { tag: Tag }[];
   author?: { id: number; name: string } | null;
+  authorName?: string | null;
 }
 
 const PAGE_SIZE = 24;

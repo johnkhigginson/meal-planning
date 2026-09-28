@@ -6,6 +6,7 @@ import { FollowButton } from "@/components/blog/FollowButton";
 import { getPublishedBookBySlug } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
+import { recipeAuthorName } from "@/lib/recipe-author";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export default async function CookbookPage({ params }: PageProps) {
     cookTimeMinutes: r.cookTimeMinutes,
     servings: r.servings,
     publishedAt: r.publishedAt ? r.publishedAt.toISOString() : null,
-    authorName: r.author?.name ?? null,
+    authorName: recipeAuthorName(r),
     tags: r.tags.map((t) => t.tag.name),
   }));
 

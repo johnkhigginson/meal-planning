@@ -41,6 +41,13 @@ export const createRecipeSchema = z.object({
     .refine((v) => /^https?:\/\//.test(v) || v.startsWith("/"), "Invalid image URL")
     .optional(),
   authorId: z.number().int().positive().nullable().optional(),
+  // Free-text credit for someone without an account. Blank means none.
+  authorName: z
+    .string()
+    .trim()
+    .max(200)
+    .nullish()
+    .transform((v) => (v === undefined ? undefined : v || null)),
   // Optional: create this recipe directly into a cookbook (used by cookbook
   // collaborators contributing to someone else's blog).
   bookId: z.number().int().positive().optional(),

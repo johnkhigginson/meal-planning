@@ -14,6 +14,7 @@ import { SearchInput } from "@/components/shared/SearchInput";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink, UserPlus, UserRound, X } from "lucide-react";
+import { recipeAuthorName } from "@/lib/recipe-author";
 
 interface BookRecipe {
   id: number;
@@ -24,6 +25,7 @@ interface BookRecipe {
   cookTimeMinutes: number | null;
   imageUrl: string | null;
   author: { id: number; name: string } | null;
+  authorName: string | null;
   tags: { tag: { id: number; name: string } }[];
 }
 
@@ -343,8 +345,8 @@ export default function BookDetailPage() {
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{totalTime}m</span>}
                         <span className="flex items-center gap-1"><Users className="h-3 w-3" />{recipe.servings}</span>
-                        {recipe.author?.name && (
-                          <span className="flex items-center gap-1"><UserRound className="h-3 w-3" />{recipe.author.name}</span>
+                        {recipeAuthorName(recipe) && (
+                          <span className="flex items-center gap-1"><UserRound className="h-3 w-3" />{recipeAuthorName(recipe)}</span>
                         )}
                       </div>
                     </Link>

@@ -114,6 +114,7 @@ model Recipe {
   id              Int      @id @default(autoincrement())
   householdId     Int
   authorId        Int?     // owner/author of the recipe (a User in the household); null = household default
+  authorName      String?  @db.NVarChar(200) // free-text credit ("Grandma Jean") for someone without an account; unused when authorId is set
   name            String   @db.NVarChar(300)
   slug            String?  @db.NVarChar(350) // url-friendly identifier for the public blog
   description     String?  @db.NVarChar(Max)
