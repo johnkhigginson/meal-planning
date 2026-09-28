@@ -101,6 +101,12 @@ export const mealPlanEntrySchema = z
 
 export const addMealPlanEntrySchema = mealPlanEntrySchema;
 
+// Moving a planned meal to another day or slot within the same week.
+export const moveMealPlanEntrySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  mealSlot: z.enum(["BREAKFAST", "LUNCH", "DINNER", "SNACK"]),
+});
+
 // ─── Stores ─────────────────────────────────────────────────────
 
 export const createStoreSchema = z.object({

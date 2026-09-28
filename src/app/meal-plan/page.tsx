@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { SearchInput } from "@/components/shared/SearchInput";
-import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2, Move } from "lucide-react";
 
 const ALL_MEAL_SLOTS = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"] as const;
 const SLOT_LABELS: Record<string, string> = {
@@ -38,6 +39,23 @@ interface MealPlanEntry {
 
 function entryLabel(entry: MealPlanEntry): string {
   return entry.recipe?.name ?? entry.customName ?? "Meal";
+}
+
+// A recipe-backed meal links to its recipe. draggable={false} lets a drag that
+// starts on the name move the meal instead of dragging the link's URL.
+function EntryName({ entry }: { entry: MealPlanEntry }) {
+  if (!entry.recipe) {
+    return <span className="font-medium text-muted-foreground">{entryLabel(entry)}</span>;
+  }
+  return (
+    <Link
+      href={`/recipes/${entry.recipe.id}`}
+      draggable={false}
+      className="font-medium hover:text-primary hover:underline"
+    >
+      {entryLabel(entry)}
+    </Link>
+  );
 }
 
 interface MealPlan {
@@ -93,6 +111,12 @@ export default function MealPlanPage() {
   const [pickerMode, setPickerMode] = useState<"recipe" | "custom">("recipe");
   const [customName, setCustomName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Desktop drag and drop: the meal being dragged and the cell under it.
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  // Phone "Move" dialog: the meal and where it's headed.
+  const [moving, setMoving] = useState<{ entry: MealPlanEntry; date: string; mealSlot: string } | null>(null);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(currentMonday);
@@ -172,6 +196,33 @@ export default function MealPlanPage() {
     if (!plan) return;
     await fetch(`/api/meal-plans/${plan.id}/entries/${entryId}`, { method: "DELETE" });
     loadPlan();
+  }
+
+  async function moveEntry(entryId: number, date: string, mealSlot: string) {
+    if (!plan) return;
+    const entry = plan.entries.find((e) => e.id === entryId);
+    if (!entry || (entry.date.split("T")[0] === date && entry.mealSlot === mealSlot)) return;
+    // Move it on screen right away; reload from the server if the save fails.
+    setPlan((prev) =>
+      prev && {
+        ...prev,
+        entries: prev.entries.map((e) =>
+          e.id === entryId ? { ...e, date: `${date}T00:00:00.000Z`, mealSlot } : e
+        ),
+      }
+    );
+    const res = await fetch(`/api/meal-plans/${plan.id}/entries/${entryId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, mealSlot }),
+    });
+    if (!res.ok) loadPlan();
+  }
+
+  function confirmMove() {
+    if (!moving) return;
+    moveEntry(moving.entry.id, moving.date, moving.mealSlot);
+    setMoving(null);
   }
 
   async function generateGroceryList() {
@@ -271,21 +322,53 @@ export default function MealPlanPage() {
                   </div>
                   {weekDates.map((date, dayIdx) => {
                     const entries = getEntries(date, slot);
+                    const dateStr = formatDate(date);
+                    const cellKey = `${dateStr}|${slot}`;
+                    const cellTint =
+                      dropTarget === cellKey
+                        ? "bg-primary/10 ring-2 ring-inset ring-primary/40"
+                        : isToday(date)
+                          ? "bg-primary/[0.02]"
+                          : "";
                     return (
-                      <div key={`${slot}-${dayIdx}`} className={`group/cell min-h-[90px] border-l p-1.5 ${slotIdx > 0 ? "border-t" : ""} ${isToday(date) ? "bg-primary/[0.02]" : ""}`}>
+                      <div
+                        key={`${slot}-${dayIdx}`}
+                        className={`group/cell min-h-[90px] border-l p-1.5 ${slotIdx > 0 ? "border-t" : ""} ${cellTint}`}
+                        onDragOver={(e) => {
+                          if (draggingId == null) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          setDropTarget(cellKey);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const id = draggingId;
+                          setDraggingId(null);
+                          setDropTarget(null);
+                          if (id != null) moveEntry(id, dateStr, slot);
+                        }}
+                      >
                         {entries.map((entry) => (
                           <div
                             key={entry.id}
-                            className={`mb-1 flex items-start justify-between gap-1 rounded-lg px-2 py-1.5 text-xs leading-snug transition-colors ${
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", String(entry.id));
+                              e.dataTransfer.effectAllowed = "move";
+                              setDraggingId(entry.id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingId(null);
+                              setDropTarget(null);
+                            }}
+                            className={`mb-1 flex cursor-grab items-start justify-between gap-1 rounded-lg px-2 py-1.5 text-xs leading-snug transition-colors active:cursor-grabbing ${
                               entry.recipe
                                 ? "bg-primary/5 hover:bg-primary/10"
                                 : "border border-dashed border-border/70 bg-muted/40 hover:bg-muted"
-                            }`}
-                            title={entry.recipe ? undefined : "Added by name — not included in the grocery list"}
+                            } ${draggingId === entry.id ? "opacity-40" : ""}`}
+                            title={entry.recipe ? "Drag to move" : "Added by name, not included in the grocery list. Drag to move."}
                           >
-                            <span className={`font-medium ${entry.recipe ? "" : "text-muted-foreground"}`}>
-                              {entryLabel(entry)}
-                            </span>
+                            <EntryName entry={entry} />
                             <button onClick={() => removeEntry(entry.id)} className="mt-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/cell:opacity-100">
                               <X className="h-3 w-3" />
                             </button>
@@ -331,12 +414,25 @@ export default function MealPlanPage() {
                                     : "border border-dashed border-border/70 bg-muted/40"
                                 }`}
                               >
-                                <span className={`font-medium ${entry.recipe ? "" : "text-muted-foreground"}`}>
-                                  {entryLabel(entry)}
-                                </span>
-                                <button onClick={() => removeEntry(entry.id)} className="shrink-0 p-1 text-muted-foreground hover:text-destructive">
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
+                                <EntryName entry={entry} />
+                                <div className="flex shrink-0 items-center">
+                                  <button
+                                    onClick={() =>
+                                      setMoving({ entry, date: entry.date.split("T")[0], mealSlot: entry.mealSlot })
+                                    }
+                                    aria-label={`Move ${entryLabel(entry)}`}
+                                    className="p-1 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <Move className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => removeEntry(entry.id)}
+                                    aria-label={`Remove ${entryLabel(entry)}`}
+                                    className="p-1 text-muted-foreground hover:text-destructive"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -440,6 +536,60 @@ export default function MealPlanPage() {
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add to Plan
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move a meal (phones, where dragging through a long list is awkward) */}
+      <Dialog open={moving != null} onOpenChange={(open) => { if (!open) setMoving(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move {moving ? entryLabel(moving.entry) : "meal"}</DialogTitle>
+          </DialogHeader>
+          {moving && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Day</Label>
+                <div className="grid grid-cols-7 gap-1">
+                  {weekDates.map((date, i) => {
+                    const dateStr = formatDate(date);
+                    return (
+                      <Button
+                        key={dateStr}
+                        type="button"
+                        size="sm"
+                        variant={moving.date === dateStr ? "default" : "outline"}
+                        className="h-auto flex-col gap-0 px-0 py-1.5"
+                        onClick={() => setMoving({ ...moving, date: dateStr })}
+                      >
+                        <span className="text-[10px] uppercase">{DAY_LABELS[i]}</span>
+                        <span>{date.getDate()}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Meal</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeSlots.map((slot) => (
+                    <Button
+                      key={slot}
+                      type="button"
+                      size="sm"
+                      variant={moving.mealSlot === slot ? "default" : "outline"}
+                      onClick={() => setMoving({ ...moving, mealSlot: slot })}
+                    >
+                      {SLOT_LABELS[slot]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoving(null)}>Cancel</Button>
+            <Button onClick={confirmMove}>Move</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
