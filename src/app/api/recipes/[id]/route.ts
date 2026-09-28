@@ -70,22 +70,29 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "A selected category isn't available for this recipe" }, { status: 400 });
   }
 
-  await prisma.recipe.update({ where: { id: recipeId }, data: recipeData });
-
-  if (ingredients) {
-    await prisma.recipeIngredient.deleteMany({ where: { recipeId } });
-    await prisma.recipeIngredient.createMany({
-      data: ingredients.map((ing, idx) => ({
-        recipeId, ingredientId: ing.ingredientId, quantity: ing.quantity,
-        unitId: ing.unitId, notes: ing.notes, optional: ing.optional, sortOrder: ing.sortOrder ?? idx,
-        section: ing.section ?? null,
-      })),
-    });
-  }
-  if (tagIds) {
-    await prisma.recipeTag.deleteMany({ where: { recipeId } });
-    if (tagIds.length > 0) await prisma.recipeTag.createMany({ data: tagIds.map((tagId) => ({ recipeId, tagId })) });
-  }
+  // One transaction, so a failed insert can't leave the recipe with its old
+  // ingredients or tags deleted and nothing in their place.
+  await prisma.$transaction([
+    prisma.recipe.update({ where: { id: recipeId }, data: recipeData }),
+    ...(ingredients
+      ? [
+          prisma.recipeIngredient.deleteMany({ where: { recipeId } }),
+          prisma.recipeIngredient.createMany({
+            data: ingredients.map((ing, idx) => ({
+              recipeId, ingredientId: ing.ingredientId, quantity: ing.quantity,
+              unitId: ing.unitId, notes: ing.notes, optional: ing.optional, sortOrder: ing.sortOrder ?? idx,
+              section: ing.section ?? null,
+            })),
+          }),
+        ]
+      : []),
+    ...(tagIds
+      ? [
+          prisma.recipeTag.deleteMany({ where: { recipeId } }),
+          prisma.recipeTag.createMany({ data: tagIds.map((tagId) => ({ recipeId, tagId })) }),
+        ]
+      : []),
+  ]);
 
   const updated = await prisma.recipe.findUnique({
     where: { id: recipeId },
