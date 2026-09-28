@@ -86,8 +86,18 @@ export const updateInventorySchema = z.object({
 
 // ─── Meal Plans ─────────────────────────────────────────────────
 
+// A real calendar day as YYYY-MM-DD. The pattern alone let "2026-13-01" or
+// "2026-02-30" through, which became an Invalid Date and a 500.
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((v) => {
+    const d = new Date(v);
+    return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v);
+  }, "Invalid date");
+
 export const createMealPlanSchema = z.object({
-  weekStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  weekStartDate: isoDate,
 });
 
 // A planned meal is EITHER a saved recipe or a free-text name (e.g.
@@ -97,7 +107,7 @@ export const mealPlanEntrySchema = z
   .object({
     recipeId: z.number().int().positive().optional(),
     customName: z.string().max(200).optional(),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    date: isoDate,
     mealSlot: z.enum(["BREAKFAST", "LUNCH", "DINNER", "SNACK"]),
     servings: z.number().int().positive(),
   })
@@ -110,7 +120,7 @@ export const addMealPlanEntrySchema = mealPlanEntrySchema;
 
 // Moving a planned meal to another day or slot within the same week.
 export const moveMealPlanEntrySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: isoDate,
   mealSlot: z.enum(["BREAKFAST", "LUNCH", "DINNER", "SNACK"]),
 });
 

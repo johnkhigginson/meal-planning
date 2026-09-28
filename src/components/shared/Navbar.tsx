@@ -48,8 +48,10 @@ export function Navbar() {
   const systemRole = (session?.user as { systemRole?: string } | undefined)?.systemRole;
   const canAdmin = systemRole === "ADMIN" || systemRole === "CONTRIBUTOR";
 
+  // The left inset keeps icons clear of the notch on a phone held sideways,
+  // which is wide enough to get the rail.
   return (
-    <aside className="flex h-full w-16 flex-col border-r border-sidebar-border bg-sidebar lg:w-56">
+    <aside className="flex h-full w-[calc(4rem+env(safe-area-inset-left))] flex-col border-r border-sidebar-border bg-sidebar pl-[env(safe-area-inset-left)] lg:w-56">
       {/* Logo */}
       <div className="flex items-center justify-center gap-2.5 py-5 lg:justify-start lg:px-5">
         <LemonLogo className="h-7 w-7" />

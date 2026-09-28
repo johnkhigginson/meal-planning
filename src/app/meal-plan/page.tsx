@@ -305,8 +305,9 @@ export default function MealPlanPage() {
         </div>
       ) : (
         <>
-          {/* Desktop grid */}
-          <div className="hidden overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-sm md:block">
+          {/* Desktop grid, from 1024px. Below that the side rail leaves too
+              little width for seven columns, so tablets get the day cards. */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-sm lg:block">
             <div className="grid" style={{ gridTemplateColumns: `80px repeat(7, 1fr)` }}>
               <div className="border-b bg-muted/30 p-3" />
               {weekDates.map((date, i) => (
@@ -402,7 +403,7 @@ export default function MealPlanPage() {
           </div>
 
           {/* Mobile: stacked day cards */}
-          <div className="space-y-3 md:hidden">
+          <div className="space-y-3 lg:hidden">
             {weekDates.map((date, i) => (
               <div key={i} className={`rounded-2xl border border-border/60 bg-card shadow-sm ${isToday(date) ? "ring-2 ring-primary/20" : ""}`}>
                 <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5 rounded-t-2xl">
