@@ -17,6 +17,7 @@ interface Unit {
 interface Ingredient {
   id: number;
   name: string;
+  defaultUnitId: number | null;
 }
 
 export interface RecipeIngredientRow {
@@ -78,7 +79,12 @@ export function IngredientInput({
   }, []);
 
   async function selectIngredient(ingredient: Ingredient) {
-    onChange({ ...row, ingredientId: ingredient.id, ingredientName: ingredient.name });
+    onChange({
+      ...row,
+      ingredientId: ingredient.id,
+      ingredientName: ingredient.name,
+      unitId: row.unitId || ingredient.defaultUnitId || 0,
+    });
     setQuery(ingredient.name);
     setShowSuggestions(false);
   }
@@ -109,9 +115,9 @@ export function IngredientInput({
             onChange={(e) => {
               setQuery(e.target.value);
               setShowSuggestions(true);
-              if (!e.target.value) {
-                onChange({ ...row, ingredientId: 0, ingredientName: "" });
-              }
+              // Keep the typed name on the row even when no suggestion is
+              // picked. The form matches or creates it by name on save.
+              onChange({ ...row, ingredientId: 0, ingredientName: e.target.value });
             }}
             onFocus={() => query.length >= 2 && setShowSuggestions(true)}
           />

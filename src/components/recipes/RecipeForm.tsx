@@ -129,6 +129,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [parsingPhoto, setParsingPhoto] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -410,9 +411,67 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
     }
   }
 
+  // Turn every named row into one the API accepts. A name typed without picking
+  // a suggestion is matched or created by name (the endpoint upserts), and a
+  // blank quantity or unit gets the same defaults the import parser uses: 1, and
+  // the ingredient's default unit or "each". Rows with no name are dropped.
+  async function resolveIngredientRows(): Promise<RecipeIngredientRow[]> {
+    const named = form.ingredients.filter(
+      (ing) => ing.ingredientId > 0 || ing.ingredientName.trim()
+    );
+
+    const unmatched = [
+      ...new Map(
+        named
+          .filter((ing) => ing.ingredientId === 0)
+          .map((ing) => [ing.ingredientName.trim().toLowerCase(), ing.ingredientName.trim()])
+      ).values(),
+    ];
+    const created = new Map<string, { id: number; defaultUnitId: number | null }>();
+    await Promise.all(
+      unmatched.map(async (name) => {
+        const res = await fetch("/api/ingredients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!res.ok) throw new Error(`Couldn't add the ingredient “${name}”.`);
+        const ingredient = await res.json();
+        created.set(name.toLowerCase(), {
+          id: ingredient.id,
+          defaultUnitId: ingredient.defaultUnitId,
+        });
+      })
+    );
+
+    const eachUnitId = units.find((u) => u.name === "each")?.id ?? 0;
+    return named.map((ing) => {
+      const match =
+        ing.ingredientId === 0 ? created.get(ing.ingredientName.trim().toLowerCase()) : undefined;
+      const unitId = ing.unitId || match?.defaultUnitId || eachUnitId;
+      if (!unitId) throw new Error(`Pick a unit for “${ing.ingredientName.trim()}”.`);
+      return {
+        ...ing,
+        ingredientId: match?.id ?? ing.ingredientId,
+        quantity: ing.quantity > 0 ? ing.quantity : 1,
+        unitId,
+      };
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setSaveError(null);
+
+    let ingredients: RecipeIngredientRow[];
+    try {
+      ingredients = await resolveIngredientRows();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Couldn't save the ingredients.");
+      setSaving(false);
+      return;
+    }
 
     const payload = {
       name: form.name,
@@ -430,35 +489,43 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       // Only on create: contribute the new recipe into a cookbook.
       bookId: !recipeId && bookId ? bookId : undefined,
       isFavorite: form.isFavorite,
-      ingredients: form.ingredients
-        .filter((ing) => ing.ingredientId > 0 && ing.quantity > 0 && ing.unitId > 0)
-        .map((ing, idx) => ({
-          ingredientId: ing.ingredientId,
-          quantity: ing.quantity,
-          unitId: ing.unitId,
-          notes: ing.notes || undefined,
-          optional: ing.optional,
-          sortOrder: idx,
-          section: ing.section.trim() || null,
-        })),
+      ingredients: ingredients.map((ing, idx) => ({
+        ingredientId: ing.ingredientId,
+        quantity: ing.quantity,
+        unitId: ing.unitId,
+        notes: ing.notes || undefined,
+        optional: ing.optional,
+        sortOrder: idx,
+        section: ing.section.trim() || null,
+      })),
       tagIds: form.tagIds,
     };
 
     const url = recipeId ? `/api/recipes/${recipeId}` : "/api/recipes";
     const method = recipeId ? "PUT" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    setSaving(false);
-
-    if (res.ok) {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setSaveError(
+          typeof data?.error === "string"
+            ? data.error
+            : "Couldn't save the recipe. Check the fields and try again."
+        );
+        return;
+      }
       const recipe = await res.json();
       trackEvent(recipeId ? "recipe_updated" : "recipe_created", { source_type: form.sourceType });
       router.push(`/recipes/${recipe.id}`);
+    } catch {
+      setSaveError("Couldn't reach the server. Try again.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -918,6 +985,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       </Card>
 
       {/* Submit */}
+      {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       <div className="flex gap-3">
         <Button type="submit" disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
