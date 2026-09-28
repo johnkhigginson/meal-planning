@@ -94,6 +94,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         sourceUrl: source.sourceUrl,
         sourceBookTitle: source.sourceBookTitle,
         sourceBookPage: source.sourceBookPage,
+        // A typed credit ("Grandma Jean") travels with the recipe. A user author
+        // belongs to the sharer's household, so it doesn't.
+        authorName: source.authorName,
         ingredients: {
           create: source.ingredients.map((i) => ({
             ingredientId: i.ingredientId,
@@ -143,6 +146,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           sourceUrl: r.sourceUrl,
           sourceBookTitle: r.sourceBookTitle,
           sourceBookPage: r.sourceBookPage,
+          authorName: r.authorName,
           ingredients: {
             create: r.ingredients.map((i) => ({
               ingredientId: i.ingredientId,

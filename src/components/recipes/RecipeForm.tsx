@@ -75,6 +75,16 @@ interface RecipeFormProps {
 
 let ingredientKeyCounter = 0;
 
+// A name that starts with an amount, like "2 cups flour" or "½ tsp salt".
+const LEADING_AMOUNT = /^\s*[\d¼½¾⅓⅔⅛⅜⅝⅞]/;
+
+interface ParsedLine {
+  ingredientId: number;
+  quantity: number;
+  unitId: number;
+  notes: string | null;
+}
+
 function newIngredientRow(section = ""): RecipeIngredientRow {
   return {
     key: `ing-${++ingredientKeyCounter}-${Date.now()}`,
@@ -108,6 +118,24 @@ function buildIngredientGroups(rows: RecipeIngredientRow[]): EditorIngredientGro
   return groups;
 }
 
+// Rename one group. Its rows join any other rows already under that name, so a
+// heading never shows twice, and a blank name folds them into the main list
+// (which leads the recipe).
+export function renameIngredientGroup(
+  rows: RecipeIngredientRow[],
+  groupIndex: number,
+  name: string
+): RecipeIngredientRow[] {
+  const section = name.trim();
+  const group = buildIngredientGroups(rows)[groupIndex];
+  const moving = new Set(group.rows.map((r) => r.index));
+  const renamed = group.rows.map(({ row }) => ({ ...row, section }));
+  const rest = rows.filter((_, i) => !moving.has(i));
+  const lastSame = rest.reduce((found, row, i) => (row.section === section ? i : found), -1);
+  const at = lastSame >= 0 ? lastSame + 1 : section === "" ? 0 : group.rows[0].index;
+  return [...rest.slice(0, at), ...renamed, ...rest.slice(at)];
+}
+
 // A placeholder the cook renames. A blank name would merge straight back into
 // the ungrouped list, so a new group needs one.
 function nextSectionName(rows: RecipeIngredientRow[]): string {
@@ -118,6 +146,32 @@ function nextSectionName(rows: RecipeIngredientRow[]): string {
   let n = 2;
   while (taken.has(`new section ${n}`)) n++;
   return `New section ${n}`;
+}
+
+// Edits a section heading locally and applies it on blur or Enter. Applying it
+// on every keystroke merged groups mid-edit: backspacing "Filling" to empty
+// folded it into the main list before the new name was typed.
+function SectionNameInput({ value, onCommit }: { value: string; onCommit: (name: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  return (
+    <Input
+      value={draft}
+      maxLength={100}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+      placeholder="Section name (e.g. For the filling)"
+      aria-label="Ingredient section name"
+      className="h-8 max-w-sm text-sm font-medium"
+    />
+  );
 }
 
 export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
@@ -233,12 +287,8 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
   const ingredientGroups = buildIngredientGroups(form.ingredients);
 
-  function renameSection(groupIndex: number, name: string) {
-    const indexes = new Set(ingredientGroups[groupIndex].rows.map((r) => r.index));
-    updateForm(
-      "ingredients",
-      form.ingredients.map((row, i) => (indexes.has(i) ? { ...row, section: name } : row))
-    );
+  function commitSectionName(groupIndex: number, name: string) {
+    updateForm("ingredients", renameIngredientGroup(form.ingredients, groupIndex, name));
   }
 
   // Slot the new row in after the last row of its section so a section's
@@ -288,13 +338,22 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
   // Match an existing member or saved name case-insensitively before adding a
   // new one, so "grandma jean" doesn't become a second Grandma Jean.
+  function resolveTypedAuthor(name: string): { authorId: number | null; authorName: string } {
+    const member = members.find((m) => m.name.toLowerCase() === name.toLowerCase());
+    if (member) return { authorId: member.id, authorName: "" };
+    const saved = authorNames.find((n) => n.toLowerCase() === name.toLowerCase());
+    return { authorId: null, authorName: saved ?? name };
+  }
+
   function addAuthor() {
     const name = newAuthor?.trim();
     if (!name) return;
-    const member = members.find((m) => m.name.toLowerCase() === name.toLowerCase());
-    const saved = authorNames.find((n) => n.toLowerCase() === name.toLowerCase());
-    if (member) chooseAuthor(`user:${member.id}`);
-    else chooseAuthor(`name:${saved ?? name}`);
+    const author = resolveTypedAuthor(name);
+    setForm((prev) => ({ ...prev, ...author }));
+    // Keep a new name in the list even after picking someone else.
+    if (author.authorName && !authorNames.includes(author.authorName)) {
+      setAuthorNames((prev) => [...prev, author.authorName].sort((a, b) => a.localeCompare(b)));
+    }
     setNewAuthor(null);
   }
 
@@ -367,35 +426,35 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
     // Auto-parse ingredient strings into structured rows
     if (data.ingredients && data.ingredients.length > 0) {
+      const rawLines = data.ingredients.map((i) => (typeof i === "string" ? i : i.text));
       try {
         const parseRes = await fetch("/api/ingredients/parse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ingredients: data.ingredients }),
         });
-        if (parseRes.ok) {
-          const parsed = await parseRes.json();
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const rows: RecipeIngredientRow[] = parsed.map(
-              (p: { ingredientId: number; ingredientName: string; quantity: number; unitId: number; notes: string; optional: boolean; section: string | null }, idx: number) => ({
-                key: `parsed-${p.ingredientId}-${idx}`,
-                ingredientId: p.ingredientId,
-                ingredientName: p.ingredientName,
-                quantity: p.quantity,
-                unitId: p.unitId,
-                notes: p.notes,
-                optional: p.optional,
-                section: p.section ?? "",
-              })
-            );
-            updateForm("ingredients", rows);
-          }
+        const parsed = parseRes.ok ? await parseRes.json() : null;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const rows: RecipeIngredientRow[] = parsed.map(
+            (p: { ingredientId: number; ingredientName: string; quantity: number; unitId: number; notes: string; optional: boolean; section: string | null }, idx: number) => ({
+              key: `parsed-${p.ingredientId}-${idx}`,
+              ingredientId: p.ingredientId,
+              ingredientName: p.ingredientName,
+              quantity: p.quantity,
+              unitId: p.unitId,
+              notes: p.notes,
+              optional: p.optional,
+              section: p.section ?? "",
+            })
+          );
+          updateForm("ingredients", rows);
+        } else {
+          // Parsing failed (rate limit, server error): keep the lines visible
+          // instead of losing them.
+          setRawIngredients(rawLines);
         }
       } catch {
-        // Fall back to showing raw strings
-        setRawIngredients(
-          data.ingredients.map((i) => (typeof i === "string" ? i : i.text))
-        );
+        setRawIngredients(rawLines);
       }
     }
   }
@@ -469,10 +528,32 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       (ing) => ing.ingredientId > 0 || ing.ingredientName.trim()
     );
 
+    // A whole line typed into the name box ("2 cups flour") goes through the
+    // import parser, so it saves as 2 cups of flour instead of creating a new
+    // ingredient called "2 cups flour".
+    const lines = named.filter(
+      (ing) => ing.ingredientId === 0 && LEADING_AMOUNT.test(ing.ingredientName)
+    );
+    const parsedLines = new Map<string, ParsedLine>();
+    if (lines.length > 0) {
+      const res = await fetch("/api/ingredients/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredients: lines.map((ing) => ing.ingredientName.trim()) }),
+      });
+      if (!res.ok) throw new Error("Couldn't read the ingredient amounts. Try saving again.");
+      const parsed: ParsedLine[] = await res.json();
+      // The parser skips a line with no ingredient in it, so results only line
+      // up with the input when the counts match. Otherwise save them as names.
+      if (Array.isArray(parsed) && parsed.length === lines.length) {
+        lines.forEach((ing, i) => parsedLines.set(ing.key, parsed[i]));
+      }
+    }
+
     const unmatched = [
       ...new Map(
         named
-          .filter((ing) => ing.ingredientId === 0)
+          .filter((ing) => ing.ingredientId === 0 && !parsedLines.has(ing.key))
           .map((ing) => [ing.ingredientName.trim().toLowerCase(), ing.ingredientName.trim()])
       ).values(),
     ];
@@ -495,6 +576,16 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
     const eachUnitId = units.find((u) => u.name === "each")?.id ?? 0;
     return named.map((ing) => {
+      const line = parsedLines.get(ing.key);
+      if (line) {
+        return {
+          ...ing,
+          ingredientId: line.ingredientId,
+          quantity: ing.quantity > 0 ? ing.quantity : line.quantity,
+          unitId: ing.unitId || line.unitId,
+          notes: ing.notes || line.notes || "",
+        };
+      }
       const match =
         ing.ingredientId === 0 ? created.get(ing.ingredientName.trim().toLowerCase()) : undefined;
       const unitId = ing.unitId || match?.defaultUnitId || eachUnitId;
@@ -512,6 +603,12 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
     e.preventDefault();
     setSaving(true);
     setSaveError(null);
+
+    // A name typed into "Add an author…" but never confirmed still counts.
+    const pendingAuthor = newAuthor?.trim();
+    const author = pendingAuthor
+      ? resolveTypedAuthor(pendingAuthor)
+      : { authorId: form.authorId, authorName: form.authorName };
 
     let ingredients: RecipeIngredientRow[];
     try {
@@ -533,8 +630,8 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       sourceUrl: form.sourceType === "WEBSITE" ? form.sourceUrl || undefined : undefined,
       sourceBookTitle: form.sourceType === "BOOK" ? form.sourceBookTitle || undefined : undefined,
       sourceBookPage: form.sourceType === "BOOK" ? form.sourceBookPage || undefined : undefined,
-      authorId: form.authorId,
-      authorName: form.authorId == null ? form.authorName.trim() || null : null,
+      authorId: author.authorId,
+      authorName: author.authorId == null ? author.authorName.trim() || null : null,
       imageUrl: form.imageUrl.trim() || undefined,
       // Only on create: contribute the new recipe into a cookbook.
       bookId: !recipeId && bookId ? bookId : undefined,
@@ -959,18 +1056,16 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
             const sectioned = ingredientGroups.length > 1 || group.section !== "";
             return (
               <div
-                key={groupIndex}
+                key={group.rows[0].row.key}
                 className={
                   sectioned ? "space-y-2 rounded-lg border border-dashed p-3" : "space-y-2"
                 }
               >
                 {sectioned && (
-                  <Input
+                  <SectionNameInput
+                    key={group.section}
                     value={group.section}
-                    onChange={(e) => renameSection(groupIndex, e.target.value)}
-                    placeholder="Section name (e.g. For the filling)"
-                    aria-label="Ingredient section name"
-                    className="h-8 max-w-sm text-sm font-medium"
+                    onCommit={(name) => commitSectionName(groupIndex, name)}
                   />
                 )}
                 {group.rows.map(({ row, index }) => (

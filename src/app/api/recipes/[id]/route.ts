@@ -45,6 +45,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const body = await request.json();
   const parsed = updateRecipeSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  // .partial() still fills in .default() values, so a PUT that left out
+  // ingredients or tags would read as "clear them" and reset isFavorite. Keep
+  // only the fields the request actually sent.
+  const sent = Object.fromEntries(
+    Object.entries(parsed.data).filter(([key]) => key in body)
+  ) as typeof parsed.data;
 
   // Editable by the owning household or a collaborator on a containing cookbook.
   const existing = await prisma.recipe.findFirst({
@@ -53,7 +59,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   });
   if (!existing) return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
 
-  const { ingredients, tagIds, ...recipeData } = parsed.data;
+  const { ingredients, tagIds, ...recipeData } = sent;
   normalizeRecipeAuthor(recipeData);
 
   // The author must be a member of the recipe's household OR a collaborator on
