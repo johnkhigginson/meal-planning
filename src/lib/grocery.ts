@@ -156,27 +156,61 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
   return { items, mealPlanId, weekStartDate: mealPlan.weekStartDate };
 }
 
+// weekStartDate is a SQL date, which arrives as UTC midnight.
+export function weekListName(weekStartDate: Date): string {
+  const label = weekStartDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `Week of ${label}`;
+}
+
+// Each week keeps one list. Regenerating it (say, after adding a meal) rewrites
+// that list in place, so it stays the one the cook comes back to. An item they
+// already checked off stays checked unless the week now needs more of it.
 export async function saveGroceryList(
   mealPlanId: number,
   householdId: number,
-  items: AggregatedItem[]
+  items: AggregatedItem[],
+  weekStartDate: Date
 ): Promise<number> {
-  const groceryList = await prisma.groceryList.create({
-    data: {
-      mealPlanId,
-      householdId,
-      name: `Grocery List - ${new Date().toLocaleDateString()}`,
-      items: {
-        create: items.map((item) => ({
-          ingredientId: item.ingredientId,
-          quantity: item.totalQuantity,
-          unitId: item.unitId,
-          inInventory: item.inInventory,
-          needed: item.needed,
-          checked: item.needed <= 0,
-        })),
-      },
-    },
+  const name = weekListName(weekStartDate);
+  const existing = await prisma.groceryList.findFirst({
+    where: { mealPlanId, householdId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: { items: { select: { ingredientId: true, unitId: true, needed: true, checked: true } } },
   });
-  return groceryList.id;
+
+  const previous = new Map(
+    (existing?.items ?? []).map((item) => [`${item.ingredientId}:${item.unitId}`, item])
+  );
+  const rows = items.map((item) => {
+    const before = previous.get(`${item.ingredientId}:${item.unitId}`);
+    return {
+      ingredientId: item.ingredientId,
+      quantity: item.totalQuantity,
+      unitId: item.unitId,
+      inInventory: item.inInventory,
+      needed: item.needed,
+      checked: item.needed <= 0 || (!!before?.checked && item.needed <= before.needed),
+    };
+  });
+
+  if (!existing) {
+    const created = await prisma.groceryList.create({
+      data: { mealPlanId, householdId, name, items: { create: rows } },
+    });
+    return created.id;
+  }
+
+  await prisma.$transaction([
+    prisma.groceryListItem.deleteMany({ where: { groceryListId: existing.id } }),
+    prisma.groceryList.update({
+      where: { id: existing.id },
+      data: { name, items: { create: rows } },
+    }),
+  ]);
+  return existing.id;
 }

@@ -1,14 +1,21 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { DollarSign, Loader2, MapPin, Store } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DollarSign, Loader2, MapPin, Store, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface GroceryListItem {
@@ -28,6 +35,12 @@ interface GroceryList {
   name: string;
   mealPlanId: number | null;
   items: GroceryListItem[];
+}
+
+interface GroceryListSummary {
+  id: number;
+  name: string;
+  _count: { items: number };
 }
 
 export default function GroceryListPage() {
@@ -61,46 +74,79 @@ interface ShoppingResult {
 }
 
 function GroceryListContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const listId = searchParams.get("id");
-  const [list, setList] = useState<GroceryList | null>(null);
-  const [loading, setLoading] = useState(true);
+  // undefined while loading; null when the list in the URL doesn't exist.
+  const [loadedList, setLoadedList] = useState<GroceryList | null | undefined>(undefined);
+  const [lists, setLists] = useState<GroceryListSummary[] | null>(null);
   const [shopping, setShopping] = useState<ShoppingResult | null>(null);
   const [loadingShopping, setLoadingShopping] = useState(false);
 
   useEffect(() => {
-    if (!listId) {
-      setLoading(false);
-      return;
+    fetch("/api/grocery-lists")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setLists(Array.isArray(data) ? data : []))
+      .catch(() => setLists([]));
+  }, []);
+
+  // With no list in the URL (the nav link), reopen the most recent one.
+  useEffect(() => {
+    if (!listId && lists && lists.length > 0) {
+      router.replace(`/grocery-list?id=${lists[0].id}`);
     }
+  }, [listId, lists, router]);
+
+  useEffect(() => {
+    if (!listId) return;
+    let cancelled = false;
     fetch(`/api/grocery-lists/${listId}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
       .then((data) => {
-        setList(data);
-        setLoading(false);
+        if (cancelled) return;
+        setLoadedList(data);
+        setShopping(null);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [listId]);
 
+  const current = listId && loadedList && String(loadedList.id) === listId ? loadedList : null;
+  const loading = listId
+    ? loadedList === undefined || (loadedList !== null && String(loadedList.id) !== listId)
+    : lists === null || lists.length > 0;
+
+  async function deleteList() {
+    if (!current || !confirm(`Delete “${current.name}”?`)) return;
+    const res = await fetch(`/api/grocery-lists/${current.id}`, { method: "DELETE" });
+    if (!res.ok) return;
+    const remaining = (lists ?? []).filter((l) => l.id !== current.id);
+    setLists(remaining);
+    router.replace(remaining.length > 0 ? `/grocery-list?id=${remaining[0].id}` : "/grocery-list");
+  }
+
   async function toggleItem(itemId: number, checked: boolean) {
-    if (!list) return;
-    const res = await fetch(`/api/grocery-lists/${list.id}`, {
+    if (!current) return;
+    const res = await fetch(`/api/grocery-lists/${current.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId, checked }),
     });
     if (res.ok) {
       const updated = await res.json();
-      setList(updated);
+      setLoadedList(updated);
     }
   }
 
   async function findBestPrices() {
-    if (!list) return;
+    if (!current) return;
     setLoadingShopping(true);
     const res = await fetch("/api/shopping-list", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groceryListId: list.id }),
+      body: JSON.stringify({ groceryListId: current.id }),
     });
     if (res.ok) {
       setShopping(await res.json());
@@ -110,23 +156,50 @@ function GroceryListContent() {
 
   if (loading) return <PageLoader />;
 
-  if (!listId || !list) {
+  const hasSavedLists = !!lists && lists.length > 0;
+  const listPicker = lists && lists.length > 0 && (lists.length > 1 || !current) && (
+    <Select
+      value={current ? String(current.id) : undefined}
+      onValueChange={(v) => v && router.push(`/grocery-list?id=${v}`)}
+    >
+      <SelectTrigger className="w-full sm:w-72" aria-label="Saved grocery lists">
+        <SelectValue placeholder="Open a saved list">{current?.name ?? null}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {lists.map((l) => (
+          <SelectItem key={l.id} value={String(l.id)}>
+            {l.name}
+            <span className="text-muted-foreground">
+              · {l._count.items} item{l._count.items !== 1 ? "s" : ""}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  if (!current) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Grocery List</h1>
+        {listPicker}
         <div className="py-12 text-center">
-          <p className="text-lg text-muted-foreground">No grocery list selected</p>
+          <p className="text-lg text-muted-foreground">
+            {hasSavedLists ? "That grocery list isn't available" : "No grocery lists yet"}
+          </p>
           <p className="text-sm text-muted-foreground">
             Go to{" "}
             <Link href="/meal-plan" className="text-primary underline">
               Meal Plan
             </Link>{" "}
-            and click &quot;Generate Grocery List&quot;
+            and click &quot;Grocery List&quot; to make one for the week
           </p>
         </div>
       </div>
     );
   }
+
+  const list = current;
 
   // Group items by category
   const grouped = list.items.reduce(
@@ -146,9 +219,9 @@ function GroceryListContent() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0 space-y-1">
           <h1 className="text-2xl font-bold">Grocery List</h1>
-          <p className="text-sm text-muted-foreground">{list.name}</p>
+          {listPicker || <p className="text-sm text-muted-foreground">{list.name}</p>}
           <div className="mt-2 flex gap-2 text-sm">
             <Badge variant="outline">
               {needToBuy.filter((i) => i.checked).length}/{needToBuy.length} checked
@@ -160,10 +233,15 @@ function GroceryListContent() {
             )}
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={findBestPrices} disabled={loadingShopping || needToBuy.length === 0}>
-          {loadingShopping ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <DollarSign className="mr-2 h-3.5 w-3.5" />}
-          Find Best Prices
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm" onClick={findBestPrices} disabled={loadingShopping || needToBuy.length === 0}>
+            {loadingShopping ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <DollarSign className="mr-2 h-3.5 w-3.5" />}
+            Find Best Prices
+          </Button>
+          <Button variant="ghost" size="sm" onClick={deleteList} aria-label="Delete this grocery list">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
       {/* Smart shopping results */}

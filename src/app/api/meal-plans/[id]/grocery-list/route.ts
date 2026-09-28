@@ -13,8 +13,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Scoped to the caller's household, so another household's plan is a 404.
   const generated = await generateGroceryList(mealPlanId, householdId);
   if (!generated) return NextResponse.json({ error: "Meal plan not found" }, { status: 404 });
-  const { items } = generated;
-  const groceryListId = await saveGroceryList(mealPlanId, householdId, items);
+  const { items, weekStartDate } = generated;
+  const groceryListId = await saveGroceryList(mealPlanId, householdId, items, weekStartDate);
 
   return NextResponse.json({ groceryListId, items }, { status: 201 });
 }
