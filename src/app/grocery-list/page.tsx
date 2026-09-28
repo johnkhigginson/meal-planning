@@ -81,10 +81,10 @@ function groupByAisle(items: GroceryListItem[]): ListSection[] {
 // each, with the total to buy and a note naming the others; checking it off
 // anywhere checks it off everywhere.
 function groupByRecipe(list: GroceryList, items: GroceryListItem[]): ListSection[] {
-  const recipesFor = new Map<number, string[]>();
+  const recipesFor = new Map<number, { id: number; name: string }[]>();
   for (const recipe of list.recipes) {
     for (const id of recipe.ingredientIds) {
-      recipesFor.set(id, [...(recipesFor.get(id) ?? []), recipe.name]);
+      recipesFor.set(id, [...(recipesFor.get(id) ?? []), recipe]);
     }
   }
   const sections: ListSection[] = list.recipes
@@ -94,7 +94,9 @@ function groupByRecipe(list: GroceryList, items: GroceryListItem[]): ListSection
       rows: items
         .filter((item) => recipe.ingredientIds.includes(item.ingredientId))
         .map((item) => {
-          const others = (recipesFor.get(item.ingredientId) ?? []).filter((n) => n !== recipe.name);
+          const others = (recipesFor.get(item.ingredientId) ?? [])
+            .filter((r) => r.id !== recipe.id)
+            .map((r) => r.name);
           return { item, note: others.length > 0 ? `also for ${others.join(", ")}` : undefined };
         }),
     }))
@@ -150,7 +152,9 @@ function GroceryListContent() {
   // undefined while loading; null when the list in the URL doesn't exist.
   const [loadedList, setLoadedList] = useState<GroceryList | null | undefined>(undefined);
   const [lists, setLists] = useState<GroceryListSummary[] | null>(null);
-  const [shopping, setShopping] = useState<ShoppingResult | null>(null);
+  // Price results carry their list id, so a slow response for one list never
+  // shows up under another.
+  const [shoppingFor, setShoppingFor] = useState<{ listId: number; result: ShoppingResult } | null>(null);
   const [loadingShopping, setLoadingShopping] = useState(false);
   // Remembered per browser; storage can be missing (private windows).
   const [view, setView] = useState<ListView>(() => {
@@ -193,17 +197,19 @@ function GroceryListContent() {
       .then((data) => {
         if (cancelled) return;
         setLoadedList(data);
-        setShopping(null);
       });
     return () => {
       cancelled = true;
     };
   }, [listId]);
 
-  const current = listId && loadedList && String(loadedList.id) === listId ? loadedList : null;
+  // Parse the id the way the API does, so "?id=012" still matches list 12.
+  const wantedId = listId ? parseInt(listId, 10) : NaN;
+  const current = loadedList && loadedList.id === wantedId ? loadedList : null;
   const loading = listId
-    ? loadedList === undefined || (loadedList !== null && String(loadedList.id) !== listId)
+    ? loadedList === undefined || (loadedList !== null && loadedList.id !== wantedId)
     : lists === null || lists.length > 0;
+  const shopping = shoppingFor && current && shoppingFor.listId === current.id ? shoppingFor.result : null;
 
   async function deleteList() {
     if (!current || !confirm(`Delete “${current.name}”?`)) return;
@@ -215,9 +221,12 @@ function GroceryListContent() {
   }
 
   // Reload the list after a failed save so the screen matches what's stored.
+  // A reply that lands after the cook switched lists is dropped.
   async function reloadList(id: number) {
-    const res = await fetch(`/api/grocery-lists/${id}`);
-    if (res.ok) setLoadedList(await res.json());
+    const data = await fetch(`/api/grocery-lists/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+    if (data) setLoadedList((prev) => (prev && prev.id === id ? data : prev));
   }
 
   // Check marks change on screen at once, which matters when tapping through a
@@ -244,6 +253,8 @@ function GroceryListContent() {
   // lists.
   async function changeAisle(ingredientId: number, category: string) {
     if (!current) return;
+    const item = current.items.find((i) => i.ingredientId === ingredientId);
+    if ((item?.ingredient.category ?? "Other") === category) return;
     const listId = current.id;
     setLoadedList((prev) =>
       prev && {
@@ -263,14 +274,15 @@ function GroceryListContent() {
 
   async function findBestPrices() {
     if (!current) return;
+    const listId = current.id;
     setLoadingShopping(true);
     const res = await fetch("/api/shopping-list", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groceryListId: current.id }),
-    });
-    if (res.ok) {
-      setShopping(await res.json());
+      body: JSON.stringify({ groceryListId: listId }),
+    }).catch(() => null);
+    if (res?.ok) {
+      setShoppingFor({ listId, result: await res.json() });
     }
     setLoadingShopping(false);
   }
@@ -466,7 +478,7 @@ function GroceryListContent() {
                         onValueChange={(v) => changeAisle(item.ingredientId, String(v))}
                       >
                         {INGREDIENT_CATEGORIES.map((category) => (
-                          <DropdownMenuRadioItem key={category} value={category}>
+                          <DropdownMenuRadioItem key={category} value={category} closeOnClick>
                             {category}
                           </DropdownMenuRadioItem>
                         ))}

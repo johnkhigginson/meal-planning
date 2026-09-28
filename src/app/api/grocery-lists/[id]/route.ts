@@ -38,13 +38,19 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   const existing = await prisma.groceryList.findFirst({ where: { id: listId, householdId } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (Number.isInteger(body.itemId) && typeof body.checked === "boolean") {
-    // updateMany scopes to this list, so a foreign itemId is a no-op (not a 500).
-    await prisma.groceryListItem.updateMany({
-      where: { id: body.itemId, groceryListId: listId },
-      data: { checked: body.checked },
-    });
+  if (!Number.isInteger(body.itemId) || typeof body.checked !== "boolean") {
+    return NextResponse.json({ error: "itemId and checked are required" }, { status: 400 });
   }
 
-  return NextResponse.json(await loadGroceryList(listId, householdId));
+  // updateMany scopes to this list, so a foreign itemId matches nothing.
+  const result = await prisma.groceryListItem.updateMany({
+    where: { id: body.itemId, groceryListId: listId },
+    data: { checked: body.checked },
+  });
+  // Regenerating a list replaces its items, so a screen opened before that
+  // holds ids that no longer exist. Report it, and the page reloads the list.
+  if (result.count === 0) {
+    return NextResponse.json({ error: "That item is no longer on this list" }, { status: 409 });
+  }
+  return NextResponse.json({ success: true });
 }
