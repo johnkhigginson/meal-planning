@@ -60,7 +60,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className="flex h-full min-h-screen flex-col lg:flex-row">
+      <body className="flex h-full min-h-screen flex-col sm:flex-row">
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

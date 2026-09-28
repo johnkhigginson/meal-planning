@@ -33,23 +33,33 @@ const navItems = [
   { href: "/stores", label: "Stores", icon: Store },
 ];
 
+// Below 1024px the sidebar collapses to an icon rail; labels show as tooltips.
+const linkBase =
+  "flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors lg:justify-start";
+const linkIdle = "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground";
+const linkActive = "bg-sidebar-accent text-sidebar-primary";
+
 export function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
   const hidden = parseHiddenNav((session?.user as { hiddenNavItems?: string } | undefined)?.hiddenNavItems);
   const visibleItems = navItems.filter((item) => !hidden.has(item.href));
+  const systemRole = (session?.user as { systemRole?: string } | undefined)?.systemRole;
+  const canAdmin = systemRole === "ADMIN" || systemRole === "CONTRIBUTOR";
 
   return (
-    <aside className="flex h-full w-56 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className="flex h-full w-16 flex-col border-r border-sidebar-border bg-sidebar lg:w-56">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-5">
+      <div className="flex items-center justify-center gap-2.5 py-5 lg:justify-start lg:px-5">
         <LemonLogo className="h-7 w-7" />
-        <span className="text-base font-bold tracking-tight text-sidebar-foreground">My Lemon Kitchen</span>
+        <span className="hidden text-base font-bold tracking-tight text-sidebar-foreground lg:inline">
+          My Lemon Kitchen
+        </span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 px-3 pt-2">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pt-2">
         {visibleItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -58,15 +68,12 @@ export function Navbar() {
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-primary"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )}
+              title={item.label}
+              aria-label={item.label}
+              className={cn(linkBase, isActive ? linkActive : linkIdle)}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="hidden lg:inline">{item.label}</span>
             </Link>
           );
         })}
@@ -74,8 +81,8 @@ export function Navbar() {
 
       {/* User section */}
       {session?.user && (
-        <div className="border-t border-sidebar-border px-3 py-3">
-          <div className="mb-1 px-3 py-1.5">
+        <div className="space-y-0.5 border-t border-sidebar-border px-3 py-3">
+          <div className="mb-1 hidden px-3 py-1.5 lg:block">
             <p className="truncate text-sm font-medium text-sidebar-foreground">
               {session.user.name}
             </p>
@@ -83,52 +90,45 @@ export function Navbar() {
               {session.user.email}
             </p>
           </div>
-          {((session.user as { systemRole?: string }).systemRole === "ADMIN" || (session.user as { systemRole?: string }).systemRole === "CONTRIBUTOR") && (
+          {canAdmin && (
             <Link
               href="/admin"
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-                pathname.startsWith("/admin")
-                  ? "bg-sidebar-accent text-sidebar-primary"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )}
+              title="Admin"
+              aria-label="Admin"
+              className={cn(linkBase, pathname.startsWith("/admin") ? linkActive : linkIdle)}
             >
-              <Shield className="h-4 w-4" />
-              Admin
+              <Shield className="h-4 w-4 shrink-0" />
+              <span className="hidden lg:inline">Admin</span>
             </Link>
           )}
           <Link
             href="/help"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-              pathname === "/help"
-                ? "bg-sidebar-accent text-sidebar-primary"
-                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            )}
+            title="Help & Tutorial"
+            aria-label="Help & Tutorial"
+            className={cn(linkBase, pathname === "/help" ? linkActive : linkIdle)}
           >
-            <HelpCircle className="h-4 w-4" />
-            Help &amp; Tutorial
+            <HelpCircle className="h-4 w-4 shrink-0" />
+            <span className="hidden lg:inline">Help &amp; Tutorial</span>
           </Link>
           <Link
             href="/settings"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-              pathname === "/settings"
-                ? "bg-sidebar-accent text-sidebar-primary"
-                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            )}
+            title="Settings"
+            aria-label="Settings"
+            className={cn(linkBase, pathname === "/settings" ? linkActive : linkIdle)}
           >
-            <Settings className="h-4 w-4" />
-            Settings
+            <Settings className="h-4 w-4 shrink-0" />
+            <span className="hidden lg:inline">Settings</span>
           </Link>
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start gap-3 px-3 text-[13px] text-sidebar-foreground/60 hover:text-sidebar-foreground"
+            title="Sign Out"
+            aria-label="Sign Out"
+            className="w-full justify-center gap-3 px-3 text-[13px] text-sidebar-foreground/60 hover:text-sidebar-foreground lg:justify-start"
             onClick={() => signOut({ callbackUrl: "/login" })}
           >
-            <LogOut className="h-4 w-4" />
-            Sign Out
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span className="hidden lg:inline">Sign Out</span>
           </Button>
         </div>
       )}

@@ -37,15 +37,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Phones get the bottom tab bar. From 640px up (a tablet, or a desktop window
+  // snapped to half the screen) the side menu shows, as an icon rail until
+  // there's room for the full sidebar at 1024px.
   return (
     <>
-      <div className="app-nav hidden lg:block">
+      <div className="app-nav hidden sm:block">
         <Navbar />
       </div>
-      <div className="app-nav lg:hidden">
+      <div className="app-nav sm:hidden">
         <MobileNav />
       </div>
-      <main className="flex-1 overflow-auto p-4 pb-28 lg:p-6 lg:pb-6">
+      <main className="min-w-0 flex-1 overflow-auto p-4 pb-28 sm:pb-4 lg:p-6 lg:pb-6">
         <ImpersonationBanner />
         {children}
       </main>
