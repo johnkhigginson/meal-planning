@@ -10,6 +10,7 @@ import { LemonLogo } from "@/components/shared/LemonLogo";
 import { Download, Check, Clock, Users, Loader2, BookOpen, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { groupBySection } from "@/lib/recipe-sections";
+import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
 
 interface SharedRecipe {
   name: string;
@@ -140,7 +141,9 @@ export default function SharePage() {
             </div>
             <div>
               <h3 className="mb-2 text-sm font-semibold">Instructions</h3>
-              <div className="whitespace-pre-wrap text-sm">{data.recipe.instructions}</div>
+              <div className="text-sm">
+                <RecipeInstructions text={data.recipe.instructions} />
+              </div>
             </div>
           </CardContent>
         </Card>

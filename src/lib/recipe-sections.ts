@@ -33,7 +33,9 @@ export function formatSectionHeading(name: string): string {
 // Returns the section name when the line is a heading, else null.
 export function parseSectionHeading(line: string): string | null {
   const match = line.match(DASH_HEADING) || line.match(HASH_HEADING);
-  return match ? cleanSectionName(match[1]) : null;
+  const name = match ? cleanSectionName(match[1]) : null;
+  // A rule of seven dashes would otherwise read as a heading named "-".
+  return name && /[\p{L}\p{N}]/u.test(name) ? name : null;
 }
 
 export interface InstructionSection {
@@ -136,6 +138,11 @@ function headingFromLooseLine(line: string): string | null {
 // Accepts what any of our importers produce: plain strings, `{ text, section }`
 // objects, or a mix, with headings possibly inlined as their own line. Returns
 // one flat list where every line carries the section it belongs to.
+//
+// Only a heading line ("For the topping:") carries forward to the lines after
+// it. A row's own section applies to that row alone: the AI prompts ask for a
+// plain string on any line outside a group, so a trailing "salt and pepper"
+// must not inherit the group above it.
 export function normalizeImportedIngredients(input: unknown): ImportedIngredient[] {
   if (!Array.isArray(input)) return [];
 
@@ -158,11 +165,15 @@ export function normalizeImportedIngredients(input: unknown): ImportedIngredient
       const row = item as { text?: unknown; name?: unknown; section?: unknown; group?: unknown };
       const text = typeof row.text === "string" ? row.text : typeof row.name === "string" ? row.name : "";
       if (!text.trim()) continue;
+      // The scraper wraps every line as an object, so a heading can arrive
+      // here too ("For the crust:" in a flat JSON-LD list).
+      const heading = headingFromLooseLine(text);
+      if (heading) {
+        carried = heading;
+        continue;
+      }
       const section =
         cleanSectionName(typeof row.section === "string" ? row.section : typeof row.group === "string" ? row.group : null);
-      // An explicit section on one row becomes the default for bare strings
-      // that follow it, which is how a partially-structured AI reply reads.
-      if (section !== null) carried = section;
       out.push({ text: text.trim(), section: section ?? carried });
     }
   }

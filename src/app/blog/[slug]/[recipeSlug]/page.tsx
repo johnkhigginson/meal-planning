@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
 import { recipeAuthorName } from "@/lib/recipe-author";
+import { parseInstructionSections } from "@/lib/recipe-sections";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +63,19 @@ function recipeJsonLd(recipe: Awaited<ReturnType<typeof getPublishedRecipe>>) {
   const ingredients = r.ingredients.map(
     (ri) => `${ri.quantity} ${ri.unit.abbreviation} ${ri.ingredient.name}`.trim()
   );
-  const steps = (r.instructions || "")
-    .split("\n")
-    .map((s) => s.replace(/^\s*\d+\.\s*/, "").trim())
-    .filter(Boolean);
+  // Section heading lines ("--- Pot Pie Filling ---") become HowToSections
+  // rather than being published as steps of their own.
+  const toSteps = (body: string) =>
+    body
+      .split("\n")
+      .map((s) => s.replace(/^\s*\d+\.\s*/, "").trim())
+      .filter(Boolean)
+      .map((text) => ({ "@type": "HowToStep", text }));
+  const sections = parseInstructionSections(r.instructions || "");
+  const steps = sections.flatMap((s) => toSteps(s.body));
+  const instructionsLd = sections.flatMap((s): Record<string, unknown>[] =>
+    s.name ? [{ "@type": "HowToSection", name: s.name, itemListElement: toSteps(s.body) }] : toSteps(s.body)
+  );
   if (ingredients.length === 0 && steps.length === 0) return null;
 
   const image = absoluteUrl(r.imageUrl);
@@ -81,7 +91,7 @@ function recipeJsonLd(recipe: Awaited<ReturnType<typeof getPublishedRecipe>>) {
     prepTime: isoDuration(r.prepTimeMinutes),
     cookTime: isoDuration(r.cookTimeMinutes),
     recipeIngredient: ingredients.length ? ingredients : undefined,
-    recipeInstructions: steps.length ? steps.map((text) => ({ "@type": "HowToStep", text })) : undefined,
+    recipeInstructions: steps.length ? instructionsLd : undefined,
     keywords: r.tags.length ? r.tags.map((t) => t.tag.name).join(", ") : undefined,
   };
   return JSON.stringify(data).replace(/</g, "\\u003c");

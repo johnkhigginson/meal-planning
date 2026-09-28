@@ -21,15 +21,28 @@ const NAMED_ENTITIES: Record<string, string> = {
 // JSON-LD recipe fields routinely carry HTML entities ("half &amp; half",
 // "don&#39;t add salt"). Decode them rather than dropping them, which is what
 // used to turn apostrophes into spaces.
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
-    .replace(/&([a-z][a-z0-9]*);/gi, (match, name) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
+// A code point past U+10FFFF makes String.fromCodePoint throw, which turned one
+// bad entity into a failed import.
+function fromCodePoint(match: string, code: number): string {
+  return code <= 0x10ffff ? String.fromCodePoint(code) : match;
 }
 
+function decodeEntities(text: string): string {
+  const once = (s: string) =>
+    s
+      .replace(/&#x([0-9a-f]+);/gi, (m, hex) => fromCodePoint(m, parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (m, dec) => fromCodePoint(m, parseInt(dec, 10)))
+      .replace(/&([a-z][a-z0-9]*);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
+  // Sites often double-encode ("don&amp;#39;t"), so a second pass finishes
+  // the job.
+  return once(once(text));
+}
+
+const stripTags = (text: string) => text.replace(/<[^>]*>/g, "");
+
 function cleanText(text: string): string {
-  return decodeEntities(text.replace(/<[^>]*>/g, ""))
+  // Strip again after decoding, since "&lt;b&gt;" decodes into a tag.
+  return stripTags(decodeEntities(stripTags(text)))
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -77,6 +90,11 @@ const INGREDIENT_ITEM_SELECTORS = [
 const GROUP_HEADING_SELECTOR = 'h2, h3, h4, h5, h6, legend, [class*="group-name"]';
 
 // Headings that label the list as a whole rather than a group inside it.
+// The list's own header often holds serving and unit toggles ("Ingredients
+// 1x2x3x", "US Customary Metric"). Drop those before judging the text, or the
+// unnamed first group gets labeled "Ingredients 1x2x3x".
+const HEADER_CONTROLS = /\b(?:\d+(?:\.\d+)?x)+\b|\b(?:us customary|metric)\b/gi;
+
 const NOT_A_GROUP_NAME =
   /^(ingredients?|equipment|instructions?|directions?|method|notes?|nutrition|what you need)$/i;
 
@@ -117,7 +135,7 @@ export function extractIngredientLines($: cheerio.CheerioAPI): ImportedIngredien
           return;
         }
         if ($(el).is(GROUP_HEADING_SELECTOR)) {
-          const name = cleanSectionName(cleanText($(el).text()));
+          const name = cleanSectionName(cleanText($(el).text()).replace(HEADER_CONTROLS, ""));
           // A long "heading" is almost always a stray paragraph, not a label.
           if (name && name.length <= 80 && !NOT_A_GROUP_NAME.test(name)) section = name;
         }
@@ -265,8 +283,8 @@ export function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
       }
 
       return {
-        name: data.name || "",
-        description: data.description || "",
+        name: cleanText(String(data.name || "")),
+        description: cleanText(String(data.description || "")),
         instructions,
         servings,
         prepTimeMinutes: parseDuration(data.prepTime),
