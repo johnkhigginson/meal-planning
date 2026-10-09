@@ -79,32 +79,37 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
       {/* Right sidebar: search + categories + sort */}
       <aside className="space-y-5 lg:w-56 lg:shrink-0">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search recipes…"
+            aria-label="Search recipes"
             className="pl-9"
           />
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categories</p>
+          <p className="mb-2 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">Categories</p>
           <div className="flex flex-wrap gap-1.5 lg:flex-col lg:items-start">
             <button
+              type="button"
+              aria-pressed={activeTag === null}
               onClick={() => setActiveTag(null)}
-              className={`rounded-full px-2.5 py-1 text-sm transition-colors ${
-                activeTag === null ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              className={`min-h-9 rounded-full px-3 py-1.5 text-sm transition-colors duration-200 ease-out focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                activeTag === null ? "bg-brand font-bold text-brand-foreground" : "font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               All ({posts.length})
             </button>
             {categories.map((c) => (
               <button
+                type="button"
                 key={c.name}
+                aria-pressed={activeTag === c.name}
                 onClick={() => { setActiveTag(c.name); trackEvent("blog_category_filter", { category: c.name }); }}
-                className={`rounded-full px-2.5 py-1 text-sm transition-colors ${
-                  activeTag === c.name ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                className={`min-h-9 rounded-full px-3 py-1.5 text-sm transition-colors duration-200 ease-out focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                  activeTag === c.name ? "bg-brand font-bold text-brand-foreground" : "font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {c.name} ({c.count})
@@ -114,20 +119,24 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sort</p>
+          <p className="mb-2 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">Sort</p>
           <div className="flex gap-1.5">
             <button
+              type="button"
+              aria-pressed={sort === "new"}
               onClick={() => setSort("new")}
-              className={`rounded-full px-2.5 py-1 text-sm transition-colors ${
-                sort === "new" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              className={`min-h-9 rounded-full px-3 py-1.5 text-sm transition-colors duration-200 ease-out focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                sort === "new" ? "bg-brand font-bold text-brand-foreground" : "font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               Newest
             </button>
             <button
+              type="button"
+              aria-pressed={sort === "az"}
               onClick={() => setSort("az")}
-              className={`rounded-full px-2.5 py-1 text-sm transition-colors ${
-                sort === "az" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              className={`min-h-9 rounded-full px-3 py-1.5 text-sm transition-colors duration-200 ease-out focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                sort === "az" ? "bg-brand font-bold text-brand-foreground" : "font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               A–Z
@@ -138,18 +147,18 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
 
       {/* Recipe list */}
       <div className="min-w-0 flex-1">
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm font-semibold text-muted-foreground" aria-live="polite">
           {filtered.length} recipe{filtered.length === 1 ? "" : "s"}
           {activeTag ? ` in “${activeTag}”` : ""}
           {query ? ` matching “${query}”` : ""}
         </p>
-        <div className="space-y-5">
+        <div className="space-y-4">
           {shown.map((recipe) => {
             const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
             const href = `/blog/${bookSlug}/${recipe.slug ?? recipe.id}`;
             return (
-              <Link key={recipe.id} href={href} className="block">
-                <Card className="group overflow-hidden p-0 transition-all hover:shadow-md">
+              <Link key={recipe.id} href={href} className="block rounded-2xl focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                <Card className="group gap-0 overflow-hidden p-0 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]">
                   <div className="flex flex-col sm:flex-row">
                     {recipe.imageUrl && (
                       <div className="relative h-48 w-full shrink-0 overflow-hidden bg-muted sm:h-auto sm:w-52">
@@ -163,7 +172,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                       </div>
                     )}
                     <CardContent className="flex-1 p-5">
-                      <h2 className="font-display text-lg font-semibold group-hover:text-primary">{recipe.name}</h2>
+                      <h2 className="font-display text-xl leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{recipe.name}</h2>
                       {recipe.publishedAt && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {formatDate(recipe.publishedAt)}
@@ -173,19 +182,19 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                       {recipe.description && (
                         <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{recipe.description}</p>
                       )}
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
                         {totalTime > 0 && (
                           <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                             {totalTime}m
                           </span>
                         )}
                         <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
+                          <Users className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                           {recipe.servings}
                         </span>
                         {recipe.tags.slice(0, 3).map((t) => (
-                          <Badge key={t} variant="outline" className="text-[10px]">
+                          <Badge key={t} variant="tag">
                             {t}
                           </Badge>
                         ))}
@@ -197,7 +206,12 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
             );
           })}
           {filtered.length === 0 && (
-            <div className="py-12 text-center text-muted-foreground">No recipes match your search.</div>
+            <div className="flex flex-col items-center gap-3 rounded-3xl border bg-card px-6 py-12 text-center">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+                <Search className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <p className="font-heading text-xl font-semibold">No recipes match your search.</p>
+            </div>
           )}
         </div>
 

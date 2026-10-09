@@ -36,14 +36,14 @@ export function DeleteRecipeButton({ recipeId }: DeleteRecipeButtonProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button variant="outline" size="sm" className="text-destructive" />}
+        render={<Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" />}
       >
         <Trash2 className="mr-1 h-4 w-4" />
         Delete
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Recipe</DialogTitle>
+          <DialogTitle>Delete recipe</DialogTitle>
           <DialogDescription>
             Are you sure you want to delete this recipe? This action cannot be
             undone.

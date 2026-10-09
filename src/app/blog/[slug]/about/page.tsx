@@ -34,20 +34,20 @@ export default async function AboutPage({ params }: PageProps) {
     <BlogShell homeHref={`/blog/${book.slug}`} homeLabel={book.name} aboutHref={`/blog/${book.slug}/about`}>
       <Link
         href={`/blog/${book.slug}`}
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-4 inline-flex items-center gap-1 rounded text-sm font-bold text-muted-foreground transition-colors duration-200 ease-out hover:text-foreground focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <ArrowLeft className="h-4 w-4" /> {book.name}
       </Link>
 
-      <h1 className="font-display text-4xl font-semibold tracking-tight">About</h1>
+      <h1 className="font-display text-4xl leading-tight font-semibold tracking-tight">About</h1>
       {book.description && <p className="mt-2 text-muted-foreground">{book.description}</p>}
 
-      <div className="mt-8 space-y-8">
+      <div className="mt-8 space-y-4">
         {shown.length === 0 && (
           <p className="text-muted-foreground">The cooks behind {book.name}.</p>
         )}
         {shown.map((author) => (
-          <div key={author.id} className="flex gap-4">
+          <div key={author.id} className="flex gap-4 rounded-2xl border bg-card p-5">
             {author.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -56,11 +56,11 @@ export default async function AboutPage({ params }: PageProps) {
                 className="h-16 w-16 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-xl font-semibold text-muted-foreground">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-soft font-heading text-2xl font-semibold text-primary">
                 {author.name.charAt(0).toUpperCase()}
               </div>
             )}
-            <div>
+            <div className="min-w-0">
               <h2 className="font-display text-xl font-semibold">{author.name}</h2>
               {author.bio ? (
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{author.bio}</p>

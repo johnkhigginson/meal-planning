@@ -16,12 +16,13 @@ export function SearchInput({
 }: SearchInputProps) {
   return (
     <div className="relative">
-      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
       <Input
         type="search"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={placeholder.replace(/\.+$/, "")}
         className="pl-9"
       />
     </div>

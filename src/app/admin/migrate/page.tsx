@@ -256,15 +256,15 @@ export default function MigratePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-2">
-        <Link href="/admin">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+      <div className="flex items-start gap-2">
+        <Link href="/admin" aria-label="Back to admin" className="mt-1 rounded-full focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <Button variant="ghost" size="icon" className="h-9 w-9" tabIndex={-1}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Import from Blogger</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-3xl leading-tight font-medium">Import from Blogger</h1>
+          <p className="text-muted-foreground">
             Migrate a Blogspot blog into a cookbook. Each post becomes a recipe with its
             original content preserved.
           </p>
@@ -273,7 +273,7 @@ export default function MigratePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base font-bold">
             <Rss className="h-4 w-4 text-primary" /> Source
           </CardTitle>
         </CardHeader>
@@ -295,7 +295,7 @@ export default function MigratePage() {
 
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">or upload export</span>
+            <span className="text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">or upload export</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
@@ -316,7 +316,7 @@ export default function MigratePage() {
               {file && (
                 <span className="text-xs text-muted-foreground">
                   {file.name}{" "}
-                  <button className="underline" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}>
+                  <button type="button" className="font-bold text-primary underline" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}>
                     remove
                   </button>
                 </span>
@@ -363,7 +363,7 @@ export default function MigratePage() {
                 {selectedOwner?.household && (
                   <>
                     {" "}
-                    Importing into <span className="font-medium">{selectedOwner.household.name}</span>.
+                    Importing into <span className="font-bold">{selectedOwner.household.name}</span>.
                   </>
                 )}
               </p>
@@ -371,7 +371,7 @@ export default function MigratePage() {
           )}
 
           <p className="text-xs text-muted-foreground">
-            Re-running is safe: posts already imported are <span className="font-medium">updated</span> in
+            Re-running is safe: posts already imported are <span className="font-bold">updated</span> in
             place (description, full post content, photo) rather than duplicated.
           </p>
 
@@ -381,7 +381,7 @@ export default function MigratePage() {
           </Button>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -392,8 +392,8 @@ export default function MigratePage() {
       {result && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CheckCircle2 className="h-4 w-4 text-green-600" /> Import complete
+            <CardTitle className="flex items-center gap-2 text-base font-bold">
+              <CheckCircle2 className="h-4 w-4 text-leaf-ink" /> Import complete
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -403,7 +403,7 @@ export default function MigratePage() {
               <Stat label="Total posts" value={result.totalPosts} />
             </div>
             <p className="text-muted-foreground">
-              Added to <span className="font-medium text-foreground">{result.bookName}</span>.
+              Added to <span className="font-bold text-foreground">{result.bookName}</span>.
               {result.importedComments > 0 && ` Imported ${result.importedComments} comment${result.importedComments === 1 ? "" : "s"}.`}
               {" "}Next, run AI extraction below to pull structured ingredients from the posts.
             </p>
@@ -416,8 +416,8 @@ export default function MigratePage() {
               </Link>
             </div>
             {result.errors.length > 0 && (
-              <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
-                <p className="mb-1 font-medium">Some posts had issues:</p>
+              <div className="rounded-xl bg-muted p-3">
+                <p className="mb-1 font-bold">Some posts had issues:</p>
                 <ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
                   {result.errors.map((e, i) => (
                     <li key={i}>{e}</li>
@@ -433,14 +433,14 @@ export default function MigratePage() {
           owner; processes in batches and loops until done. */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base font-bold">
             <Sparkles className="h-4 w-4 text-primary" /> Extract ingredients with AI
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="text-muted-foreground">
             Reads each imported post and pulls out structured ingredients and steps
-            {selectedOwner ? <> for <span className="font-medium text-foreground">{selectedOwner.name}</span></> : null}.
+            {selectedOwner ? <> for <span className="font-bold text-foreground">{selectedOwner.name}</span></> : null}.
             Posts without a real recipe are skipped. Safe to run repeatedly — it only
             processes recipes it hasn&apos;t handled yet.
           </p>
@@ -460,15 +460,15 @@ export default function MigratePage() {
           </p>
 
           {aiProgress && (
-            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
-              Processed <span className="font-medium">{aiProgress.processed}</span> · added ingredients to{" "}
-              <span className="font-medium">{aiProgress.withIngredients}</span> · {aiProgress.remaining} remaining
+            <div className="rounded-xl bg-muted p-3 text-xs">
+              Processed <span className="font-bold">{aiProgress.processed}</span> · added ingredients to{" "}
+              <span className="font-bold">{aiProgress.withIngredients}</span> · {aiProgress.remaining} remaining
               {aiProgress.done && " · done ✓"}
             </div>
           )}
 
           {aiError && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
+            <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{aiError}</span>
             </div>
@@ -479,7 +479,7 @@ export default function MigratePage() {
       {/* Self-host photos — download externally-linked images into the app. */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base font-bold">
             <ImageDown className="h-4 w-4 text-primary" /> Self-host photos
           </CardTitle>
         </CardHeader>
@@ -499,14 +499,14 @@ export default function MigratePage() {
             </Button>
           </div>
           {imgProgress && (
-            <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-xs">
-              Self-hosted <span className="font-medium">{imgProgress.converted}</span>
+            <div className="rounded-xl bg-muted p-3 text-xs">
+              Self-hosted <span className="font-bold">{imgProgress.converted}</span>
               {imgProgress.failed > 0 && <> · {imgProgress.failed} kept original link</>} ·{" "}
               {imgProgress.remaining} remaining{imgProgress.done && " · done ✓"}
             </div>
           )}
           {imgError && (
-            <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
+            <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{imgError}</span>
             </div>
@@ -519,9 +519,9 @@ export default function MigratePage() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-3 text-center">
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
+    <div className="rounded-xl border bg-card p-3 text-center">
+      <div className="font-heading text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
     </div>
   );
 }

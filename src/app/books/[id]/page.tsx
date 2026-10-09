@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +14,7 @@ import {
 import { SearchInput } from "@/components/shared/SearchInput";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink, UserPlus, UserRound, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink, UserPlus, UserRound, X, BookOpen, UtensilsCrossed } from "lucide-react";
 import { recipeAuthorName } from "@/lib/recipe-author";
 
 interface BookRecipe {
@@ -194,72 +195,78 @@ export default function BookDetailPage() {
   }
 
   if (loading) return <PageLoader />;
-  if (!book) return <div className="text-muted-foreground">Book not found</div>;
+  if (!book) return <div className="mx-auto max-w-6xl text-muted-foreground">Book not found</div>;
 
   const existingIds = new Set(book.entries.map((e) => e.recipe.id));
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Link href="/books">
-            <Button variant="ghost" size="icon" className="h-8 w-8"><ArrowLeft className="h-4 w-4" /></Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold">{book.name}</h1>
-            {book.description && <p className="text-sm text-muted-foreground">{book.description}</p>}
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="space-y-4">
+        <Link
+          href="/books"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-full text-sm font-bold text-primary hover:underline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Recipe books
+        </Link>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-4xl leading-tight font-medium text-balance">{book.name}</h1>
+            {book.description && <p className="max-w-2xl text-muted-foreground">{book.description}</p>}
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={book.isPublished ? "secondary" : "outline"}
-            size="sm"
-            onClick={togglePublish}
-            disabled={publishing}
-          >
-            {publishing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Globe className="mr-2 h-3.5 w-3.5" />}
-            {book.isPublished ? "Published" : "Publish"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={shareBook} disabled={sharing}>
-            {sharing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Share2 className="mr-2 h-3.5 w-3.5" />}
-            Share
-          </Button>
-          <Link href={`/recipes/new?bookId=${book.id}`}>
-            <Button variant="outline" size="sm">
-              <Plus className="mr-2 h-3.5 w-3.5" />
-              New Recipe
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={book.isPublished ? "default" : "outline"}
+              className="h-10"
+              aria-pressed={book.isPublished}
+              onClick={togglePublish}
+              disabled={publishing}
+            >
+              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+              {book.isPublished ? "Published" : "Publish"}
             </Button>
-          </Link>
-          <Button size="sm" onClick={() => { setAddOpen(true); setSearch(""); setAddedIds(new Set()); }}>
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Add Recipes
-          </Button>
+            <Button variant="outline" className="h-10" onClick={shareBook} disabled={sharing}>
+              {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+              Share
+            </Button>
+            <Link href={`/recipes/new?bookId=${book.id}`} className={cn(buttonVariants({ variant: "outline" }), "h-10")}>
+              <Plus className="h-4 w-4" />
+              New recipe
+            </Link>
+            <Button className="h-10" onClick={() => { setAddOpen(true); setSearch(""); setAddedIds(new Set()); }}>
+              <Plus className="h-4 w-4" />
+              Add recipes
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Public blog link */}
       {book.isPublished && book.slug && (
-        <div className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-col gap-3 rounded-2xl border bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <Globe className="h-4 w-4 text-primary" />
             <span className="text-muted-foreground">Live publicly at</span>
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/blog/{book.slug}</code>
+            <code className="rounded-lg bg-muted px-1.5 py-0.5 text-xs">/blog/{book.slug}</code>
           </div>
-          <a href={`/blog/${book.slug}`} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="outline">
-              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-              View blog
-            </Button>
+          <a
+            href={`/blog/${book.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: "outline" }), "h-10 self-start sm:self-auto")}
+          >
+            <ExternalLink className="h-4 w-4" />
+            View blog
           </a>
         </div>
       )}
 
       {/* Share URL */}
       {shareUrl && (
-        <div className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2 rounded-2xl border bg-card px-5 py-3">
           <span className="flex-1 truncate text-sm text-muted-foreground">{shareUrl}</span>
-          <Button size="sm" variant="outline" onClick={copyShareUrl}>
-            {copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+          <Button variant="outline" className="h-10" onClick={copyShareUrl}>
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>
@@ -267,91 +274,117 @@ export default function BookDetailPage() {
 
       {/* Collaborators (cookbook owner only) */}
       {isOwner && (
-        <div className="rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <UserPlus className="h-4 w-4 text-primary" /> Collaborators
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+        <section aria-labelledby="collab-heading" className="rounded-2xl border bg-card p-5">
+          <h2 id="collab-heading" className="flex items-center gap-2 font-heading text-xl font-semibold">
+            <UserPlus className="h-5 w-5 text-primary" /> Collaborators
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Invite people from other households to help with this cookbook. They keep their own
             kitchen and can be credited as recipe authors. No account yet? They&apos;ll get an email
             inviting them to sign up and accept.
           </p>
           {collaborators.length > 0 && (
-            <div className="mt-3 space-y-1.5">
+            <ul className="mt-4 space-y-1.5">
               {collaborators.map((c) => (
-                <div key={c.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-1.5 text-sm">
-                  <span>{c.name} <span className="text-muted-foreground">· {c.email}</span></span>
-                  <button onClick={() => removeCollaborator(c.id)} className="text-muted-foreground hover:text-destructive" title="Remove">
-                    <X className="h-3.5 w-3.5" />
+                <li key={c.id} className="flex items-center justify-between gap-2 rounded-xl bg-muted py-1 pr-1 pl-3 text-sm">
+                  <span className="min-w-0 truncate"><span className="font-bold">{c.name}</span> <span className="text-muted-foreground">· {c.email}</span></span>
+                  <button
+                    onClick={() => removeCollaborator(c.id)}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 ease-out hover:bg-card hover:text-destructive"
+                    title="Remove"
+                    aria-label={`Remove ${c.name}`}
+                  >
+                    <X className="h-4 w-4" />
                   </button>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
           {invites.length > 0 && (
-            <div className="mt-3 space-y-1.5">
+            <ul className="mt-3 space-y-1.5">
               {invites.map((i) => (
-                <div key={i.email} className="flex items-center justify-between rounded-lg border border-dashed border-border/60 px-3 py-1.5 text-sm">
-                  <span className="text-muted-foreground">{i.email} · invited (pending)</span>
-                  <button onClick={() => removeInvite(i.email)} className="text-muted-foreground hover:text-destructive" title="Cancel invite">
-                    <X className="h-3.5 w-3.5" />
+                <li key={i.email} className="flex items-center justify-between gap-2 rounded-xl border-[1.5px] border-dashed border-input py-1 pr-1 pl-3 text-sm">
+                  <span className="min-w-0 truncate text-muted-foreground">{i.email} · invited (pending)</span>
+                  <button
+                    onClick={() => removeInvite(i.email)}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-destructive"
+                    title="Cancel invite"
+                    aria-label={`Cancel invite for ${i.email}`}
+                  >
+                    <X className="h-4 w-4" />
                   </button>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Input
               type="email"
               placeholder="collaborator@email.com"
+              aria-label="Collaborator email"
               value={collabEmail}
               onChange={(e) => { setCollabEmail(e.target.value); setCollabError(""); }}
               onKeyDown={(e) => e.key === "Enter" && addCollaborator()}
-              className="max-w-xs"
+              className="sm:max-w-xs"
             />
-            <Button size="sm" onClick={addCollaborator} disabled={collabBusy || !collabEmail.trim()}>
-              {collabBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+            <Button className="h-10 self-start" onClick={addCollaborator} disabled={collabBusy || !collabEmail.trim()}>
+              {collabBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               Add
             </Button>
           </div>
-          {collabError && <p className="mt-1.5 text-xs text-destructive">{collabError}</p>}
-          {collabNotice && <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">{collabNotice}</p>}
-        </div>
+          {collabError && <p role="alert" className="mt-2 text-sm text-destructive">{collabError}</p>}
+          {collabNotice && <p role="status" className="mt-2 rounded-xl bg-leaf-soft px-3 py-2 text-sm text-leaf-ink">{collabNotice}</p>}
+        </section>
       )}
 
       {/* Recipe list */}
       {book.entries.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          No recipes in this book yet. Click &quot;Add Recipes&quot; to get started.
+        <div className="flex flex-col items-center gap-3 rounded-3xl border-[1.5px] border-dashed border-input px-6 py-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <BookOpen className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">No recipes in this book yet</p>
+          <p className="text-muted-foreground">Click &quot;Add recipes&quot; to get started.</p>
+          <Button size="lg" onClick={() => { setAddOpen(true); setSearch(""); setAddedIds(new Set()); }}>
+            <Plus className="h-4 w-4" />
+            Add recipes
+          </Button>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {book.entries.map((entry) => {
             const recipe = entry.recipe;
             const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
             return (
-              <Card key={entry.id} className="group overflow-hidden transition-all hover:shadow-md">
-                {recipe.imageUrl && (
-                  <Link href={`/recipes/${recipe.id}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={recipe.imageUrl} alt={recipe.name} className="h-32 w-full object-cover" />
-                  </Link>
-                )}
-                <CardContent className="p-5">
+              <Card
+                key={entry.id}
+                className="group gap-0 py-0 hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]"
+              >
+                <Link href={`/recipes/${recipe.id}`} tabIndex={-1} aria-hidden="true" className="block aspect-[4/3] w-full overflow-hidden bg-accent">
+                  {recipe.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={recipe.imageUrl} alt={recipe.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <UtensilsCrossed className="h-6 w-6 text-primary/50" />
+                    </div>
+                  )}
+                </Link>
+                <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/recipes/${recipe.id}`} className="flex-1">
-                      <h3 className="text-sm font-semibold group-hover:text-primary transition-colors">{recipe.name}</h3>
-                      {recipe.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{recipe.description}</p>}
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{totalTime}m</span>}
-                        <span className="flex items-center gap-1"><Users className="h-3 w-3" />{recipe.servings}</span>
+                    <Link href={`/recipes/${recipe.id}`} className="min-w-0 flex-1 rounded-lg focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                      <h3 className="font-heading text-lg leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{recipe.name}</h3>
+                      {recipe.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{recipe.description}</p>}
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
+                        {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{totalTime}m</span>}
+                        <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{recipe.servings}</span>
                         {recipeAuthorName(recipe) && (
-                          <span className="flex items-center gap-1"><UserRound className="h-3 w-3" />{recipeAuthorName(recipe)}</span>
+                          <span className="flex items-center gap-1"><UserRound className="h-3.5 w-3.5" />{recipeAuthorName(recipe)}</span>
                         )}
                       </div>
                     </Link>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive" onClick={() => removeRecipe(recipe.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
+                    <Button variant="ghost" size="icon" className="size-10 shrink-0 text-destructive hover:text-destructive" aria-label={`Remove ${recipe.name} from book`} onClick={() => removeRecipe(recipe.id)}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -364,16 +397,16 @@ export default function BookDetailPage() {
       {/* Add recipe dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add Recipes to Book</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add recipes to book</DialogTitle></DialogHeader>
           <SearchInput value={search} onChange={setSearch} placeholder="Search your recipes..." />
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {searchResults.map((recipe) => {
               const alreadyIn = existingIds.has(recipe.id) || addedIds.has(recipe.id);
               return (
-                <div key={recipe.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-muted">
-                  <span className="text-sm">{recipe.name}</span>
+                <div key={recipe.id} className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 transition-colors duration-200 ease-out hover:bg-muted">
+                  <span className="text-sm font-semibold">{recipe.name}</span>
                   <Button size="sm" variant={alreadyIn ? "secondary" : "default"} disabled={alreadyIn} onClick={() => addRecipe(recipe.id)}>
-                    {alreadyIn ? <><Check className="mr-1 h-3 w-3" /> Added</> : <><Plus className="mr-1 h-3 w-3" /> Add</>}
+                    {alreadyIn ? <><Check className="h-3.5 w-3.5" /> Added</> : <><Plus className="h-3.5 w-3.5" /> Add</>}
                   </Button>
                 </div>
               );

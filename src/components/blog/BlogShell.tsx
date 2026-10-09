@@ -7,7 +7,7 @@ import { LemonLogo } from "@/components/shared/LemonLogo";
 export function BlogShell({
   children,
   homeHref = "/blog",
-  homeLabel = "Recipe Blog",
+  homeLabel = "Recipe blog",
   aboutHref,
   headerAction,
   wide = false,
@@ -22,19 +22,28 @@ export function BlogShell({
 }) {
   const width = wide ? "max-w-5xl" : "max-w-3xl";
   return (
-    <div className="flex min-h-screen flex-col bg-[#fdfcf8] text-stone-800 dark:bg-background dark:text-foreground">
-      <header className="sticky top-0 z-40 border-b border-stone-200/80 bg-[#fdfcf8]/85 backdrop-blur dark:border-border/60 dark:bg-background/85">
-        <div className={`mx-auto flex ${width} items-center justify-between gap-2 px-4 py-3.5`}>
-          <Link href={homeHref} className="flex items-center gap-2">
-            <LemonLogo className="h-7 w-7" />
-            <span className="font-display text-lg font-semibold tracking-tight">{homeLabel}</span>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur print:hidden">
+        <div className={`mx-auto flex ${width} items-center justify-between gap-3 px-4 py-3`}>
+          <Link
+            href={homeHref}
+            className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <LemonLogo className="h-7 w-7 shrink-0" />
+            <span className="truncate font-display text-lg font-semibold tracking-tight">{homeLabel}</span>
           </Link>
-          <nav className="flex items-center gap-5 text-sm text-stone-500 dark:text-muted-foreground">
-            <Link href={homeHref} className="transition-colors hover:text-stone-900 dark:hover:text-foreground">
+          <nav className="flex shrink-0 items-center gap-4 text-sm font-bold text-muted-foreground sm:gap-5">
+            <Link
+              href={homeHref}
+              className="rounded transition-colors duration-200 ease-out hover:text-foreground focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
               Recipes
             </Link>
             {aboutHref && (
-              <Link href={aboutHref} className="transition-colors hover:text-stone-900 dark:hover:text-foreground">
+              <Link
+                href={aboutHref}
+                className="rounded transition-colors duration-200 ease-out hover:text-foreground focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
                 About
               </Link>
             )}
@@ -45,8 +54,8 @@ export function BlogShell({
 
       <main className={`mx-auto w-full ${width} flex-1 px-4 py-10`}>{children}</main>
 
-      <footer className="mt-8 border-t border-stone-200/80 py-8 dark:border-border/60">
-        <div className={`mx-auto ${width} flex items-center gap-2 px-4 text-xs text-stone-400 dark:text-muted-foreground`}>
+      <footer className="mt-8 border-t py-8 print:hidden">
+        <div className={`mx-auto ${width} flex items-center gap-2 px-4 text-xs text-muted-foreground`}>
           <LemonLogo className="h-4 w-4" />
           Powered by My Lemon Kitchen
         </div>
@@ -57,8 +66,8 @@ export function BlogShell({
 
 // Tailwind-only article styling for preserved blog HTML (no typography plugin).
 export const PROSE_CLASS =
-  "max-w-none text-[15px] leading-7 text-foreground [&_a]:text-primary [&_a]:underline " +
-  "[&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:font-display [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:font-display [&_h3]:text-lg [&_h3]:font-semibold " +
-  "[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 " +
-  "[&_img]:my-4 [&_img]:max-w-full [&_img]:rounded-xl [&_img]:h-auto [&_blockquote]:border-l-4 [&_blockquote]:border-border " +
-  "[&_blockquote]:pl-4 [&_blockquote]:italic [&_table]:my-3 [&_iframe]:max-w-full";
+  "max-w-none text-base leading-7 text-foreground [&_a]:font-bold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 " +
+  "[&_h2]:mt-8 [&_h2]:mb-2 [&_h2]:font-display [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:font-display [&_h3]:text-xl [&_h3]:font-semibold " +
+  "[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_li]:marker:text-primary " +
+  "[&_strong]:font-bold [&_img]:my-5 [&_img]:max-w-full [&_img]:rounded-2xl [&_img]:h-auto [&_blockquote]:my-5 [&_blockquote]:rounded-2xl [&_blockquote]:bg-muted " +
+  "[&_blockquote]:px-5 [&_blockquote]:py-3 [&_blockquote]:font-display [&_blockquote]:italic [&_table]:my-3 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_iframe]:max-w-full";

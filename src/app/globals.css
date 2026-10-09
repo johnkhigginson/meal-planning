@@ -9,7 +9,15 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-nunito-sans);
   --font-mono: var(--font-nunito-sans);
-  --font-heading: var(--font-nunito);
+  --font-heading: var(--font-display), Georgia, "Times New Roman", serif;
+  /* Brand: lemon fills (primary buttons, active nav). Text on lemon is ink.
+     `primary` stays a text-safe colour because ~60 screens use text-primary. */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-leaf: var(--leaf);
+  --color-leaf-soft: var(--leaf-soft);
+  --color-leaf-ink: var(--leaf-ink);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,73 +56,87 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Warm kitchen palette. Contrast on --background: foreground 16:1,
+   muted-foreground 5.6:1, primary (link gold) 5.9:1. Ink on --brand 11:1. */
 :root {
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.1 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.1 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.1 0 0);
-  --primary: oklch(0.1 0 0);
-  --primary-foreground: oklch(0.97 0.17 102);
-  --secondary: oklch(0.96 0.03 102);
-  --secondary-foreground: oklch(0.15 0 0);
-  --muted: oklch(0.955 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.96 0.03 102);
-  --accent-foreground: oklch(0.15 0 0);
+  --background: #fbf7ee;
+  --foreground: #1f1b14;
+  --card: #fffdf8;
+  --card-foreground: #1f1b14;
+  --popover: #fffdf8;
+  --popover-foreground: #1f1b14;
+  --primary: #7a5c00;
+  --primary-foreground: #fffdf8;
+  --secondary: #f3ecdc;
+  --secondary-foreground: #1f1b14;
+  --muted: #f3ecdc;
+  --muted-foreground: #6b6355;
+  --accent: #fbefc2;
+  --accent-foreground: #1f1b14;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0 0);
-  --input: oklch(0.91 0 0);
-  --ring: oklch(0.1 0 0);
-  --chart-1: oklch(0.97 0.17 102);
-  --chart-2: oklch(0.1 0 0);
-  --chart-3: oklch(0.65 0.1 80);
-  --chart-4: oklch(0.55 0.15 280);
-  --chart-5: oklch(0.5 0.12 30);
+  --border: #e8e0cf;
+  --input: #d8ccb2;
+  --ring: #1f1b14;
+  --brand: #f4cf3a;
+  --brand-foreground: #1f1b14;
+  --brand-soft: #fbefc2;
+  --leaf: #3f7d20;
+  --leaf-soft: #eaf3e0;
+  --leaf-ink: #2f5f18;
+  --chart-1: #f4cf3a;
+  --chart-2: #1f1b14;
+  --chart-3: #7a5c00;
+  --chart-4: #3f7d20;
+  --chart-5: #c2410c;
   --radius: 0.625rem;
-  --sidebar: oklch(0.1 0 0);
-  --sidebar-foreground: oklch(0.85 0 0);
-  --sidebar-primary: oklch(0.97 0.17 102);
-  --sidebar-primary-foreground: oklch(0.1 0 0);
-  --sidebar-accent: oklch(0.18 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.2 0 0);
-  --sidebar-ring: oklch(0.97 0.17 102);
+  --sidebar: #fffdf8;
+  --sidebar-foreground: #4e473b;
+  --sidebar-primary: #f4cf3a;
+  --sidebar-primary-foreground: #1f1b14;
+  --sidebar-accent: #f3ecdc;
+  --sidebar-accent-foreground: #1f1b14;
+  --sidebar-border: #e8e0cf;
+  --sidebar-ring: #1f1b14;
 }
 
 .dark {
-  --background: oklch(0.1 0 0);
-  --foreground: oklch(0.94 0 0);
-  --card: oklch(0.15 0 0);
-  --card-foreground: oklch(0.94 0 0);
-  --popover: oklch(0.15 0 0);
-  --popover-foreground: oklch(0.94 0 0);
-  --primary: oklch(0.97 0.17 102);
-  --primary-foreground: oklch(0.1 0 0);
-  --secondary: oklch(0.2 0.02 102);
-  --secondary-foreground: oklch(0.9 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.2 0.02 102);
-  --accent-foreground: oklch(0.9 0 0);
+  --background: #17140f;
+  --foreground: #f3ede0;
+  --card: #211d16;
+  --card-foreground: #f3ede0;
+  --popover: #211d16;
+  --popover-foreground: #f3ede0;
+  --primary: #f4cf3a;
+  --primary-foreground: #1f1b14;
+  --secondary: #2b261d;
+  --secondary-foreground: #f3ede0;
+  --muted: #2b261d;
+  --muted-foreground: #a89f8c;
+  --accent: #3a3014;
+  --accent-foreground: #f3ede0;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.97 0.17 102);
-  --chart-1: oklch(0.97 0.17 102);
-  --chart-2: oklch(0.65 0.12 200);
-  --chart-3: oklch(0.7 0.1 80);
-  --chart-4: oklch(0.6 0.15 280);
-  --chart-5: oklch(0.55 0.12 30);
-  --sidebar: oklch(0.08 0 0);
-  --sidebar-foreground: oklch(0.85 0 0);
-  --sidebar-primary: oklch(0.97 0.17 102);
-  --sidebar-primary-foreground: oklch(0.1 0 0);
-  --sidebar-accent: oklch(0.15 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.97 0.17 102);
+  --border: rgb(243 237 224 / 12%);
+  --input: rgb(243 237 224 / 18%);
+  --ring: #f4cf3a;
+  --brand: #f4cf3a;
+  --brand-foreground: #1f1b14;
+  --brand-soft: #3a3014;
+  --leaf: #3f7d20; /* white check 5:1; 3.6:1 against the dark page */
+  --leaf-soft: #1f2e17;
+  --leaf-ink: #a6d98a;
+  --chart-1: #f4cf3a;
+  --chart-2: #f3ede0;
+  --chart-3: #c9a227;
+  --chart-4: #7cbf52;
+  --chart-5: #f08a5d;
+  --sidebar: #110f0b;
+  --sidebar-foreground: #c9c0ad;
+  --sidebar-primary: #f4cf3a;
+  --sidebar-primary-foreground: #1f1b14;
+  --sidebar-accent: #2b261d;
+  --sidebar-accent-foreground: #f3ede0;
+  --sidebar-border: rgb(243 237 224 / 10%);
+  --sidebar-ring: #f4cf3a;
 }
 
 @layer base {
@@ -125,6 +147,12 @@
     @apply bg-background text-foreground;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+  }
+  /* Page titles take the serif across every screen. h2 and below stay sans
+     because many are small uppercase section labels. */
+  h1 {
+    @apply font-heading;
+    letter-spacing: -0.015em;
   }
   html {
     @apply font-sans;
@@ -150,6 +178,33 @@
   .app-nav {
     display: none !important;
   }
+}
+
+/* Landing hero lemon (components/landing/LemonSlice.tsx): segments draw in
+   from the centre and the flesh pops on load. Skipped for reduced motion. */
+.lemon-seg {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 0;
+}
+.lemon-flesh {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lemon-seg {
+    animation: lemon-draw 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .lemon-flesh {
+    animation: lemon-pop 700ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+  }
+}
+@keyframes lemon-draw {
+  from { stroke-dashoffset: 160; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes lemon-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 /* Editorial serif for the public blog's display headings. */

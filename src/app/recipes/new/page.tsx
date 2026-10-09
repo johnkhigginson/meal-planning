@@ -10,8 +10,8 @@ export default async function NewRecipePage({ searchParams }: PageProps) {
   const validBookId = parsedBookId && !Number.isNaN(parsedBookId) ? parsedBookId : undefined;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold">{validBookId ? "Add Recipe to Cookbook" : "Add Recipe"}</h1>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <h1 className="text-3xl leading-tight font-medium">{validBookId ? "Add recipe to cookbook" : "Add recipe"}</h1>
       <RecipeForm bookId={validBookId} />
     </div>
   );

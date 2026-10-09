@@ -22,7 +22,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
-import { Plus, Trash2, Save, Upload, Camera, Loader2, Receipt } from "lucide-react";
+import { Plus, Trash2, Save, Upload, Camera, Loader2, Receipt, Package } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Unit {
@@ -386,10 +386,10 @@ export default function PantryPage() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Pantry</h1>
-        <div className="flex gap-2">
+        <h1 className="text-4xl leading-tight font-medium">Pantry</h1>
+        <div className="flex flex-wrap gap-2">
           <input
             ref={receiptInputRef}
             type="file"
@@ -400,26 +400,27 @@ export default function PantryPage() {
           />
           <Button
             variant="outline"
+            size="lg"
             onClick={() => receiptInputRef.current?.click()}
             disabled={parsingReceipt}
           >
             {parsingReceipt ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Receipt className="mr-2 h-4 w-4" />
+              <Receipt className="h-4 w-4 text-primary" />
             )}
-            {parsingReceipt ? "Scanning..." : "Scan Receipt"}
+            {parsingReceipt ? "Scanning..." : "Scan receipt"}
           </Button>
-          <Button onClick={() => setShowAdd(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
+          <Button size="lg" onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add item
           </Button>
         </div>
       </div>
 
       {receiptError && (
-        <Card className="border-destructive">
-          <CardContent className="py-3 text-sm text-destructive">
+        <Card className="border-destructive/50 bg-destructive/5" role="alert">
+          <CardContent className="text-sm font-semibold text-destructive">
             {receiptError}
           </CardContent>
         </Card>
@@ -433,10 +434,11 @@ export default function PantryPage() {
 
       {/* Add Item Form */}
       {showAdd && (
-        <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+        <div className="rounded-2xl border bg-card p-4 sm:p-5">
           <div className="space-y-3">
             <div ref={suggestRef} className="relative">
               <Input
+                aria-label="Ingredient name"
                 placeholder="Ingredient name"
                 value={addQuery}
                 onChange={(e) => {
@@ -448,12 +450,12 @@ export default function PantryPage() {
                 autoFocus
               />
               {showSuggestions && addQuery.length >= 2 && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border bg-popover shadow-md">
                   {suggestions.map((s) => (
                     <button
                       key={s.id}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                      className="w-full px-3 py-2.5 text-left text-sm transition-colors duration-200 ease-out hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                       onClick={() => {
                         setSelectedIngredient(s);
                         setAddQuery(s.name);
@@ -468,7 +470,7 @@ export default function PantryPage() {
                   ) && (
                     <button
                       type="button"
-                      className="w-full border-t px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent"
+                      className="w-full border-t px-3 py-2.5 text-left text-sm font-bold text-primary transition-colors duration-200 ease-out hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                       onClick={createAndAddIngredient}
                     >
                       Create &quot;{addQuery}&quot;
@@ -486,12 +488,13 @@ export default function PantryPage() {
                 onChange={(e) => setAddQty(parseFloat(e.target.value) || 0)}
                 className="w-20"
                 placeholder="Qty"
+                aria-label="Quantity"
               />
               <Select
                 value={addUnitId ? addUnitId.toString() : undefined}
                 onValueChange={(v) => v && setAddUnitId(parseInt(v, 10))}
               >
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1" aria-label="Unit">
                   <SelectValue placeholder="Unit">
                     {addUnitId ? units.find((u) => u.id === addUnitId)?.name ?? "" : null}
                   </SelectValue>
@@ -517,11 +520,11 @@ export default function PantryPage() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={addItem} disabled={!selectedIngredient}>
-                <Save className="mr-2 h-4 w-4" />
+              <Button size="lg" className="flex-1" onClick={addItem} disabled={!selectedIngredient}>
+                <Save className="h-4 w-4" />
                 Save
               </Button>
-              <Button variant="outline" onClick={resetAdd}>
+              <Button size="lg" variant="outline" onClick={resetAdd}>
                 Cancel
               </Button>
             </div>
@@ -531,19 +534,29 @@ export default function PantryPage() {
 
       {/* Pantry items */}
       {filtered.length === 0 && !showAdd ? (
-        <div className="py-12 text-center text-muted-foreground">
-          No items in pantry. Tap &quot;Add Item&quot; or &quot;Scan Receipt&quot; to get started.
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input px-6 py-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <Package className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">No items in pantry</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Tap &quot;Add item&quot; or &quot;Scan receipt&quot; to get started.
+          </p>
+          <Button size="lg" className="mt-1" onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add item
+          </Button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <ul className="space-y-2">
           {filtered.map((item) => (
-            <div
+            <li
               key={item.id}
-              className="flex items-center justify-between rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm"
+              className="flex items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3"
             >
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">{item.ingredient.name}</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="font-bold">{item.ingredient.name}</div>
+                <div className="mt-0.5 text-sm text-muted-foreground">
                   {editingId === item.id ? (
                     <span className="inline-flex items-center gap-1">
                       <Input
@@ -552,7 +565,8 @@ export default function PantryPage() {
                         step="any"
                         value={editQty}
                         onChange={(e) => setEditQty(parseFloat(e.target.value) || 0)}
-                        className="h-6 w-16 text-xs"
+                        className="h-8 w-20 text-sm"
+                        aria-label={`Quantity of ${item.ingredient.name}`}
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === "Enter") saveEdit(item);
@@ -560,8 +574,14 @@ export default function PantryPage() {
                         }}
                       />
                       {item.unit.abbreviation}
-                      <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => saveEdit(item)}>
-                        <Save className="h-3 w-3" />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-8 text-primary"
+                        onClick={() => saveEdit(item)}
+                        aria-label="Save quantity"
+                      >
+                        <Save className="h-4 w-4" />
                       </Button>
                     </span>
                   ) : (
@@ -570,27 +590,28 @@ export default function PantryPage() {
                         setEditingId(item.id);
                         setEditQty(item.quantity);
                       }}
-                      className="hover:underline"
+                      className="rounded-md font-bold text-foreground tabular-nums underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                     >
                       {item.quantity} {item.unit.abbreviation}
                     </button>
                   )}
                   {item.ingredient.category && (
-                    <span className="ml-2 text-muted-foreground/60">{item.ingredient.category}</span>
+                    <span className="ml-2">{item.ingredient.category}</span>
                   )}
                 </div>
               </div>
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
-                className="shrink-0 text-destructive"
+                className="size-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => deleteItem(item.id)}
+                aria-label={`Remove ${item.ingredient.name}`}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {/* Receipt Review Dialog */}
@@ -598,7 +619,7 @@ export default function PantryPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              Receipt Items
+              Receipt items
               {receiptStoreName && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
                   from {receiptStoreName}
@@ -619,15 +640,15 @@ export default function PantryPage() {
                   return (
                     <label
                       key={index}
-                      className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 hover:bg-accent"
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-3 transition-colors duration-200 ease-out hover:bg-muted has-data-checked:border-input has-data-checked:bg-brand-soft"
                     >
                       <Checkbox
                         checked={item.selected}
                         onCheckedChange={() => toggleReceiptItem(index)}
-                        className="mt-0.5"
+                        className="mt-0.5 size-5"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold">{item.genericName}</div>
+                        <div className="text-sm font-bold">{item.genericName}</div>
                         <div className="text-xs text-muted-foreground">
                           {item.rawName !== item.genericName && (
                             <span className="block truncate">{item.rawName}</span>
@@ -640,7 +661,7 @@ export default function PantryPage() {
                         </div>
                       </div>
                       {item.price != null && (
-                        <span className="shrink-0 text-sm font-medium text-green-700">
+                        <span className="shrink-0 text-sm font-bold text-leaf-ink tabular-nums">
                           ${item.price.toFixed(2)}
                         </span>
                       )}
@@ -653,7 +674,7 @@ export default function PantryPage() {
             {/* Non-ingredients */}
             {receiptItems.filter((i) => !i.isIngredient).length > 0 && (
               <div className="space-y-1.5">
-                <div className="mt-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <div className="mt-3 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">
                   Skipped (not ingredients)
                 </div>
                 {receiptItems.map((item, index) => {
@@ -661,19 +682,19 @@ export default function PantryPage() {
                   return (
                     <label
                       key={index}
-                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-dashed p-3 opacity-50 hover:opacity-75"
+                      className="flex cursor-pointer items-start gap-3 rounded-xl border border-dashed border-input p-3 text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted has-data-checked:border-solid has-data-checked:bg-brand-soft has-data-checked:text-foreground"
                     >
                       <Checkbox
                         checked={item.selected}
                         onCheckedChange={() => toggleReceiptItem(index)}
-                        className="mt-0.5"
+                        className="mt-0.5 size-5"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm">{item.genericName}</div>
                         <div className="text-xs text-muted-foreground truncate">{item.rawName}</div>
                       </div>
                       {item.price != null && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                           ${item.price.toFixed(2)}
                         </span>
                       )}
@@ -704,11 +725,11 @@ export default function PantryPage() {
               }
             >
               {importingReceipt ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Upload className="mr-2 h-4 w-4" />
+                <Upload className="h-4 w-4" />
               )}
-              Import {receiptItems.filter((i) => i.selected).length} Items
+              Import {receiptItems.filter((i) => i.selected).length} items
             </Button>
           </DialogFooter>
         </DialogContent>

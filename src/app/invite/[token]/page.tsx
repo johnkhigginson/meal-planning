@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { LemonLogo } from "@/components/shared/LemonLogo";
+import { cn } from "@/lib/utils";
 import { InviteAcceptButton } from "@/components/blog/InviteAcceptButton";
 
 export const dynamic = "force-dynamic";
@@ -12,14 +12,33 @@ interface PageProps {
   params: Promise<{ token: string }>;
 }
 
+// Pill links. buttonVariants lives in a client module, so it can't be called
+// from this server component.
+const pill =
+  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-6 text-[15px] font-bold transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const pillSolid =
+  "bg-brand font-extrabold text-brand-foreground hover:bg-brand/85 hover:shadow-[0_6px_18px_-8px_rgb(122_92_0/0.55)]";
+const pillOutline = "border border-border bg-card hover:bg-muted";
+
+const titleClass = "text-3xl leading-tight font-medium tracking-[-0.015em]";
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#fdfcf8] p-4 dark:bg-background">
-      <div className="mb-6 flex items-center gap-2">
-        <LemonLogo className="h-8 w-8" />
-        <span className="font-display text-xl font-semibold tracking-tight">My Lemon Kitchen</span>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="mx-auto flex w-full max-w-6xl items-center px-4 py-5 sm:px-6">
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-full focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+        >
+          <LemonLogo className="h-8 w-8" />
+          <span className="font-heading text-xl font-semibold tracking-tight">My Lemon Kitchen</span>
+        </Link>
+      </header>
+      <div className="flex flex-1 flex-col items-center px-4 pt-6 pb-20 sm:pt-12">
+        <Card className="w-full max-w-md gap-5 rounded-3xl py-7 sm:py-8">
+          {children}
+        </Card>
       </div>
-      <Card className="w-full max-w-md">{children}</Card>
     </div>
   );
 }
@@ -40,11 +59,13 @@ export default async function InvitePage({ params }: PageProps) {
     return (
       <Shell>
         <CardHeader>
-          <CardTitle>Invitation not found</CardTitle>
+          <h1 className={titleClass}>Invitation not found</h1>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p>This invitation link is invalid or has been withdrawn.</p>
-          <Link href="/" className="text-primary hover:underline">Go to My Lemon Kitchen</Link>
+          <Link href="/" className="font-bold text-primary underline-offset-4 hover:underline">
+            Go to My Lemon Kitchen
+          </Link>
         </CardContent>
       </Shell>
     );
@@ -58,12 +79,12 @@ export default async function InvitePage({ params }: PageProps) {
     return (
       <Shell>
         <CardHeader>
-          <CardTitle>Already accepted</CardTitle>
+          <h1 className={titleClass}>Already accepted</h1>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <p className="text-muted-foreground">You&apos;ve already accepted the invitation to “{book.name}”.</p>
-          <Link href={`/books/${book.id}`}>
-            <Button className="w-full">Open the cookbook</Button>
+          <Link href={`/books/${book.id}`} className={cn(pill, pillSolid)}>
+            Open the cookbook
           </Link>
         </CardContent>
       </Shell>
@@ -75,7 +96,7 @@ export default async function InvitePage({ params }: PageProps) {
   return (
     <Shell>
       <CardHeader>
-        <CardTitle>You&apos;re invited to collaborate</CardTitle>
+        <h1 className={titleClass}>You&apos;re invited to collaborate</h1>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <p className="text-muted-foreground">
@@ -87,8 +108,8 @@ export default async function InvitePage({ params }: PageProps) {
         {user && user.householdId === book.householdId ? (
           <>
             <p className="text-muted-foreground">This is your own cookbook — there&apos;s nothing to accept.</p>
-            <Link href={`/books/${book.id}`}>
-              <Button className="w-full">Open the cookbook</Button>
+            <Link href={`/books/${book.id}`} className={cn(pill, pillSolid)}>
+              Open the cookbook
             </Link>
           </>
         ) : user ? (
@@ -99,12 +120,18 @@ export default async function InvitePage({ params }: PageProps) {
             <InviteAcceptButton token={token} />
           </>
         ) : (
-          <div className="space-y-2">
-            <Link href={`/register?callbackUrl=${encodeURIComponent(acceptPath)}&email=${encodeURIComponent(invite.email)}`}>
-              <Button className="w-full">Create your account &amp; accept</Button>
+          <div className="flex flex-col gap-2">
+            <Link
+              href={`/register?callbackUrl=${encodeURIComponent(acceptPath)}&email=${encodeURIComponent(invite.email)}`}
+              className={cn(pill, pillSolid)}
+            >
+              Create your account &amp; accept
             </Link>
-            <Link href={`/login?callbackUrl=${encodeURIComponent(acceptPath)}`}>
-              <Button variant="outline" className="w-full">I already have an account</Button>
+            <Link
+              href={`/login?callbackUrl=${encodeURIComponent(acceptPath)}`}
+              className={cn(pill, pillOutline)}
+            >
+              I already have an account
             </Link>
           </div>
         )}

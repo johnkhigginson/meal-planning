@@ -103,7 +103,7 @@ export function IngredientInput({
   }
 
   return (
-    <div className="flex items-start gap-2 rounded-md border p-3">
+    <div className="flex items-start gap-2 rounded-2xl border bg-card p-3">
       <GripVertical className="mt-2.5 h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
 
       <div className="flex flex-1 flex-wrap items-start gap-2">
@@ -122,12 +122,12 @@ export function IngredientInput({
             onFocus={() => query.length >= 2 && setShowSuggestions(true)}
           />
           {showSuggestions && (query.length >= 2) && (
-            <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+            <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border bg-popover py-1 shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]">
               {suggestions.map((s) => (
                 <button
                   key={s.id}
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                  className="w-full px-3 py-2 text-left text-sm transition-colors duration-200 ease-out hover:bg-accent"
                   onClick={() => selectIngredient(s)}
                 >
                   {s.name}
@@ -136,7 +136,7 @@ export function IngredientInput({
               {suggestions.length === 0 && (
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent"
+                  className="w-full px-3 py-2 text-left text-sm text-muted-foreground transition-colors duration-200 ease-out hover:bg-accent hover:text-foreground"
                   onClick={createIngredient}
                 >
                   Create &quot;{query}&quot;
@@ -148,7 +148,7 @@ export function IngredientInput({
                 ) && (
                   <button
                     type="button"
-                    className="w-full border-t px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent"
+                    className="w-full border-t px-3 py-2 text-left text-sm text-muted-foreground transition-colors duration-200 ease-out hover:bg-accent hover:text-foreground"
                     onClick={createIngredient}
                   >
                     Create &quot;{query}&quot;
@@ -192,7 +192,8 @@ export function IngredientInput({
         variant="ghost"
         size="icon"
         onClick={onRemove}
-        className="mt-1 shrink-0"
+        className="mt-0.5 shrink-0 text-muted-foreground"
+        aria-label="Remove ingredient"
       >
         <X className="h-4 w-4" />
       </Button>

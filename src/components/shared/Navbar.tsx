@@ -35,9 +35,10 @@ const navItems = [
 
 // Below 1024px the sidebar collapses to an icon rail; labels show as tooltips.
 const linkBase =
-  "flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors lg:justify-start";
-const linkIdle = "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground";
-const linkActive = "bg-sidebar-accent text-sidebar-primary";
+  "flex min-h-10 items-center justify-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors duration-200 ease-out lg:justify-start";
+const linkIdle =
+  "font-semibold text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+const linkActive = "bg-sidebar-primary font-bold text-sidebar-primary-foreground";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -55,7 +56,7 @@ export function Navbar() {
       {/* Logo */}
       <div className="flex items-center justify-center gap-2.5 py-5 lg:justify-start lg:px-5">
         <LemonLogo className="h-7 w-7" />
-        <span className="hidden text-base font-bold tracking-tight text-sidebar-foreground lg:inline">
+        <span className="hidden font-heading text-lg font-semibold tracking-tight text-sidebar-accent-foreground lg:inline">
           My Lemon Kitchen
         </span>
       </div>
@@ -85,10 +86,10 @@ export function Navbar() {
       {session?.user && (
         <div className="space-y-0.5 border-t border-sidebar-border px-3 py-3">
           <div className="mb-1 hidden px-3 py-1.5 lg:block">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">
+            <p className="truncate text-sm font-bold text-sidebar-accent-foreground">
               {session.user.name}
             </p>
-            <p className="truncate text-xs text-sidebar-foreground/50">
+            <p className="truncate text-xs text-muted-foreground">
               {session.user.email}
             </p>
           </div>
@@ -126,7 +127,7 @@ export function Navbar() {
             size="sm"
             title="Sign Out"
             aria-label="Sign Out"
-            className="w-full justify-center gap-3 px-3 text-[13px] text-sidebar-foreground/60 hover:text-sidebar-foreground lg:justify-start"
+            className="min-h-10 w-full justify-center gap-3 rounded-xl px-3 text-sm font-semibold text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:justify-start"
             onClick={() => signOut({ callbackUrl: "/login" })}
           >
             <LogOut className="h-4 w-4 shrink-0" />

@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, Heart, UserRound } from "lucide-react";
+import { Clock, Users, Heart, UserRound, UtensilsCrossed } from "lucide-react";
 
 interface RecipeCardProps {
   recipe: {
@@ -28,65 +27,73 @@ export function RecipeCard({ recipe, showAuthor = false }: RecipeCardProps) {
     (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
 
   return (
-    <Link href={`/recipes/${recipe.id}`}>
-      <Card className="group h-full overflow-hidden transition-all hover:shadow-md">
-        {recipe.imageUrl && (
+    <Link
+      href={`/recipes/${recipe.id}`}
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      <div className="aspect-[4/3] w-full overflow-hidden bg-accent">
+        {recipe.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={recipe.imageUrl}
-            alt={recipe.name}
-            className="h-36 w-full object-cover"
-          />
+          <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <UtensilsCrossed className="h-6 w-6 text-primary/50" />
+          </div>
         )}
-        <CardContent className="space-y-3 p-5">
+      </div>
+
+      <div className="flex flex-1 flex-col gap-2 p-4">
+        <div className="space-y-0.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-semibold leading-snug group-hover:text-primary transition-colors">
-              {recipe.name}
-            </h3>
+            <h3 className="line-clamp-2 text-base leading-snug font-bold">{recipe.name}</h3>
             {recipe.isFavorite && (
-              <Heart className="h-4 w-4 shrink-0 fill-red-500 text-red-500" />
+              <Heart
+                role="img"
+                aria-label="Favorite"
+                className="mt-0.5 h-4 w-4 shrink-0 fill-red-600 text-red-600"
+              />
             )}
           </div>
-
-          {recipe.description && (
-            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-              {recipe.description}
+          {totalTime > 0 && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {totalTime} min
             </p>
           )}
+        </div>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {totalTime > 0 && (
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {totalTime}m
-              </span>
-            )}
+        {recipe.description && (
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {recipe.description}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {recipe.servings}
+          </span>
+          <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+            {recipe.sourceType}
+          </Badge>
+          {((showAuthor && recipe.author?.name) || recipe.authorName) && (
             <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {recipe.servings}
+              <UserRound className="h-3 w-3" />
+              {recipe.author?.name ?? recipe.authorName}
             </span>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {recipe.sourceType}
-            </Badge>
-            {((showAuthor && recipe.author?.name) || recipe.authorName) && (
-              <span className="flex items-center gap-1">
-                <UserRound className="h-3 w-3" />
-                {recipe.author?.name ?? recipe.authorName}
-              </span>
-            )}
-          </div>
-
-          {recipe.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {recipe.tags.map(({ tag }) => (
-                <Badge key={tag.id} variant="outline" className="text-[10px] px-1.5 py-0">
-                  {tag.name}
-                </Badge>
-              ))}
-            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {recipe.tags.length > 0 && (
+          <div className="mt-auto flex flex-wrap gap-1 pt-1">
+            {recipe.tags.map(({ tag }) => (
+              <Badge key={tag.id} variant="tag">
+                {tag.name}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
     </Link>
   );
 }

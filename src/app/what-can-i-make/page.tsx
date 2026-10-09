@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Clock, Users, Check, X, Heart } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Clock, Users, Check, Heart, ChevronDown, Lightbulb } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MatchedIngredient {
   ingredientId: number;
@@ -53,16 +55,16 @@ export default function WhatCanIMakePage() {
   }, [minMatch]);
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">What Can I Make?</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-4xl leading-tight font-medium">What can I make?</h1>
+        <p className="text-muted-foreground">
           Recipes ranked by what you have in your pantry
         </p>
       </div>
 
-      <div className="flex items-center gap-4">
-        <Label htmlFor="minMatch" className="shrink-0 text-sm">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border bg-card px-4 py-3 sm:w-fit">
+        <Label htmlFor="minMatch" className="shrink-0 text-sm font-bold">
           Minimum match:
         </Label>
         <Input
@@ -75,53 +77,67 @@ export default function WhatCanIMakePage() {
           onChange={(e) => setMinMatch(parseFloat(e.target.value))}
           className="w-48"
         />
-        <span className="text-sm text-muted-foreground">
+        <span className="min-w-[3ch] font-heading text-lg font-semibold tabular-nums">
           {Math.round(minMatch * 100)}%
         </span>
       </div>
 
       {loading ? (
-        <p className="text-muted-foreground">Analyzing your pantry...</p>
+        <p className="text-muted-foreground" role="status">Analyzing your pantry...</p>
       ) : results.length === 0 ? (
-        <div className="py-12 text-center">
-          <p className="text-lg text-muted-foreground">No matching recipes found</p>
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input px-6 py-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <Lightbulb className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">No matching recipes found</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
             Try lowering the minimum match or{" "}
-            <Link href="/pantry" className="text-primary underline">
+            <Link href="/pantry" className="font-bold text-primary underline-offset-4 hover:underline">
               add items to your pantry
             </Link>
           </p>
+          <Link href="/pantry" className={cn(buttonVariants({ size: "lg" }), "mt-1")}>
+            Open pantry
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
           {results.map((match) => {
             const pct = Math.round(match.matchScore * 100);
+            const full = pct === 100;
             const isExpanded = expandedId === match.recipeId;
             const totalTime =
               (match.prepTimeMinutes || 0) + (match.cookTimeMinutes || 0);
 
             return (
-              <Card key={match.recipeId}>
+              <Card
+                key={match.recipeId}
+                className={cn("gap-0 py-0", isExpanded ? "border-input" : "hover:border-input")}
+              >
                 <CardHeader
-                  className="cursor-pointer"
+                  className="cursor-pointer py-4 sm:py-5"
                   onClick={() =>
                     setExpandedId(isExpanded ? null : match.recipeId)
                   }
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-base">
+                        <CardTitle className="text-xl">
                           <Link
                             href={`/recipes/${match.recipeId}`}
-                            className="hover:underline"
+                            className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                             onClick={(e) => e.stopPropagation()}
                           >
                             {match.recipeName}
                           </Link>
                         </CardTitle>
                         {match.isFavorite && (
-                          <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                          <Heart
+                            className="h-4 w-4 shrink-0 fill-red-600 text-red-600"
+                            role="img"
+                            aria-label="Favorite"
+                          />
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -137,56 +153,75 @@ export default function WhatCanIMakePage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-right">
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium">
+                    <div className="flex items-center gap-3 sm:text-right">
+                      <div className="space-y-1.5">
+                        <div className="text-sm font-bold tabular-nums">
                           {match.matchedCount}/{match.totalRequired} ingredients
                         </div>
-                        <Progress value={pct} className="h-2 w-32" />
+                        <Progress
+                          value={pct}
+                          aria-label={`${pct}% of ingredients in your pantry`}
+                          className={cn(
+                            "w-32 [&_[data-slot=progress-track]]:h-2",
+                            full
+                              ? "[&_[data-slot=progress-indicator]]:bg-leaf"
+                              : "[&_[data-slot=progress-indicator]]:bg-primary"
+                          )}
+                        />
                       </div>
                       <Badge
-                        variant={pct === 100 ? "default" : "secondary"}
-                        className="text-sm"
+                        variant={full ? "pantry" : "tag"}
+                        className="h-7 px-2.5 text-sm font-extrabold tabular-nums"
                       >
+                        {full && <Check strokeWidth={3} aria-hidden="true" />}
                         {pct}%
                       </Badge>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className={cn(
+                          "ml-auto h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ease-out sm:ml-0",
+                          isExpanded && "rotate-180"
+                        )}
+                      />
                     </div>
                   </div>
                 </CardHeader>
 
                 {isExpanded && (
-                  <CardContent>
-                    <div className="grid gap-1 sm:grid-cols-2">
+                  <CardContent className="border-t pt-3 pb-5">
+                    <ul className="grid gap-x-6 sm:grid-cols-2">
                       {match.ingredients.map((ing) => (
-                        <div
+                        <li
                           key={ing.ingredientId}
-                          className="flex items-center gap-2 text-sm"
+                          className="flex items-baseline gap-3 border-b border-border/70 py-2.5"
                         >
-                          {ing.isMet ? (
-                            <Check className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <X className="h-4 w-4 text-red-500" />
-                          )}
                           <span
-                            className={
-                              ing.isMet ? "" : "font-medium text-red-600"
-                            }
+                            className={cn(
+                              "relative top-[3px] flex size-5 shrink-0 items-center justify-center rounded-full",
+                              ing.isMet ? "bg-leaf text-white" : "border-2 border-muted-foreground/60"
+                            )}
                           >
-                            {ing.requiredQty} {ing.requiredUnitAbbr}{" "}
-                            {ing.ingredientName}
+                            {ing.isMet && <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />}
+                            <span className="sr-only">{ing.isMet ? "In pantry" : "Not in pantry"}</span>
                           </span>
-                          {ing.optional && (
-                            <Badge variant="secondary" className="text-xs">
-                              optional
-                            </Badge>
-                          )}
-                        </div>
+                          <span className="min-w-0">
+                            <span className="font-extrabold">
+                              {ing.requiredQty} {ing.requiredUnitAbbr}
+                            </span>{" "}
+                            <span>{ing.ingredientName}</span>
+                            {ing.optional && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                optional
+                              </Badge>
+                            )}
+                          </span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                     {match.tags.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1">
+                      <div className="mt-4 flex flex-wrap gap-1.5">
                         {match.tags.map((tag) => (
-                          <Badge key={tag.id} variant="outline" className="text-xs">
+                          <Badge key={tag.id} variant="tag" className="text-xs">
                             {tag.name}
                           </Badge>
                         ))}

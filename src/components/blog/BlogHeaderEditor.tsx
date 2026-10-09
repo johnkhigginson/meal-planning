@@ -40,7 +40,7 @@ function IntroBlock({ text, onDark = false }: { text: string; onDark?: boolean }
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className={`mt-1.5 text-sm font-medium underline-offset-2 hover:underline ${link}`}
+        className={`mt-1.5 rounded text-sm font-bold underline-offset-2 hover:underline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring ${link}`}
       >
         {expanded ? "Show less" : "Read more"}
       </button>
@@ -102,7 +102,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
 
   if (editing) {
     return (
-      <div className="mb-6 space-y-4 rounded-2xl border border-border/60 bg-card/50 p-5">
+      <div className="mb-6 space-y-4 rounded-2xl border bg-card p-5">
         <div className="space-y-2">
           <Label htmlFor="hdr-title">Title</Label>
           <Input id="hdr-title" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -128,10 +128,10 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
         </div>
         <div className="space-y-2">
           <Label>Cover image</Label>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {cover && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={cover} alt="" className="h-16 w-24 shrink-0 rounded-lg object-cover" />
+              <img src={cover} alt="" className="h-16 w-24 shrink-0 rounded-xl object-cover" />
             )}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadCover} />
             <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
@@ -146,7 +146,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
           </div>
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={save} disabled={saving || uploading}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save header
@@ -176,7 +176,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
             <Button
               variant="outline"
               size="sm"
-              className="absolute right-4 top-4 border-white/40 bg-white/85 hover:bg-white"
+              className="absolute right-4 top-4 bg-card/90 text-foreground backdrop-blur hover:bg-card"
               onClick={() => setEditing(true)}
             >
               <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit header
@@ -206,7 +206,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
         <p className="mx-auto mt-3 max-w-2xl font-display text-lg text-muted-foreground sm:text-xl">{subtitle}</p>
       )}
       {intro && <IntroBlock text={intro} />}
-      <div className="mx-auto mt-5 h-px w-16 bg-primary/40" />
+      <div className="mx-auto mt-6 h-1 w-12 rounded-full bg-brand" aria-hidden="true" />
     </div>
   );
 }

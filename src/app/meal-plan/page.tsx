@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2, Move } from "lucide-react";
 
@@ -45,13 +44,13 @@ function entryLabel(entry: MealPlanEntry): string {
 // starts on the name move the meal instead of dragging the link's URL.
 function EntryName({ entry }: { entry: MealPlanEntry }) {
   if (!entry.recipe) {
-    return <span className="font-medium text-muted-foreground">{entryLabel(entry)}</span>;
+    return <span className="font-semibold text-muted-foreground">{entryLabel(entry)}</span>;
   }
   return (
     <Link
       href={`/recipes/${entry.recipe.id}`}
       draggable={false}
-      className="font-medium hover:text-primary hover:underline"
+      className="font-semibold transition-colors duration-200 ease-out hover:text-primary hover:underline"
     >
       {entryLabel(entry)}
     </Link>
@@ -243,12 +242,12 @@ export default function MealPlanPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Meal Plan</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-4xl leading-tight font-medium">Meal plan</h1>
+          <p className="text-muted-foreground">
             {currentMonday.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
             {" - "}
             {weekDates[6].toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
@@ -258,48 +257,57 @@ export default function MealPlanPage() {
             meals alone has nothing to generate. */}
         <Button
           variant="outline"
-          size="sm"
+          size="lg"
+          className="self-start sm:self-auto"
           onClick={generateGroceryList}
           disabled={generating || !plan?.entries.some((e) => e.recipeId)}
         >
-          {generating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <ShoppingCart className="mr-2 h-3.5 w-3.5" />}
-          Grocery List
+          {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+          Grocery list
         </Button>
       </div>
 
       {/* Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { const p = new Date(currentMonday); p.setDate(p.getDate() - 7); setCurrentMonday(p); }}>
+          <Button variant="outline" size="icon" className="size-10" aria-label="Previous week" onClick={() => { const p = new Date(currentMonday); p.setDate(p.getDate() - 7); setCurrentMonday(p); }}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setCurrentMonday(getMonday(new Date()))}>Today</Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { const n = new Date(currentMonday); n.setDate(n.getDate() + 7); setCurrentMonday(n); }}>
+          <Button variant="ghost" className="h-10 font-bold" onClick={() => setCurrentMonday(getMonday(new Date()))}>Today</Button>
+          <Button variant="outline" size="icon" className="size-10" aria-label="Next week" onClick={() => { const n = new Date(currentMonday); n.setDate(n.getDate() + 7); setCurrentMonday(n); }}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {ALL_MEAL_SLOTS.map((slot) => (
-            <Badge
-              key={slot}
-              variant={enabledSlots.includes(slot) ? "default" : "outline"}
-              className="cursor-pointer text-xs"
-              onClick={() => {
-                const updated = enabledSlots.includes(slot) ? enabledSlots.filter((s) => s !== slot) : [...enabledSlots, slot];
-                if (updated.length === 0) return;
-                setEnabledSlots(updated);
-                fetch("/api/user/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabledMealSlots: updated.join(",") }) });
-              }}
-            >
-              {SLOT_LABELS[slot]}
-            </Badge>
-          ))}
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Meals to show">
+          {ALL_MEAL_SLOTS.map((slot) => {
+            const on = enabledSlots.includes(slot);
+            return (
+              <button
+                key={slot}
+                type="button"
+                aria-pressed={on}
+                className={`inline-flex h-10 items-center rounded-full px-4 text-sm font-bold transition-colors duration-200 ease-out focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+                  on
+                    ? "bg-brand text-brand-foreground hover:bg-brand/85"
+                    : "border-[1.5px] border-input text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+                onClick={() => {
+                  const updated = enabledSlots.includes(slot) ? enabledSlots.filter((s) => s !== slot) : [...enabledSlots, slot];
+                  if (updated.length === 0) return;
+                  setEnabledSlots(updated);
+                  fetch("/api/user/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabledMealSlots: updated.join(",") }) });
+                }}
+              >
+                {SLOT_LABELS[slot]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Calendar Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground">
+        <div className="flex items-center justify-center rounded-3xl border bg-card py-20 text-muted-foreground">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Loading...
         </div>
@@ -307,18 +315,22 @@ export default function MealPlanPage() {
         <>
           {/* Desktop grid, from 1024px. Below that the side rail leaves too
               little width for seven columns, so tablets get the day cards. */}
-          <div className="hidden overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-sm lg:block">
-            <div className="grid" style={{ gridTemplateColumns: `80px repeat(7, 1fr)` }}>
-              <div className="border-b bg-muted/30 p-3" />
+          <div className="hidden overflow-x-auto rounded-3xl border bg-card p-5 lg:block">
+            <div className="grid min-w-[52rem] gap-2" style={{ gridTemplateColumns: `80px repeat(7, minmax(0, 1fr))` }}>
+              <div />
               {weekDates.map((date, i) => (
-                <div key={i} className={`border-b border-l bg-muted/30 p-3 text-center ${isToday(date) ? "bg-primary/5" : ""}`}>
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{DAY_LABELS[i]}</div>
-                  <div className={`mt-0.5 text-lg font-semibold ${isToday(date) ? "text-primary" : ""}`}>{date.getDate()}</div>
+                <div
+                  key={i}
+                  aria-current={isToday(date) ? "date" : undefined}
+                  className={`rounded-2xl px-3 py-2 text-center ${isToday(date) ? "bg-brand text-brand-foreground" : ""}`}
+                >
+                  <div className={`text-xs font-extrabold tracking-[0.08em] uppercase ${isToday(date) ? "" : "text-muted-foreground"}`}>{DAY_LABELS[i]}</div>
+                  <div className="font-heading text-xl leading-tight font-semibold tabular-nums">{date.getDate()}</div>
                 </div>
               ))}
-              {activeSlots.map((slot, slotIdx) => (
+              {activeSlots.map((slot) => (
                 <>
-                  <div key={`label-${slot}`} className={`flex items-start p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground ${slotIdx > 0 ? "border-t" : ""}`}>
+                  <div key={`label-${slot}`} className="flex items-start pt-3 text-xs font-extrabold tracking-[0.08em] text-muted-foreground uppercase">
                     {SLOT_LABELS[slot]}
                   </div>
                   {weekDates.map((date, dayIdx) => {
@@ -327,14 +339,18 @@ export default function MealPlanPage() {
                     const cellKey = `${dateStr}|${slot}`;
                     const cellTint =
                       dropTarget === cellKey
-                        ? "bg-primary/10 ring-2 ring-inset ring-primary/40"
-                        : isToday(date)
-                          ? "bg-primary/[0.02]"
-                          : "";
+                        ? "bg-brand-soft ring-2 ring-inset ring-primary/50"
+                        : entries.length > 0
+                          ? isToday(date)
+                            ? "bg-muted ring-2 ring-inset ring-brand"
+                            : "bg-muted"
+                          : isToday(date)
+                            ? "border-[1.5px] border-dashed border-brand"
+                            : "border-[1.5px] border-dashed border-input";
                     return (
                       <div
                         key={`${slot}-${dayIdx}`}
-                        className={`group/cell min-h-[90px] border-l p-1.5 ${slotIdx > 0 ? "border-t" : ""} ${cellTint}`}
+                        className={`group/cell flex min-h-[90px] flex-col gap-1 rounded-2xl p-1.5 transition-colors duration-200 ease-out ${cellTint}`}
                         onDragOver={(e) => {
                           if (draggingId == null) return;
                           e.preventDefault();
@@ -362,10 +378,10 @@ export default function MealPlanPage() {
                               setDraggingId(null);
                               setDropTarget(null);
                             }}
-                            className={`mb-1 flex cursor-grab items-start justify-between gap-1 rounded-lg px-2 py-1.5 text-xs leading-snug transition-colors active:cursor-grabbing ${
+                            className={`flex cursor-grab items-start justify-between gap-1 rounded-xl px-2 py-1.5 text-[13px] leading-snug font-semibold transition-colors duration-200 ease-out active:cursor-grabbing ${
                               entry.recipe
-                                ? "bg-primary/5 hover:bg-primary/10"
-                                : "border border-dashed border-border/70 bg-muted/40 hover:bg-muted"
+                                ? "border border-border bg-card hover:border-input"
+                                : "border border-dashed border-input bg-transparent hover:bg-card"
                             } ${draggingId === entry.id ? "opacity-40" : ""}`}
                             title={entry.recipe ? "Drag to move" : "Added by name, not included in the grocery list. Drag to move."}
                           >
@@ -373,7 +389,7 @@ export default function MealPlanPage() {
                             {/* Shown on hover, and always on touch screens (a
                                 tablet gets this grid but can't hover or
                                 reliably drag). */}
-                            <div className="mt-0.5 flex shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 [@media(hover:none)]:opacity-100">
+                            <div className="mt-0.5 flex shrink-0 opacity-0 transition-opacity duration-200 ease-out group-hover/cell:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                               <button
                                 onClick={() => setMoving({ entry, date: dateStr, mealSlot: slot })}
                                 aria-label={`Move ${entryLabel(entry)}`}
@@ -391,7 +407,11 @@ export default function MealPlanPage() {
                             </div>
                           </div>
                         ))}
-                        <button onClick={() => openPicker(formatDate(date), slot)} className="flex w-full items-center justify-center rounded-lg p-1.5 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-muted-foreground group-hover/cell:opacity-100 [@media(hover:none)]:opacity-100">
+                        <button
+                          onClick={() => openPicker(formatDate(date), slot)}
+                          aria-label={`Add ${SLOT_LABELS[slot].toLowerCase()} on ${DAY_LABELS[dayIdx]} ${date.getDate()}`}
+                          className="mt-auto flex w-full items-center justify-center rounded-xl p-1.5 text-muted-foreground opacity-0 transition-[opacity,background-color,color] duration-200 ease-out group-hover/cell:opacity-100 hover:bg-card hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring [@media(hover:none)]:opacity-100"
+                        >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -405,30 +425,34 @@ export default function MealPlanPage() {
           {/* Mobile: stacked day cards */}
           <div className="space-y-3 lg:hidden">
             {weekDates.map((date, i) => (
-              <div key={i} className={`rounded-2xl border border-border/60 bg-card shadow-sm ${isToday(date) ? "ring-2 ring-primary/20" : ""}`}>
-                <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5 rounded-t-2xl">
-                  <span className="text-sm font-semibold">{DAY_LABELS[i]}</span>
-                  <span className={`text-sm ${isToday(date) ? "font-bold text-primary" : "text-muted-foreground"}`}>
+              <div
+                key={i}
+                aria-current={isToday(date) ? "date" : undefined}
+                className={`overflow-hidden rounded-2xl border bg-card ${isToday(date) ? "border-brand" : ""}`}
+              >
+                <div className={`flex items-center justify-between px-4 py-2.5 ${isToday(date) ? "bg-brand text-brand-foreground" : "border-b bg-muted"}`}>
+                  <span className="text-sm font-extrabold tracking-[0.08em] uppercase">{DAY_LABELS[i]}</span>
+                  <span className={`text-sm font-bold ${isToday(date) ? "" : "text-muted-foreground"}`}>
                     {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                 </div>
-                <div className="divide-y">
+                <div className="space-y-3 p-3">
                   {activeSlots.map((slot) => {
                     const entries = getEntries(date, slot);
                     return (
-                      <div key={slot} className="px-4 py-3">
-                        <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <div key={slot}>
+                        <div className="mb-1.5 text-xs font-extrabold tracking-[0.08em] text-muted-foreground uppercase">
                           {SLOT_LABELS[slot]}
                         </div>
                         {entries.length > 0 ? (
-                          <div className="space-y-1.5">
+                          <div className="space-y-1.5 rounded-2xl bg-muted p-1.5">
                             {entries.map((entry) => (
                               <div
                                 key={entry.id}
-                                className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                                className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-3 py-1.5 text-sm font-semibold ${
                                   entry.recipe
-                                    ? "bg-primary/5"
-                                    : "border border-dashed border-border/70 bg-muted/40"
+                                    ? "border border-border bg-card"
+                                    : "border border-dashed border-input"
                                 }`}
                               >
                                 <EntryName entry={entry} />
@@ -438,16 +462,16 @@ export default function MealPlanPage() {
                                       setMoving({ entry, date: entry.date.split("T")[0], mealSlot: entry.mealSlot })
                                     }
                                     aria-label={`Move ${entryLabel(entry)}`}
-                                    className="p-1 text-muted-foreground hover:text-foreground"
+                                    className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-foreground"
                                   >
-                                    <Move className="h-3.5 w-3.5" />
+                                    <Move className="h-4 w-4" />
                                   </button>
                                   <button
                                     onClick={() => removeEntry(entry.id)}
                                     aria-label={`Remove ${entryLabel(entry)}`}
-                                    className="p-1 text-muted-foreground hover:text-destructive"
+                                    className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-destructive"
                                   >
-                                    <X className="h-3.5 w-3.5" />
+                                    <X className="h-4 w-4" />
                                   </button>
                                 </div>
                               </div>
@@ -456,7 +480,7 @@ export default function MealPlanPage() {
                         ) : (
                           <button
                             onClick={() => openPicker(formatDate(date), slot)}
-                            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2 text-xs text-muted-foreground hover:bg-muted"
+                            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-input text-sm font-bold text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-foreground"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add
@@ -476,7 +500,7 @@ export default function MealPlanPage() {
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add to Plan</DialogTitle>
+            <DialogTitle>Add to plan</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Choose a saved recipe, or just jot down a meal name. */}
@@ -507,9 +531,10 @@ export default function MealPlanPage() {
                     <button
                       key={recipe.id}
                       type="button"
-                      className={`w-full cursor-pointer rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                      aria-pressed={selectedRecipe?.id === recipe.id}
+                      className={`w-full cursor-pointer rounded-xl px-3 py-2.5 text-left text-sm transition-colors duration-200 ease-out ${
                         selectedRecipe?.id === recipe.id
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-brand font-bold text-brand-foreground"
                           : "hover:bg-muted"
                       }`}
                       onClick={() => { setSelectedRecipe(recipe); setServings(recipe.servings); }}
@@ -551,7 +576,7 @@ export default function MealPlanPage() {
             <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancel</Button>
             <Button onClick={addEntry} disabled={!canAdd || saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add to Plan
+              Add to plan
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -576,10 +601,10 @@ export default function MealPlanPage() {
                         type="button"
                         size="sm"
                         variant={moving.date === dateStr ? "default" : "outline"}
-                        className="h-auto flex-col gap-0 px-0 py-1.5"
+                        className="h-auto min-h-11 flex-col gap-0 rounded-2xl px-0 py-1.5"
                         onClick={() => setMoving({ ...moving, date: dateStr })}
                       >
-                        <span className="text-[10px] uppercase">{DAY_LABELS[i]}</span>
+                        <span className="text-[10px] font-extrabold uppercase">{DAY_LABELS[i]}</span>
                         <span>{date.getDate()}</span>
                       </Button>
                     );

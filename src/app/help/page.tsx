@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
   Circle,
@@ -21,7 +20,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Help & Getting Started" };
+export const metadata = { title: "Help & getting started" };
 
 interface Step {
   title: string;
@@ -85,10 +84,10 @@ export default async function HelpPage() {
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Help &amp; Getting Started</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto max-w-3xl space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-4xl leading-tight font-medium">Help &amp; getting started</h1>
+        <p className="text-muted-foreground">
           A quick tour of how to add recipes, build cookbooks, and publish your blog.
         </p>
       </div>
@@ -96,10 +95,13 @@ export default async function HelpPage() {
       {/* Live checklist */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
+          <CardTitle className="flex flex-wrap items-baseline justify-between gap-2 text-xl">
             <span>Your setup checklist</span>
-            <span className="text-sm font-normal text-muted-foreground">
-              {doneCount} / {steps.length} done
+            <span className="font-sans text-sm font-bold text-muted-foreground">
+              <span className="font-heading text-base text-foreground tabular-nums">
+                {doneCount} / {steps.length}
+              </span>{" "}
+              done
             </span>
           </CardTitle>
         </CardHeader>
@@ -107,27 +109,28 @@ export default async function HelpPage() {
           {steps.map((step) => (
             <div
               key={step.title}
-              className="flex flex-col gap-2 rounded-xl border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+              className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${step.done ? "bg-leaf-soft/60" : "bg-card"}`}
             >
               <div className="flex items-start gap-3">
                 {step.done ? (
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-leaf-ink" aria-label="Done" />
                 ) : (
-                  <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground/40" />
+                  <Circle className="mt-0.5 h-5 w-5 shrink-0 text-input" aria-label="Not done yet" />
                 )}
                 <div>
-                  <p className={`text-sm font-medium ${step.done ? "text-muted-foreground line-through" : ""}`}>
+                  <p className={`text-sm font-bold ${step.done ? "text-muted-foreground line-through" : ""}`}>
                     {step.title}
                   </p>
-                  <p className="text-xs text-muted-foreground">{step.detail}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{step.detail}</p>
                 </div>
               </div>
               {!step.done && (
-                <Link href={step.href} className="shrink-0">
-                  <Button size="sm" variant="outline">
-                    {step.cta}
-                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
+                <Link
+                  href={step.href}
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 self-start rounded-full border border-border bg-card px-4 text-sm font-bold transition-[transform,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-muted focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring sm:self-auto"
+                >
+                  {step.cta}
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               )}
             </div>
@@ -138,11 +141,11 @@ export default async function HelpPage() {
       {/* Guide */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-xl">
             <UtensilsCrossed className="h-4 w-4 text-primary" /> Adding a recipe
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
           <p>On the <Link href="/recipes/new" className="text-primary underline">New Recipe</Link> page you can add a recipe four ways — pick a Source at the top:</p>
           <ul className="space-y-2">
             <li className="flex gap-2"><UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Personal</strong> — type the name, ingredients, and steps yourself.</span></li>
@@ -156,24 +159,24 @@ export default async function HelpPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-xl">
             <BookOpen className="h-4 w-4 text-primary" /> Cookbooks &amp; publishing your blog
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
           <p>Create a <Link href="/books" className="text-primary underline">cookbook</Link>, add recipes to it, then open it and press <strong className="text-foreground">Publish</strong>.</p>
-          <p>Published cookbooks appear at a public address like <code className="rounded bg-muted px-1.5 py-0.5 text-xs">/blog/your-cookbook</code> that anyone can read without logging in. Visitors can leave <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> comments</span>, and you can delete any comment while signed in.</p>
+          <p>Published cookbooks appear at a public address like <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-foreground">/blog/your-cookbook</code> that anyone can read without logging in. Visitors can leave <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> comments</span>, and you can delete any comment while signed in.</p>
           <p>Prefer to share privately? Use <span className="inline-flex items-center gap-1"><Share2 className="h-3.5 w-3.5" /> Share</span> on a recipe or cookbook for a private link.</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-xl">
             <LayoutDashboard className="h-4 w-4 text-primary" /> Make the app your own
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
           <p>Not using meal planning, the pantry, or stores? Hide them: go to <Link href="/settings" className="text-primary underline">Settings → Menu</Link> and turn off any sections you don&apos;t need. Recipes and Cookbooks always stay.</p>
           <p className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Invite family from Settings so everyone can add recipes to your shared collection.</p>
         </CardContent>

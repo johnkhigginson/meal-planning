@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { RecipeCard } from "@/components/recipes/RecipeCard";
 import { RecipeFilters } from "@/components/recipes/RecipeFilters";
-import { Plus, Upload, Loader2 } from "lucide-react";
+import { Plus, Upload, Loader2, UtensilsCrossed } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { cn } from "@/lib/utils";
 
 interface Tag {
   id: number;
@@ -103,15 +104,15 @@ export default function RecipesPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Recipes</h1>
-          <p className="text-sm text-muted-foreground">Your recipe collection</p>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-4xl leading-tight font-medium">Recipes</h1>
+          <p className="text-muted-foreground">Your recipe collection</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/recipes/library">
-            <Button variant="outline" size="sm">Browse Library</Button>
+          <Link href="/recipes/library" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            Browse library
           </Link>
           <label>
             <input
@@ -137,28 +138,32 @@ export default function RecipesPage() {
                 e.target.value = "";
               }}
             />
-            <Button variant="outline" size="sm" disabled={importingDoc} onClick={(e) => { (e.currentTarget.parentElement?.querySelector("input") as HTMLInputElement)?.click(); }}>
-              {importingDoc ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5" />}
-              Import Doc
+            <Button variant="outline" size="lg" disabled={importingDoc} onClick={(e) => { (e.currentTarget.parentElement?.querySelector("input") as HTMLInputElement)?.click(); }}>
+              {importingDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Import doc
             </Button>
           </label>
-          <Link href="/recipes/new">
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Recipe
-            </Button>
+          <Link href="/recipes/new" className={buttonVariants({ size: "lg" })}>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add recipe
           </Link>
         </div>
       </div>
 
       {importResult && (
-        <div className="rounded-xl border border-border/60 bg-card px-4 py-2.5 text-sm shadow-sm">
+        <div role="status" className="flex items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3 text-sm font-semibold">
           {importResult}
-          <button className="ml-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => setImportResult(null)}>dismiss</button>
+          <button
+            type="button"
+            className="rounded-full px-2 py-1 text-xs font-bold text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-foreground focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            onClick={() => setImportResult(null)}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <SearchInput
           value={search}
           onChange={setSearch}
@@ -178,34 +183,37 @@ export default function RecipesPage() {
       {loading ? (
         <PageLoader />
       ) : recipes.length === 0 ? (
-        <div className="py-12 text-center">
-          <p className="text-lg text-muted-foreground">No recipes found</p>
-          <p className="text-sm text-muted-foreground">
-            Try adjusting your filters or{" "}
-            <Link href="/recipes/new" className="text-primary underline">
-              add a new recipe
-            </Link>
-          </p>
+        <div className="flex flex-col items-center gap-3 rounded-3xl border bg-card px-6 py-14 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <UtensilsCrossed className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">No recipes found</p>
+          <p className="text-sm text-muted-foreground">Try adjusting your filters or add a new recipe.</p>
+          <Link href="/recipes/new" className={cn(buttonVariants(), "mt-1")}>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add recipe
+          </Link>
         </div>
       ) : (
-        <>
-          <p className="text-xs text-muted-foreground">
-            Showing {recipes.length} of {total} recipe{total === 1 ? "" : "s"}
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Showing <span className="font-bold text-foreground tabular-nums">{recipes.length}</span> of{" "}
+            <span className="font-bold text-foreground tabular-nums">{total}</span> recipe{total === 1 ? "" : "s"}
           </p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {recipes.map((recipe) => (
               <RecipeCard key={recipe.id} recipe={recipe} showAuthor={multiMember} />
             ))}
           </div>
           {recipes.length < total && (
-            <div className="flex justify-center pt-2">
-              <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <div className="flex justify-center pt-4">
+              <Button variant="outline" size="lg" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Load more
               </Button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

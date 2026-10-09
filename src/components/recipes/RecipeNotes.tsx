@@ -68,7 +68,7 @@ export function RecipeNotes({ recipeId, initialNotes, readOnly = false }: Recipe
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Notes</CardTitle>
+        <CardTitle className="text-xl">Notes</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {!readOnly && (
@@ -83,7 +83,7 @@ export function RecipeNotes({ recipeId, initialNotes, readOnly = false }: Recipe
             <div className="flex justify-end">
               <Button onClick={addNote} disabled={saving || !text.trim()} size="sm">
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Note
+                Add note
               </Button>
             </div>
           </div>
@@ -98,10 +98,10 @@ export function RecipeNotes({ recipeId, initialNotes, readOnly = false }: Recipe
             {notes.map((note) => (
               <li
                 key={note.id}
-                className="rounded-lg border border-border/60 bg-muted/30 p-3"
+                className="rounded-2xl bg-muted p-4"
               >
-                <p className="whitespace-pre-wrap text-sm">{note.body}</p>
-                <p className="mt-1.5 text-xs text-muted-foreground">
+                <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{note.body}</p>
+                <p className="mt-2 text-xs font-semibold text-muted-foreground">
                   {note.createdByName ? `${note.createdByName} · ` : ""}
                   {new Date(note.createdAt).toLocaleString()}
                 </p>

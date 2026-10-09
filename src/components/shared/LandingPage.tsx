@@ -1,58 +1,47 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  UtensilsCrossed,
-  Package,
-  CalendarDays,
-  ShoppingCart,
-  Lightbulb,
-  Camera,
-  ArrowRight,
-  Check,
-} from "lucide-react";
+import { Check } from "lucide-react";
 import { LemonLogo } from "./LemonLogo";
+import { LemonSlice } from "@/components/landing/LemonSlice";
+import { cn } from "@/lib/utils";
+
+// Pill links. Kept local because buttonVariants lives in a client module and
+// can't be called from this server component.
+const pill =
+  "inline-flex items-center justify-center rounded-full font-bold transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-px focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring";
+const pillSolid =
+  "bg-brand font-extrabold text-brand-foreground hover:bg-brand/85 hover:shadow-[0_6px_18px_-8px_rgb(122_92_0/0.55)]";
+const pillOutline = "border-[1.5px] border-foreground hover:bg-muted";
 
 const features = [
   {
-    icon: UtensilsCrossed,
-    title: "Recipe Collection",
+    title: "Recipe collection",
     description:
       "Store all your recipes in one place. Import from websites, scan cookbook pages, or add your own.",
   },
   {
-    icon: Package,
-    title: "Pantry Tracking",
+    title: "Pantry tracking",
     description:
       "Keep track of what you have on hand. Scan receipts to instantly update your pantry.",
   },
   {
-    icon: Lightbulb,
-    title: "What Can I Make?",
-    description:
-      "See which recipes you can make right now based on what's in your pantry.",
+    title: "What can I make?",
+    description: "See which recipes you can make right now based on what is in your pantry.",
   },
   {
-    icon: CalendarDays,
-    title: "Meal Planning",
-    description:
-      "Plan your meals for the week. Choose which meals to plan — dinners only, or the whole day.",
+    title: "Meal planning",
+    description: "Plan your meals for the week. Dinners only, or the whole day. Your call.",
   },
   {
-    icon: ShoppingCart,
-    title: "Smart Grocery Lists",
-    description:
-      "Auto-generate grocery lists from your meal plan, minus what you already have.",
+    title: "Smart grocery lists",
+    description: "Auto-generate grocery lists from your meal plan, minus what you already have.",
   },
   {
-    icon: Camera,
-    title: "AI-Powered Import",
-    description:
-      "Snap a photo of a receipt or cookbook page and let AI do the data entry for you.",
+    title: "Photo import",
+    description: "Snap a photo of a receipt or cookbook page and skip the data entry.",
   },
 ];
 
-const highlights = [
-  "Import recipes from any website in one click",
+const household = [
   "Share your kitchen with a partner or roommate",
   "Know exactly what you can cook tonight",
   "Never forget an ingredient at the store",
@@ -60,118 +49,146 @@ const highlights = [
 
 export function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2">
-            <LemonLogo className="h-7 w-7" />
-            <span className="text-base font-bold tracking-tight sm:text-lg">My Lemon Kitchen</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-sm">Sign In</Button>
-            </Link>
-            <Link href="/register">
-              <Button size="sm" className="text-sm">Get Started</Button>
-            </Link>
-          </div>
-        </div>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      {/* Header */}
+      <header className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
+        <Link href="/" className="flex items-center gap-3">
+          <LemonLogo className="h-8 w-8" />
+          <span className="font-heading text-xl font-semibold tracking-tight">My Lemon Kitchen</span>
+        </Link>
+        <nav aria-label="Account" className="flex items-center gap-2">
+          <Link href="/login" className={cn(pill, "min-h-11 px-4 text-[15px] hover:bg-muted")}>
+            Sign in
+          </Link>
+          <Link href="/register" className={cn(pill, pillSolid, "min-h-11 px-5 text-[15px]")}>
+            Get started
+          </Link>
+        </nav>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-28">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#FFF700]/15 via-transparent to-transparent" />
-        <div className="relative mx-auto max-w-4xl text-center">
-          <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center">
-            <LemonLogo className="h-16 w-16" />
-          </div>
-          <h1 className="text-3xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            Meal planning,
-            <br />
-            <span className="bg-gradient-to-r from-[#FFF700] to-[#f5c800] bg-clip-text text-transparent">
-              squeezed simple.
-            </span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
-            Plan meals, track your pantry, and build smart grocery lists.
-            Import recipes from anywhere. Share everything with your household.
+      <section className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-12 px-4 pt-8 pb-20 sm:px-6 lg:pt-12 lg:pb-24">
+        <div className="flex min-w-0 flex-[1_1_440px] flex-col gap-6">
+          <p className="text-sm font-extrabold tracking-[0.12em] text-primary uppercase">
+            Recipes, pantry, plans, groceries
           </p>
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/register">
-              <Button size="lg" className="h-12 gap-2 px-8 text-base">
-                Start Planning Free
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+          <h1 className="text-[clamp(2.75rem,6vw,5.25rem)] leading-[1.02] font-medium tracking-[-0.025em] text-balance">
+            Your whole kitchen, <em className="font-normal">finally</em> in one place.
+          </h1>
+          <p className="max-w-[34em] text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            Plan meals, track your pantry, and generate smart grocery lists. Share it all with the
+            people you cook for.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/register" className={cn(pill, pillSolid, "min-h-14 px-8 text-[17px]")}>
+              Create your kitchen
+            </Link>
+            <Link href="#features" className={cn(pill, pillOutline, "min-h-14 px-7 text-[17px]")}>
+              See how it works
             </Link>
           </div>
-          <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-3">
-            {highlights.map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Check className="h-4 w-4 text-[#c4b000]" />
-                {item}
-              </div>
-            ))}
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Free to start. Works on your phone, tablet and desktop.
+          </p>
+        </div>
+
+        <div className="flex min-w-0 flex-[1_1_380px] justify-center">
+          <LemonSlice>
+            <div className="pointer-events-none absolute bottom-[6%] left-0 z-10 flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-[0_12px_30px_-16px_rgb(60_45_10/0.35)]">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-leaf-soft">
+                <Check className="size-[18px] text-leaf-ink" strokeWidth={2.5} />
+              </span>
+              <span className="flex flex-col">
+                <strong className="text-[15px]">Know what you can make</strong>
+                <span className="text-[13px] text-muted-foreground">from what is in your pantry</span>
+              </span>
+            </div>
+          </LemonSlice>
         </div>
       </section>
 
       {/* Features */}
-      <section className="border-t bg-neutral-50 px-4 py-16 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-              Features
-            </p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+      <section id="features" className="scroll-mt-4 border-y bg-card">
+        <div className="mx-auto flex max-w-6xl flex-col gap-14 px-4 py-20 sm:px-6 lg:py-24">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <h2 className="max-w-[12em] font-heading text-[clamp(2.25rem,4vw,3.5rem)] leading-[1.05] font-medium tracking-[-0.02em]">
               Everything you need in one kitchen
             </h2>
+            <p className="max-w-[26em] text-lg leading-relaxed text-muted-foreground">
+              From the recipe you saved last spring to the lemon in the crisper drawer. It all
+              talks to each other.
+            </p>
           </div>
-          <div className="mt-16 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div key={feature.title} className="group">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-black transition-transform group-hover:scale-110">
-                  <feature.icon className="h-5 w-5 text-[#FFF700]" />
-                </div>
-                <h3 className="text-base font-semibold">{feature.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {feature.description}
-                </p>
-              </div>
+          <div className="grid border-t sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((f) => (
+              <article key={f.title} className="flex flex-col gap-2 border-b py-8 pr-8">
+                <h3 className="font-heading text-2xl font-semibold">{f.title}</h3>
+                <p className="leading-relaxed text-muted-foreground">{f.description}</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Household CTA */}
-      <section className="border-t px-4 py-16 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight">
-            Built for households, not just individuals
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Invite your partner, roommate, or family to share recipes, pantry
-            items, meal plans, and grocery lists. Everyone stays in sync.
-          </p>
-          <Link href="/register">
-            <Button size="lg" className="mt-8 h-12 gap-2 px-8 text-base">
-              Create Your Kitchen
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+      {/* Households */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 lg:py-24">
+        <div className="flex flex-wrap items-center gap-12 rounded-[2rem] bg-[#1f1b14] p-[clamp(2.25rem,6vw,5rem)] text-[#fbf7ee]">
+          <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-5">
+            <h2 className="font-heading text-[clamp(2.1rem,4vw,3.25rem)] leading-[1.06] font-medium tracking-[-0.02em]">
+              Built for households, not just individuals
+            </h2>
+            <p className="text-lg leading-relaxed text-[#d9d1bf]">
+              Invite your partner, roommate, or family to share recipes, pantry items, meal plans,
+              and grocery lists. Everyone stays in sync.
+            </p>
+            <div>
+              <Link href="/register" className={cn(pill, pillSolid, "min-h-13 px-7 text-base focus-visible:outline-[#f4cf3a]")}>
+                Create your kitchen
+              </Link>
+            </div>
+          </div>
+          <ul className="flex min-w-0 flex-[1_1_320px] flex-col">
+            {household.map((item, i) => (
+              <li
+                key={item}
+                className={cn(
+                  "flex items-center gap-4 py-5 text-lg",
+                  i < household.length - 1 && "border-b border-[#fbf7ee]/15"
+                )}
+              >
+                <span className="size-2.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* Closing CTA */}
+      <section className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6 px-4 pt-4 pb-28 text-center sm:px-6">
+        <h2 className="max-w-[14em] font-heading text-[clamp(2.25rem,5vw,4rem)] leading-[1.04] font-medium tracking-[-0.02em] text-balance">
+          Dinner is easier when the kitchen remembers for you.
+        </h2>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link href="/register" className={cn(pill, pillSolid, "min-h-14 px-8 text-[17px]")}>
+            Get started free
+          </Link>
+          <Link href="/login" className={cn(pill, pillOutline, "min-h-14 px-7 text-[17px]")}>
+            Sign in
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t bg-neutral-50 px-4 py-8 sm:px-6">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-2">
+      <footer className="mt-auto border-t">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-6">
+          <span className="flex items-center gap-2">
             <LemonLogo className="h-5 w-5" />
-            <span className="text-sm font-medium">My Lemon Kitchen</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Made with lemons
-          </p>
+            My Lemon Kitchen
+          </span>
+          <nav aria-label="Footer" className="flex gap-6">
+            <Link href="/blog">Recipe blogs</Link>
+            <Link href="/login">Sign in</Link>
+          </nav>
         </div>
       </footer>
     </div>

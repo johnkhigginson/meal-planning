@@ -49,10 +49,11 @@ export function FollowButton({ bookId, slug }: { bookId: number; slug: string })
 
   return (
     <Button
-      variant={following ? "secondary" : "outline"}
+      variant={following ? "default" : "outline"}
       size="sm"
       onClick={toggle}
       disabled={busy}
+      aria-pressed={loggedIn ? following : undefined}
       title={loggedIn ? (following ? "Unfollow this blog" : "Follow for new-recipe emails") : "Sign in to follow"}
     >
       {busy ? (

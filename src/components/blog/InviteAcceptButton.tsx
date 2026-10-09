@@ -32,7 +32,7 @@ export function InviteAcceptButton({ token }: { token: string }) {
 
   return (
     <div className="space-y-2">
-      <Button onClick={accept} disabled={busy} className="w-full">
+      <Button onClick={accept} disabled={busy} size="lg" className="w-full">
         {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Accept invitation
       </Button>

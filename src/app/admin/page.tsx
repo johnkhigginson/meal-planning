@@ -126,10 +126,10 @@ export default function AdminDashboard() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Admin</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-4xl leading-tight font-medium">Admin</h1>
+        <p className="text-muted-foreground">
           {isAdmin ? "Manage users, roles, and content library" : "Manage content library"}
         </p>
       </div>
@@ -139,70 +139,70 @@ export default function AdminDashboard() {
           <>
             <Card>
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">{stats.totalUsers}</div>
-                  <div className="text-xs text-muted-foreground">Users</div>
+                  <div className="font-heading text-2xl leading-none font-semibold tabular-nums">{stats.totalUsers}</div>
+                  <div className="mt-1 text-xs font-semibold text-muted-foreground">Users</div>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft">
                   <Store className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">{stats.totalHouseholds}</div>
-                  <div className="text-xs text-muted-foreground">Households</div>
+                  <div className="font-heading text-2xl leading-none font-semibold tabular-nums">{stats.totalHouseholds}</div>
+                  <div className="mt-1 text-xs font-semibold text-muted-foreground">Households</div>
                 </div>
               </CardContent>
             </Card>
           </>
         )}
-        <Link href="/admin/library">
-          <Card className="group transition-all hover:shadow-md">
+        <Link href="/admin/library" className="block rounded-2xl focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <Card className="group h-full transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]">
             <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-brand-foreground">
                 <UtensilsCrossed className="h-5 w-5" />
               </div>
               <div className="flex-1">
-                <div className="text-sm font-semibold">Content Library</div>
+                <div className="text-sm font-bold">Content library</div>
                 <div className="text-xs text-muted-foreground">Manage recipes &amp; stores</div>
               </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
             </CardContent>
           </Card>
         </Link>
         {isAdmin && (
-          <Link href="/admin/migrate">
-            <Card className="group transition-all hover:shadow-md">
+          <Link href="/admin/migrate" className="block rounded-2xl focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <Card className="group h-full transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft">
                   <Rss className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold">Import from Blogger</div>
+                  <div className="text-sm font-bold">Import from Blogger</div>
                   <div className="text-xs text-muted-foreground">Migrate a blog into a cookbook</div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
               </CardContent>
             </Card>
           </Link>
         )}
         {isAdmin && (
-          <Link href="/admin/logs">
-            <Card className="group transition-all hover:shadow-md">
+          <Link href="/admin/logs" className="block rounded-2xl focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <Card className="group h-full transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft">
                   <ScrollText className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold">Activity Log</div>
+                  <div className="text-sm font-bold">Activity log</div>
                   <div className="text-xs text-muted-foreground">Logins, edits, imports &amp; more</div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
               </CardContent>
             </Card>
           </Link>
@@ -210,16 +210,16 @@ export default function AdminDashboard() {
       </div>
 
       {isAdmin && <div>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Users</h2>
+        <h2 className="mb-3 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">Users</h2>
         <div className="space-y-2">
           {users.map((user) => (
             <div
               key={user.id}
-              className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-2xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold">{user.name}</span>
+                  <span className="text-sm font-bold">{user.name}</span>
                   <Badge variant={ROLE_VARIANTS[user.systemRole]} className="text-[10px]">
                     {ROLE_LABELS[user.systemRole]}
                   </Badge>
@@ -235,7 +235,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground">{user.email}</div>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground/70">
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                   <span>{user.household.name}</span>
                   <span>
                     {user.household._count.members} member
@@ -253,7 +253,7 @@ export default function AdminDashboard() {
                   </span>
                 </div>
                 {user.enabledMealSlots && (
-                  <div className="mt-0.5 text-xs text-muted-foreground/60">
+                  <div className="mt-0.5 text-xs text-muted-foreground">
                     Meals:{" "}
                     {user.enabledMealSlots
                       .split(",")
@@ -290,7 +290,7 @@ export default function AdminDashboard() {
                   }
                 >
                   <Sparkles
-                    className={`mr-1.5 h-3.5 w-3.5 ${user.aiEnabled ? "text-primary" : "text-muted-foreground/50"}`}
+                    className={`mr-1.5 h-3.5 w-3.5 ${user.aiEnabled ? "text-primary" : "text-muted-foreground"}`}
                   />
                   AI {user.aiEnabled ? "on" : "off"}
                 </Button>

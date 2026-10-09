@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, ArrowRight, Trash2 } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
@@ -50,59 +50,70 @@ export default function BooksPage() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">Recipe Books</h1>
-        <p className="text-sm text-muted-foreground">Organize your recipes into collections</p>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-4xl leading-tight font-medium">Recipe books</h1>
+        <p className="text-muted-foreground">Organize your recipes into collections</p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           placeholder="New book name"
+          aria-label="New book name"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && createBook()}
-          className="max-w-xs"
+          className="sm:max-w-xs"
         />
-        <Button onClick={createBook} disabled={creating || !newName.trim()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Book
+        <Button onClick={createBook} disabled={creating || !newName.trim()} size="lg" className="self-start">
+          <Plus className="h-4 w-4" />
+          Create book
         </Button>
       </div>
 
       {books.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          <BookOpen className="mx-auto mb-3 h-8 w-8" />
-          <p>No recipe books yet. Create one to start organizing your recipes.</p>
+        <div className="flex flex-col items-center gap-3 rounded-3xl border-[1.5px] border-dashed border-input px-6 py-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <BookOpen className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">No recipe books yet</p>
+          <p className="text-muted-foreground">Create one to start organizing your recipes.</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {books.map((book) => (
-            <Card key={book.id} className="group transition-all hover:shadow-md">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <Link href={`/books/${book.id}`} className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-primary" />
-                      <h3 className="text-sm font-semibold group-hover:text-primary transition-colors">{book.name}</h3>
-                    </div>
-                    {book.description && (
-                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{book.description}</p>
-                    )}
-                    <Badge variant="secondary" className="mt-2 text-[10px]">
-                      {book._count.entries} recipe{book._count.entries !== 1 ? "s" : ""}
-                    </Badge>
-                  </Link>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteBook(book.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Link href={`/books/${book.id}`}>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-                    </Link>
-                  </div>
+            <Card
+              key={book.id}
+              className="group gap-0 py-0 hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]"
+            >
+              <Link
+                href={`/books/${book.id}`}
+                className="block p-3 pb-0 focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-ring"
+              >
+                {/* Cover: a paper panel with a ruled title plate, like a cookbook jacket. */}
+                <div className="flex aspect-[5/3] flex-col items-center justify-center gap-3 rounded-xl border bg-muted px-6 text-center">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <h3 className="line-clamp-2 border-y-[3px] border-double border-input py-2 font-heading text-2xl leading-tight font-semibold text-balance transition-colors duration-200 ease-out group-hover:text-primary">
+                    {book.name}
+                  </h3>
                 </div>
-              </CardContent>
+                {book.description && (
+                  <p className="mt-3 line-clamp-2 px-2 text-sm text-muted-foreground">{book.description}</p>
+                )}
+              </Link>
+              <div className="flex items-center justify-between gap-2 px-5 pt-2 pb-3">
+                <Badge variant="secondary">
+                  {book._count.entries} recipe{book._count.entries !== 1 ? "s" : ""}
+                </Badge>
+                <div className="flex items-center">
+                  <Button variant="ghost" size="icon" className="size-10 text-destructive hover:text-destructive" aria-label={`Delete ${book.name}`} onClick={() => deleteBook(book.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Link href={`/books/${book.id}`} aria-label={`Open ${book.name}`} className="flex size-10 items-center justify-center rounded-full">
+                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              </div>
             </Card>
           ))}
         </div>

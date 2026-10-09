@@ -26,6 +26,7 @@ import { IngredientInput, type RecipeIngredientRow } from "./IngredientInput";
 import { Plus, Loader2, Globe, Upload, Camera, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { trackEvent } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 
 interface Unit {
   id: number;
@@ -678,10 +679,10 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Source — First */}
+      {/* Source, first */}
       <Card>
         <CardHeader>
-          <CardTitle>Source</CardTitle>
+          <CardTitle className="text-xl">Source</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Select
@@ -690,13 +691,13 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
           >
             <SelectTrigger>
               <SelectValue>
-                {{ PERSONAL: "Personal Recipe", WEBSITE: "Website", BOOK: "Cookbook / Book", BLOG: "Blog Post" }[form.sourceType] ?? "Personal Recipe"}
+                {{ PERSONAL: "Personal recipe", WEBSITE: "Website", BOOK: "Cookbook / book", BLOG: "Blog post" }[form.sourceType] ?? "Personal recipe"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="PERSONAL">Personal Recipe</SelectItem>
+              <SelectItem value="PERSONAL">Personal recipe</SelectItem>
               <SelectItem value="WEBSITE">Website</SelectItem>
-              <SelectItem value="BOOK">Cookbook / Book</SelectItem>
+              <SelectItem value="BOOK">Cookbook / book</SelectItem>
             </SelectContent>
           </Select>
 
@@ -737,7 +738,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="bookTitle">Book Title</Label>
+                  <Label htmlFor="bookTitle">Book title</Label>
                   <Input
                     id="bookTitle"
                     value={form.sourceBookTitle}
@@ -759,7 +760,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Upload Photo of Recipe</Label>
+                <Label>Upload photo of recipe</Label>
                 <div className="flex gap-2">
                   <input
                     ref={fileInputRef}
@@ -781,7 +782,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                     ) : (
                       <Upload className="mr-2 h-4 w-4" />
                     )}
-                    {parsingPhoto ? "Parsing..." : "Upload Photo"}
+                    {parsingPhoto ? "Parsing..." : "Upload photo"}
                   </Button>
                   <Button
                     type="button"
@@ -795,7 +796,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                     disabled={parsingPhoto}
                   >
                     <Camera className="mr-2 h-4 w-4" />
-                    Take Photo
+                    Take photo
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -813,9 +814,9 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
       {/* Raw imported ingredients (from scrape/photo) */}
       {rawIngredients.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50/50">
+        <Card className="border-transparent bg-brand-soft">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Imported Ingredients</CardTitle>
+            <CardTitle className="text-xl">Imported ingredients</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-muted-foreground">
@@ -844,11 +845,11 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       {/* Basic Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Info</CardTitle>
+          <CardTitle className="text-xl">Basic info</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Recipe Name *</Label>
+            <Label htmlFor="name">Recipe name *</Label>
             <Input
               id="name"
               value={form.name}
@@ -875,7 +876,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                 <img
                   src={form.imageUrl}
                   alt="Recipe preview"
-                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                  className="h-16 w-16 shrink-0 rounded-xl border object-cover"
                 />
               )}
               <div className="flex-1 space-y-2">
@@ -996,7 +997,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prepTime">Prep Time (min)</Label>
+              <Label htmlFor="prepTime">Prep time (min)</Label>
               <Input
                 id="prepTime"
                 type="number"
@@ -1011,7 +1012,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cookTime">Cook Time (min)</Label>
+              <Label htmlFor="cookTime">Cook time (min)</Label>
               <Input
                 id="cookTime"
                 type="number"
@@ -1029,14 +1030,14 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
         </CardContent>
       </Card>
 
-      {/* Ingredients — grouped into sections for multi-part recipes */}
+      {/* Ingredients, grouped into sections for multi-part recipes */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Ingredients</CardTitle>
-          <div className="flex gap-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-xl">Ingredients</CardTitle>
+          <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={addSection}>
               <Plus className="mr-1 h-4 w-4" />
-              Add Section
+              Add section
             </Button>
             <Button
               type="button"
@@ -1047,7 +1048,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               }
             >
               <Plus className="mr-1 h-4 w-4" />
-              Add Ingredient
+              Add ingredient
             </Button>
           </div>
         </CardHeader>
@@ -1058,7 +1059,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               <div
                 key={group.rows[0].row.key}
                 className={
-                  sectioned ? "space-y-2 rounded-lg border border-dashed p-3" : "space-y-2"
+                  sectioned ? "space-y-2 rounded-2xl border-[1.5px] border-dashed border-input p-3" : "space-y-2"
                 }
               >
                 {sectioned && (
@@ -1103,7 +1104,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       {/* Instructions */}
       <Card>
         <CardHeader>
-          <CardTitle>Instructions</CardTitle>
+          <CardTitle className="text-xl">Instructions</CardTitle>
         </CardHeader>
         <CardContent>
           <Textarea
@@ -1119,15 +1120,19 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       {/* Tags */}
       <Card>
         <CardHeader>
-          <CardTitle>Tags</CardTitle>
+          <CardTitle className="text-xl">Tags</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {allTags.map((tag) => (
               <Badge
                 key={tag.id}
-                variant={form.tagIds.includes(tag.id) ? "default" : "outline"}
-                className="cursor-pointer gap-1"
+                variant="outline"
+                className={cn(
+                  "h-7 cursor-pointer gap-1 bg-card px-2.5 text-[13px] font-semibold transition-colors duration-200 ease-out hover:bg-muted",
+                  form.tagIds.includes(tag.id) &&
+                    "border-transparent bg-brand font-bold text-brand-foreground hover:bg-brand/85"
+                )}
                 onClick={() => toggleTag(tag.id)}
               >
                 {tag.name}
@@ -1135,7 +1140,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                   <button
                     type="button"
                     aria-label={`Delete category ${tag.name}`}
-                    className="-mr-0.5 ml-0.5 rounded-full opacity-60 hover:opacity-100"
+                    className="-mr-0.5 ml-0.5 rounded-full opacity-60 transition-opacity duration-200 ease-out hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring"
                     onClick={(e) => {
                       e.stopPropagation();
                       deleteTag(tag);
@@ -1165,7 +1170,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               className="w-48"
             />
             <Button type="button" variant="outline" size="sm" onClick={createTag}>
-              Add Tag
+              Add tag
             </Button>
           </div>
         </CardContent>
@@ -1173,14 +1178,15 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
       {/* Submit */}
       {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-      <div className="flex gap-3">
-        <Button type="submit" disabled={saving}>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" size="lg" disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {recipeId ? "Update Recipe" : "Create Recipe"}
+          {recipeId ? "Update recipe" : "Create recipe"}
         </Button>
         <Button
           type="button"
           variant="outline"
+          size="lg"
           onClick={() => router.back()}
         >
           Cancel

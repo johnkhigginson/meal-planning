@@ -61,7 +61,7 @@ export function MobileNav() {
       <div className="sticky top-0 z-50 flex items-center justify-center border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <LemonLogo className="h-6 w-6" />
-          <span className="text-sm font-bold tracking-tight">My Lemon Kitchen</span>
+          <span className="font-heading text-base font-semibold tracking-tight">My Lemon Kitchen</span>
         </div>
       </div>
 
@@ -73,24 +73,38 @@ export function MobileNav() {
               key={tab.href}
               href={tab.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] transition-colors",
                 isActive(tab.href)
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                  ? "font-bold text-foreground"
+                  : "font-semibold text-muted-foreground"
               )}
             >
-              <tab.icon className="h-5 w-5" />
+              <span
+                className={cn(
+                  "flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-200",
+                  isActive(tab.href) && "bg-brand text-brand-foreground"
+                )}
+              >
+                <tab.icon className="h-5 w-5" />
+              </span>
               {tab.label}
             </Link>
           ))}
           <button
             onClick={() => setMoreOpen(true)}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-              moreOpen ? "text-primary" : "text-muted-foreground"
+              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] transition-colors",
+              moreOpen ? "font-bold text-foreground" : "font-semibold text-muted-foreground"
             )}
           >
-            <MoreHorizontal className="h-5 w-5" />
+            <span
+              className={cn(
+                "flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-200",
+                moreOpen && "bg-brand text-brand-foreground"
+              )}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </span>
             More
           </button>
         </div>
@@ -123,7 +137,7 @@ export function MobileNav() {
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
                     isActive(item.href)
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-brand-soft font-bold text-foreground"
                       : "text-foreground hover:bg-muted"
                   )}
                 >
@@ -138,7 +152,7 @@ export function MobileNav() {
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
                     isActive("/admin")
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-brand-soft font-bold text-foreground"
                       : "text-foreground hover:bg-muted"
                   )}
                 >

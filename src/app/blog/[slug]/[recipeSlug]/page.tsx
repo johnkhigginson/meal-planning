@@ -123,14 +123,14 @@ export default async function BlogRecipePage({ params }: PageProps) {
       )}
       <Link
         href={`/blog/${book.slug}`}
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground print:hidden"
+        className="mb-4 inline-flex items-center gap-1 rounded text-sm font-bold text-muted-foreground transition-colors duration-200 ease-out hover:text-foreground focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring print:hidden"
       >
         <ArrowLeft className="h-4 w-4" /> All recipes
       </Link>
 
       <article>
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{recipe.name}</h1>
+          <h1 className="font-display text-4xl leading-tight font-semibold tracking-tight">{recipe.name}</h1>
           <PrintButton />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -140,7 +140,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
           {recipe.author?.name ? (
             <>
               {" · by "}
-              <Link href={`/blog/${book.slug}/about`} className="text-primary hover:underline">
+              <Link href={`/blog/${book.slug}/about`} className="font-bold text-primary hover:underline">
                 {recipe.author.name}
               </Link>
             </>
@@ -151,18 +151,18 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
         {recipe.imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.imageUrl} alt={recipe.name} className="mt-5 w-full rounded-2xl object-cover" />
+          <img src={recipe.imageUrl} alt={recipe.name} className="mt-6 w-full rounded-3xl object-cover" />
         )}
 
-        <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-muted-foreground">
           {totalTime > 0 && (
             <span className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
+              <Clock className="h-4 w-4 text-primary" aria-hidden="true" />
               {totalTime}m
             </span>
           )}
           <span className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
+            <Users className="h-4 w-4 text-primary" aria-hidden="true" />
             {recipe.servings} servings
           </span>
           {recipe.sourceUrl && (
@@ -170,7 +170,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
               href={recipe.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-primary hover:underline"
+              className="flex items-center gap-1 font-bold text-primary hover:underline"
             >
               <Globe className="h-4 w-4" /> Original post
             </a>
@@ -180,7 +180,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
         {recipe.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1">
             {recipe.tags.map(({ tag }) => (
-              <Badge key={tag.name} variant="outline">
+              <Badge key={tag.name} variant="tag">
                 {tag.name}
               </Badge>
             ))}
@@ -216,8 +216,8 @@ export default async function BlogRecipePage({ params }: PageProps) {
         )}
 
         {recipe.author?.bio && (
-          <div className="mt-10 rounded-2xl border border-border/60 bg-card/50 p-5">
-            <p className="text-sm font-semibold">About {recipe.author.name}</p>
+          <div className="mt-10 rounded-2xl border bg-card p-5">
+            <p className="font-heading text-xl font-semibold">About {recipe.author.name}</p>
             <p className="mt-1 text-sm text-muted-foreground">{recipe.author.bio}</p>
           </div>
         )}

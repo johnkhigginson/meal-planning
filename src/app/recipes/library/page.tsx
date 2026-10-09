@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { PageLoader } from "@/components/shared/PageLoader";
-import { Plus, Check, Clock, Users, ArrowLeft } from "lucide-react";
+import { Plus, Check, Clock, Users, ArrowLeft, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 interface LibraryRecipe {
@@ -59,69 +59,72 @@ export default function BrowseLibraryPage() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href="/recipes">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">Recipe Library</h1>
-          </div>
-          <p className="ml-10 text-sm text-muted-foreground">Browse and add recipes to your collection</p>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="space-y-3">
+        <Link
+          href="/recipes"
+          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 text-muted-foreground")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Recipes
+        </Link>
+        <div className="space-y-1">
+          <h1 className="text-4xl leading-tight font-medium">Recipe library</h1>
+          <p className="text-muted-foreground">Browse and add recipes to your collection</p>
         </div>
       </div>
 
       <SearchInput value={search} onChange={setSearch} placeholder="Search library..." />
 
       {recipes.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          {search ? "No recipes match your search" : "No recipes in the library yet"}
+        <div className="flex flex-col items-center gap-3 rounded-3xl border bg-card px-6 py-14 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <BookOpen className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">
+            {search ? "No recipes match your search" : "No recipes in the library yet"}
+          </p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {recipes.map((recipe) => {
             const totalTime = (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0);
             const added = addedIds.has(recipe.id);
             return (
-              <Card key={recipe.id} className="group">
-                <CardContent className="space-y-3 p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold leading-snug">{recipe.name}</h3>
-                    <Button
-                      size="sm"
-                      variant={added ? "secondary" : "default"}
-                      className="shrink-0"
-                      onClick={() => !added && addRecipe(recipe.id)}
-                      disabled={addingId === recipe.id || added}
-                    >
-                      {added ? (
-                        <><Check className="mr-1 h-3 w-3" /> Added</>
-                      ) : (
-                        <><Plus className="mr-1 h-3 w-3" /> Add</>
-                      )}
-                    </Button>
-                  </div>
-                  {recipe.description && (
-                    <p className="line-clamp-2 text-xs text-muted-foreground">{recipe.description}</p>
-                  )}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    {totalTime > 0 && (
-                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{totalTime}m</span>
+              <div key={recipe.id} className="flex flex-col gap-3 rounded-2xl border bg-card p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-base leading-snug font-bold">{recipe.name}</h3>
+                  <Button
+                    size="sm"
+                    variant={added ? "secondary" : "default"}
+                    className={cn("shrink-0", added && "bg-leaf-soft text-leaf-ink disabled:opacity-100")}
+                    onClick={() => !added && addRecipe(recipe.id)}
+                    disabled={addingId === recipe.id || added}
+                  >
+                    {added ? (
+                      <><Check className="h-3.5 w-3.5" /> Added</>
+                    ) : (
+                      <><Plus className="h-3.5 w-3.5" /> Add</>
                     )}
-                    <span className="flex items-center gap-1"><Users className="h-3 w-3" />{recipe.servings}</span>
-                    {recipe.category && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{recipe.category}</Badge>}
-                  </div>
-                  {recipe.ingredients.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground/60">
-                      {recipe.ingredients.slice(0, 5).map((i) => i.ingredient.name).join(", ")}
-                      {recipe.ingredients.length > 5 && ` +${recipe.ingredients.length - 5} more`}
-                    </p>
+                  </Button>
+                </div>
+                {recipe.description && (
+                  <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{recipe.description}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+                  {totalTime > 0 && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{totalTime}m</span>
                   )}
-                </CardContent>
-              </Card>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />{recipe.servings}</span>
+                  {recipe.category && <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{recipe.category}</Badge>}
+                </div>
+                {recipe.ingredients.length > 0 && (
+                  <p className="mt-auto border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+                    {recipe.ingredients.slice(0, 5).map((i) => i.ingredient.name).join(", ")}
+                    {recipe.ingredients.length > 5 && ` +${recipe.ingredients.length - 5} more`}
+                  </p>
+                )}
+              </div>
             );
           })}
         </div>

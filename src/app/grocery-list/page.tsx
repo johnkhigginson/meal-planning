@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageLoader } from "@/components/shared/PageLoader";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +22,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DollarSign, Loader2, MapPin, Store, Tag, Trash2 } from "lucide-react";
+import { Check, DollarSign, Loader2, MapPin, ShoppingCart, Store, Tag, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { INGREDIENT_CATEGORIES } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 interface GroceryListItem {
   id: number;
@@ -313,20 +314,26 @@ function GroceryListContent() {
 
   if (!current) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Grocery List</h1>
+      <div className="mx-auto max-w-2xl space-y-8">
+        <h1 className="text-4xl leading-tight font-medium">Grocery list</h1>
         {listPicker}
-        <div className="py-12 text-center">
-          <p className="text-lg text-muted-foreground">
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input px-6 py-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+            <ShoppingCart className="h-6 w-6" />
+          </div>
+          <p className="font-heading text-xl">
             {hasSavedLists ? "That grocery list isn't available" : "No grocery lists yet"}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="max-w-sm text-sm text-muted-foreground">
             Go to{" "}
-            <Link href="/meal-plan" className="text-primary underline">
-              Meal Plan
+            <Link href="/meal-plan" className="font-bold text-primary underline-offset-4 hover:underline">
+              Meal plan
             </Link>{" "}
-            and click &quot;Grocery List&quot; to make one for the week
+            and click &quot;Grocery list&quot; to make one for the week
           </p>
+          <Link href="/meal-plan" className={cn(buttonVariants({ size: "lg" }), "mt-1")}>
+            Open meal plan
+          </Link>
         </div>
       </div>
     );
@@ -338,43 +345,49 @@ function GroceryListContent() {
   const sections = view === "recipe" ? groupByRecipe(list, needToBuy) : groupByAisle(needToBuy);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto max-w-2xl space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold">Grocery List</h1>
-          {listPicker || <p className="text-sm text-muted-foreground">{list.name}</p>}
-          <div className="mt-2 flex gap-2 text-sm">
-            <Badge variant="outline">
+          <h1 className="text-4xl leading-tight font-medium">Grocery list</h1>
+          {listPicker || <p className="text-muted-foreground">{list.name}</p>}
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <Badge variant="outline" className="h-6 px-2.5 font-bold tabular-nums">
               {needToBuy.filter((i) => i.checked).length}/{needToBuy.length} checked
             </Badge>
             {alreadyHave.length > 0 && (
-              <Badge variant="secondary">
+              <Badge variant="pantry" className="h-6 px-2.5 tabular-nums">
                 {alreadyHave.length} already in pantry
               </Badge>
             )}
           </div>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={findBestPrices} disabled={loadingShopping || needToBuy.length === 0}>
-            {loadingShopping ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <DollarSign className="mr-2 h-3.5 w-3.5" />}
-            Find Best Prices
+        <div className="flex shrink-0 gap-2 print:hidden">
+          <Button variant="outline" className="h-10" onClick={findBestPrices} disabled={loadingShopping || needToBuy.length === 0}>
+            {loadingShopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <DollarSign className="h-4 w-4 text-primary" />}
+            Find best prices
           </Button>
-          <Button variant="ghost" size="sm" onClick={deleteList} aria-label="Delete this grocery list">
-            <Trash2 className="h-3.5 w-3.5" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            onClick={deleteList}
+            aria-label="Delete this grocery list"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Smart shopping results */}
       {shopping && (
-        <Card className="border-green-200 bg-green-50/30">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Store className="h-4 w-4" />
-                Smart Shopping List
+        <Card className="border-leaf/30 bg-leaf-soft/50">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Store className="h-5 w-5 text-leaf-ink" />
+                Smart shopping list
               </CardTitle>
-              <Badge variant="default" className="text-sm">
+              <Badge variant="pantry" className="h-7 px-3 font-heading text-base tabular-nums">
                 ~${shopping.totalEstimate.toFixed(2)}
               </Badge>
             </div>
@@ -386,24 +399,24 @@ function GroceryListContent() {
             {Object.entries(shopping.byStore).map(([storeName, storeItems]) => (
               <div key={storeName}>
                 <div className="mb-2 flex items-center gap-2">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-sm font-semibold">{storeName}</span>
-                  <Badge variant="outline" className="text-[10px]">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-bold">{storeName}</span>
+                  <Badge variant="outline" className="bg-card">
                     {storeItems.length} item{storeItems.length !== 1 ? "s" : ""}
                   </Badge>
                 </div>
-                <div className="space-y-1 pl-5">
+                <div className="space-y-1.5 pl-6">
                   {storeItems.map((item) => (
-                    <div key={item.ingredientId} className="flex items-center justify-between text-sm">
+                    <div key={item.ingredientId} className="flex items-center justify-between gap-3 text-sm">
                       <span>
-                        {item.needed} {item.unitAbbr} {item.ingredientName}
+                        <span className="font-bold">{item.needed} {item.unitAbbr}</span> {item.ingredientName}
                       </span>
                       {item.bestStore ? (
-                        <span className="text-xs font-medium text-green-700">
+                        <span className="shrink-0 text-sm font-bold text-leaf-ink tabular-nums">
                           ${item.bestStore.price.toFixed(2)}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">no price</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">no price</span>
                       )}
                     </div>
                   ))}
@@ -416,19 +429,21 @@ function GroceryListContent() {
 
       {/* Sort by store aisle or by the recipe each item is for */}
       {needToBuy.length > 0 && (
-        <div className="flex gap-1.5">
+        <div role="group" aria-label="Sort list" className="flex gap-1.5 print:hidden">
           <Button
             type="button"
-            size="sm"
+            className="h-10"
             variant={view === "aisle" ? "default" : "outline"}
+            aria-pressed={view === "aisle"}
             onClick={() => changeView("aisle")}
           >
             By aisle
           </Button>
           <Button
             type="button"
-            size="sm"
+            className="h-10"
             variant={view === "recipe" ? "default" : "outline"}
+            aria-pressed={view === "recipe"}
             onClick={() => changeView("recipe")}
           >
             By recipe
@@ -438,20 +453,31 @@ function GroceryListContent() {
 
       {/* Items to buy */}
       {sections.map((section) => (
-        <Card key={section.key}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{section.title}</CardTitle>
+        <Card key={section.key} className="gap-2">
+          <CardHeader>
+            <CardTitle className="text-xl">{section.title}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent>
+            <ul>
             {section.rows.map(({ item, note }) => (
-              <div key={item.id} className="flex items-center gap-2">
-                <label className="flex flex-1 cursor-pointer items-center gap-3">
+              <li
+                key={item.id}
+                className="flex items-center gap-2 border-b border-border/70 last:border-b-0"
+              >
+                <label className="flex min-h-12 flex-1 cursor-pointer items-center gap-3 py-2">
                   <Checkbox
                     checked={item.checked}
                     onCheckedChange={(checked) => toggleItem(item.id, checked === true)}
+                    className="size-6 rounded-md border-2 border-muted-foreground/60 data-checked:border-leaf data-checked:bg-leaf data-checked:text-white dark:data-checked:bg-leaf dark:data-checked:text-brand-foreground [&_svg]:size-4!"
                   />
-                  <span className={item.checked ? "text-muted-foreground line-through" : ""}>
-                    <span className="font-medium">
+                  <span
+                    className={
+                      item.checked
+                        ? "text-muted-foreground line-through decoration-muted-foreground/70 transition-colors duration-200 ease-out"
+                        : "transition-colors duration-200 ease-out"
+                    }
+                  >
+                    <span className="font-extrabold">
                       {item.needed} {item.unit.abbreviation}
                     </span>{" "}
                     {item.ingredient.name}
@@ -468,9 +494,9 @@ function GroceryListContent() {
                     <DropdownMenuTrigger
                       aria-label={`Change aisle for ${item.ingredient.name}`}
                       title="Change aisle"
-                      className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 ease-out outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-muted aria-expanded:text-foreground print:hidden"
                     >
-                      <Tag className="h-3.5 w-3.5" />
+                      <Tag className="h-4 w-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-40">
                       <DropdownMenuRadioGroup
@@ -486,8 +512,9 @@ function GroceryListContent() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-              </div>
+              </li>
             ))}
+            </ul>
           </CardContent>
         </Card>
       ))}
@@ -496,20 +523,27 @@ function GroceryListContent() {
       {alreadyHave.length > 0 && (
         <>
           <Separator />
-          <Card className="opacity-60">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Already In Pantry</CardTitle>
+          <Card className="gap-2 bg-muted/60">
+            <CardHeader>
+              <CardTitle className="text-xl">Already in pantry</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1">
-              {alreadyHave.map((item) => (
-                <div
-                  key={item.id}
-                  className="text-sm text-muted-foreground line-through"
-                >
-                  {item.quantity} {item.unit.abbreviation}{" "}
-                  {item.ingredient.name}
-                </div>
-              ))}
+            <CardContent>
+              <ul className="space-y-1.5">
+                {alreadyHave.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-2.5 text-sm text-muted-foreground"
+                  >
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-leaf-soft text-leaf-ink">
+                      <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
+                    </span>
+                    <span className="line-through decoration-muted-foreground/70">
+                      {item.quantity} {item.unit.abbreviation}{" "}
+                      {item.ingredient.name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
         </>

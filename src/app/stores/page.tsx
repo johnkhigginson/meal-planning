@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
-import { Plus, Trash2, Star, Loader2, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Star, Loader2, ArrowRight, Store as StoreIcon } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Store {
@@ -88,50 +87,59 @@ export default function StoresPage() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Stores</h1>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="space-y-1">
+        <h1 className="text-4xl leading-tight font-medium">Stores</h1>
         <p className="text-muted-foreground">
           Manage stores and pricing for smart shopping lists
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           placeholder="Store name"
+          aria-label="Store name"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addStore()}
-          className="w-64"
+          className="sm:w-64"
         />
-        <Button onClick={addStore}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Store
+        <Button onClick={addStore} size="lg" className="self-start">
+          <Plus className="h-4 w-4" />
+          Add store
         </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stores.map((store) => (
-          <Card key={store.id} className="group transition-all hover:shadow-md">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <Link href={`/stores/${store.id}`} className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <div className="text-sm font-semibold group-hover:text-primary transition-colors">{store.name}</div>
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+          <Card
+            key={store.id}
+            className="group hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]"
+          >
+            <CardContent className="p-0 px-5">
+              <div className="flex items-center justify-between gap-2">
+                <Link href={`/stores/${store.id}`} className="min-w-0 flex-1 rounded-xl focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-heading text-lg leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{store.name}</div>
+                    <Badge variant="secondary">
                       {store._count.prices} prices
                     </Badge>
                   </div>
                 </Link>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => toggleFavorite(store)} className="p-1">
-                    <Star className={`h-4 w-4 ${store.isFavorite ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground"}`} />
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => toggleFavorite(store)}
+                    aria-label={store.isFavorite ? `Unfavorite ${store.name}` : `Favorite ${store.name}`}
+                    aria-pressed={store.isFavorite}
+                    className="flex size-10 items-center justify-center rounded-full transition-colors duration-200 ease-out hover:bg-muted"
+                  >
+                    <Star className={`h-4 w-4 ${store.isFavorite ? "fill-primary text-primary" : "text-muted-foreground"}`} />
                   </button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteStore(store.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
+                  <Button variant="ghost" size="icon" className="size-10 text-destructive hover:text-destructive" aria-label={`Delete ${store.name}`} onClick={() => deleteStore(store.id)}>
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                  <Link href={`/stores/${store.id}`}>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
+                  <Link href={`/stores/${store.id}`} aria-label={`Open ${store.name}`} className="flex size-10 items-center justify-center rounded-full">
+                    <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
                   </Link>
                 </div>
               </div>
@@ -140,9 +148,13 @@ export default function StoresPage() {
         ))}
 
         {stores.length === 0 && (
-          <p className="col-span-full py-8 text-center text-muted-foreground">
-            No stores added yet. Add a store to start tracking prices.
-          </p>
+          <div className="col-span-full flex flex-col items-center gap-3 rounded-3xl border-[1.5px] border-dashed border-input px-6 py-12 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
+              <StoreIcon className="h-6 w-6" />
+            </div>
+            <p className="font-heading text-xl">No stores added yet</p>
+            <p className="text-muted-foreground">Add a store to start tracking prices.</p>
+          </div>
         )}
       </div>
 
@@ -152,29 +164,29 @@ export default function StoresPage() {
         const available = libraryStores.filter((ls) => !storeNames.has(ls.name));
         if (available.length === 0) return null;
         return (
-          <div>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Add from Library
+          <section aria-labelledby="library-heading">
+            <h2 id="library-heading" className="mb-4 font-heading text-2xl font-semibold">
+              Add from library
             </h2>
             <div className="flex flex-wrap gap-2">
               {available.map((ls) => (
                 <Button
                   key={ls.id}
                   variant="outline"
-                  size="sm"
+                  className="h-10"
                   onClick={() => addFromLibrary(ls)}
                   disabled={addingLibId === ls.id}
                 >
                   {addingLibId === ls.id ? (
-                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <Plus className="mr-1.5 h-3 w-3" />
+                    <Plus className="h-3.5 w-3.5" />
                   )}
                   {ls.name}
                 </Button>
               ))}
             </div>
-          </div>
+          </section>
         );
       })()}
     </div>

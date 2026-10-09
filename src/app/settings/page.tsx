@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Loader2, Save, UserPlus, X, Users, LayoutDashboard, Upload } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { PageLoader } from "@/components/shared/PageLoader";
+import SettingsSkeleton from "./loading";
 import { OPTIONAL_NAV_ITEMS, parseHiddenNav } from "@/lib/nav";
 
 const ALL_MEAL_SLOTS = [
@@ -176,18 +176,18 @@ export default function SettingsPage() {
     setInvites((prev) => prev.filter((i) => i.id !== id));
   }
 
-  if (!settings) return <PageLoader />;
+  if (!settings) return <SettingsSkeleton />;
 
   const isOwner = settings.role === "OWNER";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+    <div className="mx-auto max-w-2xl space-y-8">
+      <h1 className="text-3xl leading-tight font-medium sm:text-4xl">Settings</h1>
 
       {/* Profile */}
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
+          <CardTitle className="text-xl">Profile</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -216,12 +216,12 @@ export default function SettingsPage() {
 
           <div className="space-y-2">
             <Label>Photo</Label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
               ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-muted-foreground">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-soft font-heading text-xl font-semibold text-primary">
                   {name.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -244,23 +244,23 @@ export default function SettingsPage() {
       {/* Meal Preferences */}
       <Card>
         <CardHeader>
-          <CardTitle>Meal Plan Preferences</CardTitle>
+          <CardTitle className="text-xl">Meal plan preferences</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           <p className="text-sm text-muted-foreground">
             Choose which meals to show in your weekly meal plan.
           </p>
           {ALL_MEAL_SLOTS.map((slot) => (
-            <label key={slot.value} className="flex cursor-pointer items-center gap-3">
+            <label key={slot.value} className="flex min-h-10 cursor-pointer items-center gap-3">
               <Checkbox
                 checked={enabledSlots.includes(slot.value)}
                 onCheckedChange={() => toggleSlot(slot.value)}
               />
-              <span className="text-sm font-medium">{slot.label}</span>
+              <span className="text-sm font-semibold">{slot.label}</span>
             </label>
           ))}
           {enabledSlots.length === 0 && (
-            <p className="text-sm text-destructive">Select at least one meal slot</p>
+            <p role="alert" className="text-sm font-semibold text-destructive">Select at least one meal slot</p>
           )}
         </CardContent>
       </Card>
@@ -269,21 +269,21 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <LayoutDashboard className="h-5 w-5" />
-            <CardTitle>Menu</CardTitle>
+            <LayoutDashboard className="h-5 w-5 text-primary" aria-hidden="true" />
+            <CardTitle className="text-xl">Menu</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           <p className="text-sm text-muted-foreground">
             Choose which sections appear in your menu. Recipes and Cookbooks are always shown.
           </p>
           {OPTIONAL_NAV_ITEMS.map((item) => (
-            <label key={item.href} className="flex cursor-pointer items-center gap-3">
+            <label key={item.href} className="flex min-h-10 cursor-pointer items-center gap-3">
               <Checkbox
                 checked={!hiddenNav.has(item.href)}
                 onCheckedChange={(c) => toggleNavVisible(item.href, c === true)}
               />
-              <span className="text-sm font-medium">{item.label}</span>
+              <span className="text-sm font-semibold">{item.label}</span>
             </label>
           ))}
         </CardContent>
@@ -293,14 +293,14 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            <CardTitle>Household</CardTitle>
+            <Users className="h-5 w-5 text-primary" aria-hidden="true" />
+            <CardTitle className="text-xl">Household</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {isOwner && (
             <div className="space-y-2">
-              <Label htmlFor="householdName">Household Name</Label>
+              <Label htmlFor="householdName">Household name</Label>
               <Input
                 id="householdName"
                 value={householdName}
@@ -310,16 +310,16 @@ export default function SettingsPage() {
           )}
           {!isOwner && (
             <div className="space-y-2">
-              <Label>Household Name</Label>
+              <Label>Household name</Label>
               <p className="text-sm">{settings.household.name}</p>
             </div>
           )}
           <div className="space-y-2">
-            <Label className="text-muted-foreground">Members</Label>
+            <Label className="text-xs font-extrabold tracking-[0.08em] text-muted-foreground uppercase">Members</Label>
             {settings.household.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between rounded-lg border p-3">
+              <div key={member.id} className="flex items-center justify-between gap-3 rounded-xl border bg-background/60 p-3">
                 <div>
-                  <p className="text-sm font-medium">{member.name}</p>
+                  <p className="text-sm font-bold">{member.name}</p>
                   <p className="text-xs text-muted-foreground">{member.email}</p>
                 </div>
                 <Badge variant={member.role === "OWNER" ? "default" : "secondary"}>
@@ -332,11 +332,11 @@ export default function SettingsPage() {
           {/* Pending invites */}
           {invites.filter((i) => i.status === "PENDING").length > 0 && (
             <div className="space-y-2">
-              <Label className="text-muted-foreground">Pending Invites</Label>
+              <Label className="text-xs font-extrabold tracking-[0.08em] text-muted-foreground uppercase">Pending invites</Label>
               {invites
                 .filter((i) => i.status === "PENDING")
                 .map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between rounded-lg border border-dashed p-3">
+                  <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-input p-3">
                     <div>
                       <p className="text-sm">{invite.email}</p>
                       <p className="text-xs text-muted-foreground">
@@ -344,7 +344,7 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     {isOwner && (
-                      <Button variant="ghost" size="sm" onClick={() => cancelInvite(invite.id)}>
+                      <Button variant="ghost" size="icon" onClick={() => cancelInvite(invite.id)} aria-label={`Cancel invite to ${invite.email}`}>
                         <X className="h-4 w-4" />
                       </Button>
                     )}
@@ -360,7 +360,7 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 They&apos;ll share your recipes, pantry, meal plans, and grocery lists.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   type="email"
                   placeholder="partner@email.com"
@@ -368,25 +368,25 @@ export default function SettingsPage() {
                   onChange={(e) => { setInviteEmail(e.target.value); setInviteError(""); setInviteSuccess(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleInvite()}
                 />
-                <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
+                <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} className="h-10">
                   {inviting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
                   Invite
                 </Button>
               </div>
               {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
-              {inviteSuccess && <p className="text-sm text-green-600">{inviteSuccess}</p>}
+              {inviteSuccess && <p className="text-sm font-semibold text-leaf-ink">{inviteSuccess}</p>}
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Save button */}
-      <div className="flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving || enabledSlots.length === 0}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="lg" onClick={handleSave} disabled={saving || enabledSlots.length === 0}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save Settings
+          Save settings
         </Button>
-        {saved && <span className="text-sm text-green-600">Settings saved</span>}
+        {saved && <span role="status" className="text-sm font-semibold text-leaf-ink">Settings saved</span>}
       </div>
     </div>
   );

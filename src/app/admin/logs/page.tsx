@@ -77,18 +77,18 @@ export default function AdminLogsPage() {
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <Link href="/admin">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex items-start gap-2">
+        <Link href="/admin" aria-label="Back to admin" className="mt-1.5 rounded-full focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <Button variant="ghost" size="icon" className="h-9 w-9" tabIndex={-1}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <ScrollText className="h-6 w-6" /> Activity Log
+          <h1 className="flex items-center gap-2 text-4xl leading-tight font-medium">
+            <ScrollText className="h-7 w-7 text-primary" aria-hidden="true" /> Activity log
           </h1>
-          <p className="text-sm text-muted-foreground">{total} recorded events</p>
+          <p className="text-muted-foreground">{total} recorded events</p>
         </div>
       </div>
 
@@ -123,13 +123,13 @@ export default function AdminLogsPage() {
           {logs.map((log) => (
             <div
               key={log.id}
-              className="flex flex-col gap-1 rounded-xl border border-border/60 bg-card px-4 py-2.5 shadow-sm sm:flex-row sm:items-center sm:gap-3"
+              className="flex flex-col gap-1 rounded-xl border bg-card px-4 py-2.5 sm:flex-row sm:items-center sm:gap-3"
             >
               <Badge variant={CATEGORY_VARIANTS[log.category] ?? "outline"} className="w-fit text-[10px]">
                 {log.category}
               </Badge>
               <span className="flex-1 text-sm">{log.summary}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                 {new Date(log.createdAt).toLocaleString()}
               </span>
             </div>
@@ -139,13 +139,13 @@ export default function AdminLogsPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm text-muted-foreground">
             Page {page} of {totalPages}
           </span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

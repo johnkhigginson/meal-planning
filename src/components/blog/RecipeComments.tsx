@@ -70,45 +70,48 @@ export function RecipeComments({ recipeId, canModerate }: { recipeId: number; ca
   }
 
   return (
-    <section className="mt-10 border-t border-border/60 pt-6">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-        <MessageCircle className="h-5 w-5 text-primary" />
+    <section className="mt-10 border-t pt-8">
+      <h2 className="mb-4 flex items-center gap-2 font-heading text-2xl font-semibold">
+        <MessageCircle className="h-5 w-5 text-primary" aria-hidden="true" />
         Comments{comments.length > 0 ? ` (${comments.length})` : ""}
       </h2>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {comments.length === 0 && (
           <p className="text-sm text-muted-foreground">Be the first to comment.</p>
         )}
         {comments.map((c) => (
-          <div key={c.id} className="rounded-xl border border-border/60 bg-card/50 p-4">
+          <div key={c.id} className="rounded-2xl border bg-card p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">{c.authorName}</span>
+              <span className="text-sm font-bold">{c.authorName}</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">{formatDate(c.createdAt)}</span>
                 {(canModerate || c.mine) && (
                   <button
+                    type="button"
                     onClick={() => remove(c.id)}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="-m-1.5 rounded-full p-1.5 text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-destructive focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     title="Delete comment"
+                    aria-label="Delete comment"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 )}
               </div>
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p>
+            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6">{c.body}</p>
           </div>
         ))}
       </div>
 
       {loggedIn ? (
         <form onSubmit={submit} className="mt-6 space-y-3">
-          <h3 className="text-sm font-semibold">Leave a comment</h3>
+          <h3 className="text-base font-bold">Leave a comment</h3>
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={3}
+            aria-label="Comment"
             maxLength={5000}
             placeholder="Share your thoughts…"
             required
@@ -120,10 +123,10 @@ export function RecipeComments({ recipeId, canModerate }: { recipeId: number; ca
           </Button>
         </form>
       ) : (
-        <div className="mt-6 rounded-xl border border-border/60 bg-card/50 p-4 text-sm text-muted-foreground">
+        <div className="mt-6 rounded-2xl bg-muted p-4 text-sm text-muted-foreground">
           <Link
             href={`/login?callbackUrl=${encodeURIComponent(pathname)}`}
-            className="font-medium text-primary hover:underline"
+            className="font-bold text-primary hover:underline"
           >
             Sign in
           </Link>{" "}

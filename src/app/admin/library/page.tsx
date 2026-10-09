@@ -180,10 +180,10 @@ export default function LibraryPage() {
   if (loading) return <PageLoader />;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Content Library</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="space-y-1">
+        <h1 className="text-4xl leading-tight font-medium">Content library</h1>
+        <p className="text-muted-foreground">
           Recipes and stores here are available for all users to add to their accounts
         </p>
       </div>
@@ -192,12 +192,12 @@ export default function LibraryPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
-            <UtensilsCrossed className="h-5 w-5" />
-            <CardTitle>Recipes ({recipes.length})</CardTitle>
+            <UtensilsCrossed className="h-5 w-5 text-primary" aria-hidden="true" />
+            <CardTitle className="font-heading text-xl font-semibold">Recipes ({recipes.length})</CardTitle>
           </div>
           <Button size="sm" onClick={() => setRecipeDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Recipe
+            Add recipe
           </Button>
         </CardHeader>
         <CardContent>
@@ -206,16 +206,16 @@ export default function LibraryPage() {
           ) : (
             <div className="space-y-2">
               {recipes.map((recipe) => (
-                <div key={recipe.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div key={recipe.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">
                   <div>
-                    <div className="text-sm font-semibold">{recipe.name}</div>
+                    <div className="text-sm font-bold">{recipe.name}</div>
                     <div className="text-xs text-muted-foreground">
                       {recipe.servings} servings
                       {recipe.category && ` · ${recipe.category}`}
                       {recipe.sourceUrl && " · From web"}
                     </div>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteRecipe(recipe.id)}>
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteRecipe(recipe.id)} aria-label={`Delete ${recipe.name}`}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -229,8 +229,8 @@ export default function LibraryPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Store className="h-5 w-5" />
-            <CardTitle>Stores ({stores.length})</CardTitle>
+            <Store className="h-5 w-5 text-primary" aria-hidden="true" />
+            <CardTitle className="font-heading text-xl font-semibold">Stores ({stores.length})</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -251,9 +251,9 @@ export default function LibraryPage() {
           ) : (
             <div className="space-y-2">
               {stores.map((store) => (
-                <div key={store.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <span className="text-sm font-medium">{store.name}</span>
-                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteStore(store.id)}>
+                <div key={store.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">
+                  <span className="text-sm font-bold">{store.name}</span>
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteStore(store.id)} aria-label={`Delete ${store.name}`}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -267,7 +267,7 @@ export default function LibraryPage() {
       <Dialog open={recipeDialogOpen} onOpenChange={setRecipeDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Library Recipe</DialogTitle>
+            <DialogTitle>Add library recipe</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -301,7 +301,7 @@ export default function LibraryPage() {
             {parsedIngredients.length > 0 && (
               <div className="space-y-2">
                 <Label>Ingredients ({parsedIngredients.length})</Label>
-                <div className="max-h-32 overflow-y-auto rounded-lg border p-2 text-xs">
+                <div className="max-h-32 overflow-y-auto rounded-xl bg-muted p-2 text-xs">
                   {parsedIngredients.map((p, i) => (
                     <div key={i} className="py-0.5">
                       {p.quantity} &middot; {p.ingredientName}{p.notes ? ` (${p.notes})` : ""}
@@ -319,7 +319,7 @@ export default function LibraryPage() {
             <Button variant="outline" onClick={() => { setRecipeDialogOpen(false); resetRecipeForm(); }}>Cancel</Button>
             <Button onClick={addRecipe} disabled={recipeSaving || !recipeName || !recipeInstructions}>
               {recipeSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add to Library
+              Add to library
             </Button>
           </DialogFooter>
         </DialogContent>

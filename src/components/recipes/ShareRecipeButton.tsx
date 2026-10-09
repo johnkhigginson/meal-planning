@@ -30,7 +30,7 @@ export function ShareRecipeButton({ recipeId }: { recipeId: number }) {
     return (
       <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
         {copied ? <Check className="mr-1 h-4 w-4" /> : <Copy className="mr-1 h-4 w-4" />}
-        {copied ? "Copied!" : "Copy Link"}
+        {copied ? "Copied!" : "Copy link"}
       </Button>
     );
   }

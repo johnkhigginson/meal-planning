@@ -7,12 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
 declare global {
@@ -155,84 +150,89 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl">Create your account</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-            <p className="text-xs text-muted-foreground">
-              At least 6 characters
-            </p>
-          </div>
+    <div className="flex w-full max-w-md flex-col gap-8">
+      <h1 className="text-center text-4xl leading-tight font-medium tracking-[-0.02em] sm:text-5xl">
+        Create your account
+      </h1>
+      <Card className="rounded-3xl py-7 sm:py-8">
+        <CardContent className="px-6 sm:px-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                At least 6 characters
+              </p>
+            </div>
 
-          {/* Honeypot: hidden from real users, tempting to naive bots. */}
-          <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-            <Label htmlFor="company">Company</Label>
-            <Input
-              id="company"
-              name="company"
-              tabIndex={-1}
-              autoComplete="off"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-            />
-          </div>
+            {/* Honeypot: hidden from real users, tempting to naive bots. */}
+            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <Label htmlFor="company">Company</Label>
+              <Input
+                id="company"
+                name="company"
+                tabIndex={-1}
+                autoComplete="off"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+            </div>
 
-          {turnstileEnabled && <div ref={containerRef} className="flex justify-center" />}
+            {turnstileEnabled && <div ref={containerRef} className="flex justify-center" />}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || (turnstileEnabled && !token)}
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Account
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              href={`/login${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
-              className="text-primary hover:underline"
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={loading || (turnstileEnabled && !token)}
             >
-              Sign in
-            </Link>
-          </p>
-        </form>
-      </CardContent>
-    </Card>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Create account
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link
+                href={`/login${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+                className="font-bold text-primary underline-offset-4 hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
