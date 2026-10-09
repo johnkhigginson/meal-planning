@@ -41,10 +41,4 @@ jobs:
             npx prisma db push
             npm run build
 
-            if pm2 describe meal-planning > /dev/null 2>&1; then
-              pm2 restart meal-planning
-            else
-              PORT=3003 pm2 start npm --name meal-planning -- start
-            fi
-
-            pm2 save
+            sudo systemctl restart meal-planning
