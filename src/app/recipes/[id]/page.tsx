@@ -12,6 +12,8 @@ import { RecipeNotes } from "@/components/recipes/RecipeNotes";
 import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
 import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
 import { PrintButton } from "@/components/recipes/PrintButton";
+import { CookMode } from "@/components/recipes/CookMode";
+import { parseCookSteps } from "@/lib/parse-steps";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { convertQuantity } from "@/lib/units";
 import { PROSE_CLASS } from "@/components/blog/BlogShell";
@@ -107,6 +109,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           )}
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          <CookMode recipeName={recipe.name} steps={parseCookSteps(recipe.instructions)} />
           <PrintButton />
           <ShareRecipeButton recipeId={recipe.id} />
           <Link href={`/recipes/${recipe.id}/edit`}>

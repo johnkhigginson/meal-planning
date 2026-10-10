@@ -1,0 +1,144 @@
+// Splits a free-text instructions blob into numbered steps for Cook mode.
+// Instructions arrive in many shapes: typed by hand ("1. Preheat..."),
+// scraped as HTML lists, pasted as paragraphs, or one long run-on paragraph.
+// Pure module: no DOM, so it runs on the server and in the browser alike.
+
+import { parseInstructionSections } from "@/lib/recipe-sections";
+
+export interface CookStep {
+  text: string;
+  // Group heading the step sits under ("Pot Pie Filling"), or null.
+  section: string | null;
+}
+
+// A leading step marker: "1." "1)" "(1)" "1:" "Step 1:" "Step 1 -" or a bullet.
+// Bare numbers need trailing punctuation so "2 cups flour" is not a marker,
+// and whitespace after it so "10.5 oz" is not one either.
+const MARKER =
+  /^\s*(?:step\s*\d+\s*[.):\-–]?|\(\d+\)|\d+\s*[.):]|[-*•‣◦▪·])(?:\s+|$)/i;
+
+// Common abbreviations that end in a period but do not end a sentence.
+const ABBREVIATIONS = /\b(?:approx|tsp|tbsp|tbs|oz|lb|lbs|pt|qt|gal|e\.g|i\.e|vs|no|deg|fl|pkg)\.$/i;
+
+const ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  "#39": "'",
+  rsquo: "'",
+  lsquo: "'",
+  rdquo: '"',
+  ldquo: '"',
+  deg: "°",
+  frac12: "½",
+  frac14: "¼",
+  frac34: "¾",
+};
+
+function decodeEntities(text: string): string {
+  return text.replace(/&(#\d+|#x[0-9a-f]+|[a-z0-9]+);/gi, (match, code: string) => {
+    const lower = code.toLowerCase();
+    if (lower in ENTITIES) return ENTITIES[lower];
+    if (lower.startsWith("#x")) return String.fromCodePoint(parseInt(lower.slice(2), 16));
+    if (lower.startsWith("#")) return String.fromCodePoint(parseInt(lower.slice(1), 10));
+    return match;
+  });
+}
+
+function stripTags(html: string): string {
+  return decodeEntities(html.replace(/<[^>]*>/g, " "));
+}
+
+function clean(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function stripMarker(text: string): string {
+  return clean(text.replace(MARKER, ""));
+}
+
+function looksLikeHtml(text: string): boolean {
+  return /<\/?(?:p|li|ol|ul|br|div|h[1-6]|span|strong|em|b|i)\b[^>]*>/i.test(text);
+}
+
+// List items win when present. Otherwise every block element becomes its own
+// paragraph and the plain-text rules take over.
+function htmlToSteps(html: string): string[] {
+  const withoutScripts = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, "");
+  const items = [...withoutScripts.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map((m) => stripMarker(stripTags(m[1])));
+  if (items.some(Boolean)) return items.filter(Boolean);
+
+  const text = withoutScripts
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?(?:p|div|h[1-6]|ol|ul|section|article|blockquote)\b[^>]*>/gi, "\n\n");
+  return textToSteps(stripTags(text));
+}
+
+function splitSentences(paragraph: string): string[] {
+  const pieces = paragraph.split(/(?<=[.!?])\s+(?=["'(\p{Lu}\d])/u);
+  const sentences: string[] = [];
+  for (const piece of pieces) {
+    const last = sentences[sentences.length - 1];
+    if (last && ABBREVIATIONS.test(last)) {
+      sentences[sentences.length - 1] = `${last} ${piece}`;
+    } else {
+      sentences.push(piece);
+    }
+  }
+  return sentences.map(clean).filter(Boolean);
+}
+
+function textToSteps(text: string): string[] {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+
+  // Numbered or bulleted lines: each marker starts a step, and unmarked lines
+  // right below it are wrapped text of the same step. A blank line ends it.
+  if (lines.some((line) => MARKER.test(line) && line.trim().length > 0)) {
+    const steps: string[] = [];
+    let current: string[] | null = null;
+    for (const line of lines) {
+      if (!line.trim()) {
+        if (current) steps.push(current.join(" "));
+        current = null;
+      } else if (MARKER.test(line)) {
+        if (current) steps.push(current.join(" "));
+        current = [stripMarker(line)];
+      } else if (current) {
+        current.push(line.trim());
+      } else {
+        current = [line.trim()];
+      }
+    }
+    if (current) steps.push(current.join(" "));
+    return steps.map(clean).filter(Boolean);
+  }
+
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map(clean)
+    .filter(Boolean);
+  if (paragraphs.length > 1) return paragraphs;
+
+  const nonEmpty = lines.map(clean).filter(Boolean);
+  if (nonEmpty.length > 1) return nonEmpty;
+
+  return paragraphs.length === 1 ? splitSentences(paragraphs[0]) : [];
+}
+
+// Splits one block of instructions into step texts with numbering removed.
+export function parseSteps(instructions: string | null | undefined): string[] {
+  const text = (instructions || "").trim();
+  if (!text) return [];
+  return looksLikeHtml(text) ? htmlToSteps(text) : textToSteps(text);
+}
+
+// Section-aware version: `--- Name ---` heading lines become the section of
+// the steps beneath them instead of steps of their own.
+export function parseCookSteps(instructions: string | null | undefined): CookStep[] {
+  return parseInstructionSections(instructions || "").flatMap((section) =>
+    parseSteps(section.body).map((text) => ({ text, section: section.name }))
+  );
+}
