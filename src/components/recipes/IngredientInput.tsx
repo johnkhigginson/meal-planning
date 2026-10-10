@@ -52,10 +52,7 @@ export function IngredientInput({
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
+    if (query.length < 2) return;
 
     const timer = setTimeout(async () => {
       const res = await fetch(`/api/ingredients?q=${encodeURIComponent(query)}`);
@@ -114,6 +111,7 @@ export function IngredientInput({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
+              if (e.target.value.length < 2) setSuggestions([]);
               setShowSuggestions(true);
               // Keep the typed name on the row even when no suggestion is
               // picked. The form matches or creates it by name on save.

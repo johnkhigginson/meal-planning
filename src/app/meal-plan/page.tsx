@@ -135,18 +135,36 @@ export default function MealPlanPage() {
       });
   }, []);
 
-  const loadPlan = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/meal-plans", {
+  const fetchPlan = useCallback(() => {
+    return fetch("/api/meal-plans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ weekStartDate: formatDate(currentMonday) }),
-    });
-    if (res.ok) setPlan(await res.json());
-    setLoading(false);
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: MealPlan | null) => {
+        if (data) setPlan(data);
+        setLoading(false);
+      });
   }, [currentMonday]);
 
-  useEffect(() => { loadPlan(); }, [loadPlan]);
+  useEffect(() => { fetchPlan(); }, [fetchPlan]);
+
+  function loadPlan() {
+    setLoading(true);
+    fetchPlan();
+  }
+
+  function goToWeek(monday: Date) {
+    setLoading(true);
+    setCurrentMonday(monday);
+  }
+
+  function shiftWeek(days: number) {
+    const d = new Date(currentMonday);
+    d.setDate(d.getDate() + days);
+    goToWeek(d);
+  }
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -270,11 +288,11 @@ export default function MealPlanPage() {
       {/* Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" className="size-10" aria-label="Previous week" onClick={() => { const p = new Date(currentMonday); p.setDate(p.getDate() - 7); setCurrentMonday(p); }}>
+          <Button variant="outline" size="icon" className="size-10" aria-label="Previous week" onClick={() => shiftWeek(-7)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" className="h-10 font-bold" onClick={() => setCurrentMonday(getMonday(new Date()))}>Today</Button>
-          <Button variant="outline" size="icon" className="size-10" aria-label="Next week" onClick={() => { const n = new Date(currentMonday); n.setDate(n.getDate() + 7); setCurrentMonday(n); }}>
+          <Button variant="ghost" className="h-10 font-bold" onClick={() => goToWeek(getMonday(new Date()))}>Today</Button>
+          <Button variant="outline" size="icon" className="size-10" aria-label="Next week" onClick={() => shiftWeek(7)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

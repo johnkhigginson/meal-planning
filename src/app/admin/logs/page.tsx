@@ -62,10 +62,7 @@ export default function AdminLogsPage() {
   }, [page, category, search]);
 
   useEffect(() => {
-    if (!isAdmin) {
-      setLoading(false);
-      return;
-    }
+    if (!isAdmin) return;
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
   }, [isAdmin, load]);

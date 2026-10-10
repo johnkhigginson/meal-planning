@@ -109,7 +109,7 @@ export default function StoreDetailPage() {
   }, [storeId]);
 
   useEffect(() => {
-    if (addQuery.length < 2) { setSuggestions([]); return; }
+    if (addQuery.length < 2) return;
     const timer = setTimeout(async () => {
       const res = await fetch(`/api/ingredients?q=${encodeURIComponent(addQuery)}`);
       if (res.ok) setSuggestions(await res.json());
@@ -142,6 +142,7 @@ export default function StoreDetailPage() {
       });
       setShowAdd(false);
       setAddQuery("");
+      setSuggestions([]);
       setSelectedIngredient(null);
       setAddPrice(0);
       setAddQty(1);
@@ -287,7 +288,7 @@ export default function StoreDetailPage() {
           <div className="space-y-3">
             <div ref={suggestRef} className="relative">
               <Label>Ingredient</Label>
-              <Input placeholder="Search ingredient..." value={addQuery} onChange={(e) => { setAddQuery(e.target.value); setShowSuggestions(true); setSelectedIngredient(null); }} onFocus={() => addQuery.length >= 2 && setShowSuggestions(true)} autoFocus />
+              <Input placeholder="Search ingredient..." value={addQuery} onChange={(e) => { setAddQuery(e.target.value); if (e.target.value.length < 2) setSuggestions([]); setShowSuggestions(true); setSelectedIngredient(null); }} onFocus={() => addQuery.length >= 2 && setShowSuggestions(true)} autoFocus />
               {showSuggestions && addQuery.length >= 2 && (
                 <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border bg-popover p-1 shadow-md">
                   {suggestions.map((s) => (

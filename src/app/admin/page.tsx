@@ -62,10 +62,7 @@ export default function AdminDashboard() {
   const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!isAdmin) {
-      setLoading(false);
-      return;
-    }
+    if (!isAdmin) return;
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((data) => {
@@ -123,7 +120,7 @@ export default function AdminDashboard() {
     }
   }
 
-  if (loading) return <PageLoader />;
+  if (isAdmin && loading) return <PageLoader />;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SearchInput } from "@/components/shared/SearchInput";
@@ -23,7 +22,6 @@ interface LibraryRecipe {
 }
 
 export default function BrowseLibraryPage() {
-  const router = useRouter();
   const [recipes, setRecipes] = useState<LibraryRecipe[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);

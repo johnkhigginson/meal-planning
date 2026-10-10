@@ -19,10 +19,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
-import { Plus, Trash2, Save, Upload, Camera, Loader2, Receipt, Package } from "lucide-react";
+import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 
 interface Unit {

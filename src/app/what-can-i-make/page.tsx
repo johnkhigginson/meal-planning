@@ -45,7 +45,6 @@ export default function WhatCanIMakePage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/api/what-can-i-make?minMatch=${minMatch}`)
       .then((r) => r.json())
       .then((data) => {
@@ -74,7 +73,12 @@ export default function WhatCanIMakePage() {
           max={1}
           step={0.1}
           value={minMatch}
-          onChange={(e) => setMinMatch(parseFloat(e.target.value))}
+          onChange={(e) => {
+            const next = parseFloat(e.target.value);
+            if (next === minMatch) return;
+            setLoading(true);
+            setMinMatch(next);
+          }}
           className="w-48"
         />
         <span className="min-w-[3ch] font-heading text-lg font-semibold tabular-nums">
