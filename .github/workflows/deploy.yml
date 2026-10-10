@@ -11,6 +11,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --delete removes server files that are no longer in the repo. Excluded
+      # paths are never deleted, so env files, node_modules, and the live and
+      # staging builds stay in place.
       - name: Deploy source to server
         uses: easingthemes/ssh-deploy@v4
         with:
@@ -18,10 +21,22 @@ jobs:
           REMOTE_HOST: mylemonkitchen.com
           REMOTE_USER: ${{ secrets.SSH_USER }}
           REMOTE_PORT: ${{ secrets.SSH_PORT || 22 }}
+          ARGS: "-rlgoDzvc -i --delete"
           SOURCE: "./"
           TARGET: /var/www/mylemonkitchen.com
-          EXCLUDE: "node_modules/, .git/, .env"
+          EXCLUDE: "node_modules/, .git/, .env, .env.*, .next/, .next-build/, .next-old/"
 
+      # The build goes to .next-build while the live site keeps serving .next.
+      # If the build fails, the script stops and .next is untouched. On success
+      # the folders are swapped and the service restarts.
+      #
+      # Renaming .next-build to .next is safe on Next 16.2. The build bakes
+      # distDir ".next-build" into its route modules, but on each request
+      # `next start` replaces it with the distDir from next.config.ts (".next"
+      # when NEXT_DIST_DIR is unset). Tested by building with
+      # NEXT_DIST_DIR=.next-build, renaming the output to .next, and serving it.
+      # Recheck this after a Next major upgrade, or if a custom cacheHandler or
+      # output: "standalone" is added.
       - name: Build and restart on server
         uses: appleboy/ssh-action@v1
         with:
@@ -38,7 +53,13 @@ jobs:
 
             npm ci
             npx prisma generate
-            npx prisma db push
-            npm run build
+            npx prisma migrate deploy
 
+            rm -rf .next-build
+            NEXT_DIST_DIR=.next-build npm run build
+
+            rm -rf .next-old
+            if [ -d .next ]; then mv .next .next-old; fi
+            mv .next-build .next
             sudo systemctl restart meal-planning
+            rm -rf .next-old

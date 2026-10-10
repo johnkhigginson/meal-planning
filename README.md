@@ -140,6 +140,7 @@ there.
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Generate the Prisma client into `src/generated/prisma` |
 | `npm run db:push` | Push the schema to the database |
+| `npm run db:migrate` | Apply pending migrations (`prisma migrate deploy`) |
 | `npm run db:seed` | Seed units, unit conversions, and reference data |
 
 There is also `prisma/migrate-tags.ts`, a one-off tag cleanup that runs as a dry
@@ -182,9 +183,35 @@ cookbooks and the public blog.
 ## Deployment
 
 `.github/workflows/deploy.yml` deploys on every push to `main`. It rsyncs the
-source to an Ubuntu server over SSH, then runs `npm ci`, `prisma generate`,
-`prisma db push`, and `npm run build`, and restarts the app under pm2 on port
-3003. A reverse proxy (Caddy) fronts it.
+source to an Ubuntu server over SSH with `--delete` (env files, `node_modules`,
+and the build folders are excluded, so they are never removed). Then it runs
+`npm ci`, `prisma generate`, and `prisma migrate deploy`, builds into
+`.next-build` while the live site keeps serving `.next`, swaps the folders, and
+restarts the `meal-planning` systemd service on port 3003. A failed build leaves
+the live site untouched. A reverse proxy (Caddy) fronts it.
+
+### Database migrations
+
+Schema changes ship as Prisma migrations in `prisma/migrations`. The deploy
+applies them with `prisma migrate deploy`.
+
+Before the first migrate-based deploy, run this once against production:
+
+```bash
+npx prisma migrate resolve --applied 0_init
+```
+
+The production database was created with `db push`, so this marks the `0_init`
+baseline as already applied instead of trying to create existing tables.
+
+For future schema changes, edit `prisma/schema.prisma` and create a migration
+locally against a development database:
+
+```bash
+npx prisma migrate dev --name describe_the_change
+```
+
+Commit the new folder under `prisma/migrations`. The next deploy applies it.
 
 Required repository secrets:
 
