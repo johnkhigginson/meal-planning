@@ -116,22 +116,30 @@ export default function WhatCanIMakePage() {
             return (
               <Card
                 key={match.recipeId}
-                className={cn("gap-0 py-0", isExpanded ? "border-input" : "hover:border-input")}
+                className={cn(
+                  "gap-0 py-0 has-[[data-slot=card-toggle]:focus-visible]:border-ring has-[[data-slot=card-toggle]:focus-visible]:ring-3 has-[[data-slot=card-toggle]:focus-visible]:ring-ring/50",
+                  isExpanded ? "border-input" : "hover:border-input"
+                )}
               >
-                <CardHeader
-                  className="cursor-pointer py-4 sm:py-5"
-                  onClick={() =>
-                    setExpandedId(isExpanded ? null : match.recipeId)
-                  }
-                >
+                <CardHeader className="relative py-4 sm:py-5">
+                  <button
+                    type="button"
+                    data-slot="card-toggle"
+                    aria-expanded={isExpanded}
+                    aria-controls={`ingredients-${match.recipeId}`}
+                    aria-label={`${isExpanded ? "Hide" : "Show"} ingredients for ${match.recipeName}`}
+                    className="absolute inset-0 cursor-pointer outline-none"
+                    onClick={() =>
+                      setExpandedId(isExpanded ? null : match.recipeId)
+                    }
+                  />
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-xl">
                           <Link
                             href={`/recipes/${match.recipeId}`}
-                            className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-                            onClick={(e) => e.stopPropagation()}
+                            className="relative z-10 rounded-sm underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                           >
                             {match.recipeName}
                           </Link>
@@ -192,7 +200,10 @@ export default function WhatCanIMakePage() {
                 </CardHeader>
 
                 {isExpanded && (
-                  <CardContent className="border-t pt-3 pb-5">
+                  <CardContent
+                    id={`ingredients-${match.recipeId}`}
+                    className="border-t pt-3 pb-5"
+                  >
                     <ul className="grid gap-x-6 sm:grid-cols-2">
                       {match.ingredients.map((ing) => (
                         <li
