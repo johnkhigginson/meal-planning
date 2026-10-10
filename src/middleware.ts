@@ -40,7 +40,8 @@ export const runtime = "nodejs";
 export const config = {
   // Skip auth for static assets. Icons, the manifest and the service worker
   // must load for signed-out visitors, or the tab icon and PWA install break.
+  // The share image must load for social crawlers, which are never signed in.
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|icon\\.svg|icon-\\d+\\.png|apple-icon|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|icon\\.svg|icon-\\d+\\.png|apple-icon|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml|opengraph-image).*)",
   ],
 };

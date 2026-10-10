@@ -4,6 +4,7 @@ import { Providers } from "@/components/shared/Providers";
 import { AppShell } from "@/components/shared/AppShell";
 import { ServiceWorkerRegistrar } from "@/components/shared/ServiceWorkerRegistrar";
 import { Analytics } from "@/components/shared/Analytics";
+import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -21,8 +22,21 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "My Lemon Kitchen",
-  description: "Plan meals, track your pantry, and generate smart grocery lists",
+  metadataBase: new URL(getSiteUrl()),
+  title: SITE_NAME,
+  description: SITE_DESCRIPTION,
+  // Share defaults. The image comes from app/opengraph-image.tsx.
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

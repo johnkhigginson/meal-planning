@@ -27,7 +27,6 @@ export async function generateMetadata({ params }: PageProps) {
   if (!data) return { title: "Not found" };
 
   const { recipe } = data;
-  const image = absoluteUrl(recipe.imageUrl);
   const url = `${getSiteUrl()}/blog/${slug}/${recipe.slug ?? recipe.id}`;
   return {
     title: recipe.name,
@@ -38,15 +37,15 @@ export async function generateMetadata({ params }: PageProps) {
       title: recipe.name,
       description: recipe.description ?? undefined,
       url,
-      images: image ? [image] : undefined,
+      // No `images` key: the generated opengraph-image.tsx beside this page
+      // is only used when this metadata leaves images unset.
       publishedTime: recipe.publishedAt?.toISOString(),
       authors: recipeAuthorName(recipe) ? [recipeAuthorName(recipe)!] : undefined,
     },
     twitter: {
-      card: image ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: recipe.name,
       description: recipe.description ?? undefined,
-      images: image ? [image] : undefined,
     },
   };
 }

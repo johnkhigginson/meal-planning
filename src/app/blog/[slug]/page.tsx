@@ -19,7 +19,9 @@ export async function generateMetadata({ params }: PageProps) {
   const book = await getPublishedBookBySlug(slug);
   if (!book) return { title: "Not found" };
 
-  const cover = absoluteUrl(book.coverImageUrl ?? book.posts.find((p) => p.imageUrl)?.imageUrl);
+  // Fall back to the site default image (app/opengraph-image.tsx).
+  const cover =
+    absoluteUrl(book.coverImageUrl ?? book.posts.find((p) => p.imageUrl)?.imageUrl) ?? "/opengraph-image";
   const url = `${getSiteUrl()}/blog/${slug}`;
   return {
     title: book.name,
@@ -33,7 +35,13 @@ export async function generateMetadata({ params }: PageProps) {
       title: book.name,
       description: book.description ?? undefined,
       url,
-      images: cover ? [cover] : undefined,
+      images: [cover],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: book.name,
+      description: book.description ?? undefined,
+      images: [cover],
     },
   };
 }

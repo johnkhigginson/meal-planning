@@ -5,6 +5,9 @@ export function getSiteUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://mylemonkitchen.com").replace(/\/$/, "");
 }
 
+export const SITE_NAME = "My Lemon Kitchen";
+export const SITE_DESCRIPTION = "Plan meals, track your pantry, and generate smart grocery lists";
+
 // Make an app-relative URL (e.g. an uploaded image at /api/images/1) absolute.
 export function absoluteUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined;
