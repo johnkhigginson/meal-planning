@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+import { canOptimizeImage } from "@/lib/image";
 import { notFound } from "next/navigation";
 import { BlogShell, PROSE_CLASS } from "@/components/blog/BlogShell";
 import { FollowButton } from "@/components/blog/FollowButton";
@@ -149,8 +151,16 @@ export default async function BlogRecipePage({ params }: PageProps) {
         </p>
 
         {recipe.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.imageUrl} alt={recipe.name} className="mt-6 w-full rounded-3xl object-cover" />
+          <Image
+            src={recipe.imageUrl}
+            alt={recipe.name}
+            width={1600}
+            height={1200}
+            sizes="(min-width: 48rem) 48rem, 100vw"
+            preload
+            unoptimized={!canOptimizeImage(recipe.imageUrl)}
+            className="mt-6 h-auto w-full rounded-3xl object-cover"
+          />
         )}
 
         <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-muted-foreground">

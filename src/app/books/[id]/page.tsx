@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import Image from "next/image";
+import { canOptimizeImage } from "@/lib/image";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -360,10 +362,16 @@ export default function BookDetailPage() {
                 key={entry.id}
                 className="group gap-0 py-0 hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]"
               >
-                <Link href={`/recipes/${recipe.id}`} tabIndex={-1} aria-hidden="true" className="block aspect-[4/3] w-full overflow-hidden bg-accent">
+                <Link href={`/recipes/${recipe.id}`} tabIndex={-1} aria-hidden="true" className="relative block aspect-[4/3] w-full overflow-hidden bg-accent">
                   {recipe.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={recipe.imageUrl} alt={recipe.name} className="h-full w-full object-cover" />
+                    <Image
+                      src={recipe.imageUrl}
+                      alt={recipe.name}
+                      fill
+                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                      unoptimized={!canOptimizeImage(recipe.imageUrl)}
+                      className="object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">
                       <UtensilsCrossed className="h-6 w-6 text-primary/50" />

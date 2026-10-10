@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+import { canOptimizeImage } from "@/lib/image";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Users, Heart, UserRound, UtensilsCrossed } from "lucide-react";
 
@@ -31,10 +33,16 @@ export function RecipeCard({ recipe, showAuthor = false }: RecipeCardProps) {
       href={`/recipes/${recipe.id}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
-      <div className="aspect-[4/3] w-full overflow-hidden bg-accent">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-accent">
         {recipe.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.imageUrl} alt="" className="h-full w-full object-cover" />
+          <Image
+            src={recipe.imageUrl}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            unoptimized={!canOptimizeImage(recipe.imageUrl)}
+            className="object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <UtensilsCrossed className="h-6 w-6 text-primary/50" />

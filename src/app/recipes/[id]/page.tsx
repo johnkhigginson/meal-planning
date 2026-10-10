@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import { canOptimizeImage } from "@/lib/image";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -162,11 +164,15 @@ export default async function RecipeDetailPage({ params }: PageProps) {
 
       {/* Photo */}
       {recipe.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={recipe.imageUrl}
           alt={recipe.name}
-          className="max-h-[28rem] w-full rounded-[1.75rem] object-cover"
+          width={1600}
+          height={1200}
+          sizes="(min-width: 64rem) 64rem, 100vw"
+          preload
+          unoptimized={!canOptimizeImage(recipe.imageUrl)}
+          className="h-auto max-h-[28rem] w-full rounded-[1.75rem] object-cover"
         />
       )}
 

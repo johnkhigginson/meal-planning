@@ -11,6 +11,8 @@ import {
   Plus,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { canOptimizeImage } from "@/lib/image";
 import { prisma } from "@/lib/prisma";
 import { parseHiddenNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -239,10 +241,16 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
                   href={`/recipes/${r.id}`}
                   className={cn("group flex flex-col overflow-hidden rounded-2xl border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out", liftCard)}
                 >
-                  <div className="aspect-[4/3] w-full overflow-hidden bg-accent">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-accent">
                     {r.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.imageUrl} alt="" className="h-full w-full object-cover" />
+                      <Image
+                        src={r.imageUrl}
+                        alt=""
+                        fill
+                        sizes="(min-width: 1024px) 17vw, (min-width: 640px) 33vw, 50vw"
+                        unoptimized={!canOptimizeImage(r.imageUrl)}
+                        className="object-cover"
+                      />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         <UtensilsCrossed className="h-6 w-6 text-primary/50" />

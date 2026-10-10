@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { canOptimizeImage } from "@/lib/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -163,11 +165,13 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                     {recipe.imageUrl && (
                       <div className="relative h-48 w-full shrink-0 overflow-hidden bg-muted sm:h-auto sm:w-52">
                         {/* Fills the card panel: fixed height on mobile, stretches to row height on desktop. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={recipe.imageUrl}
                           alt={recipe.name}
-                          className="h-full w-full object-cover sm:absolute sm:inset-0"
+                          fill
+                          sizes="(min-width: 640px) 13rem, 100vw"
+                          unoptimized={!canOptimizeImage(recipe.imageUrl)}
+                          className="object-cover"
                         />
                       </div>
                     )}

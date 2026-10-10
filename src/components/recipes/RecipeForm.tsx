@@ -872,6 +872,8 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
             <Label htmlFor="imageUrl">Photo</Label>
             <div className="flex items-start gap-3">
               {form.imageUrl && (
+                // Plain <img>: the src is whatever the user is typing, which next/image
+                // would reject until it is a complete, valid URL.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={form.imageUrl}

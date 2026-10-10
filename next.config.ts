@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
   // the adapter and its driver must be opted out of server bundling or their
   // connection handshake stalls until timeout.
   serverExternalPackages: ["@prisma/adapter-mssql", "mssql", "tedious"],
+  images: {
+    // Blogger-hosted recipe photos that were not localized yet. Uploads under
+    // /api/images and photos from other sites skip the optimizer (see
+    // canOptimizeImage in src/lib/image.ts), so they need no pattern here.
+    remotePatterns: [
+      { protocol: "https", hostname: "blogger.googleusercontent.com", pathname: "/**", search: "" },
+      { protocol: "https", hostname: "*.bp.blogspot.com", pathname: "/**", search: "" },
+    ],
+  },
 };
 
 export default nextConfig;
