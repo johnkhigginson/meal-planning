@@ -38,7 +38,9 @@ export default auth((req) => {
 export const runtime = "nodejs";
 
 export const config = {
+  // Skip auth for static assets. Icons, the manifest and the service worker
+  // must load for signed-out visitors, or the tab icon and PWA install break.
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|icon\\.svg|icon-\\d+\\.png|apple-icon|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml).*)",
   ],
 };

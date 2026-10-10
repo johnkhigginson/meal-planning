@@ -4,8 +4,8 @@
   "description": "Plan meals, track your pantry, and generate smart grocery lists",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#fbf7ee",
+  "theme_color": "#fbf7ee",
   "orientation": "portrait",
   "icons": [
     {
