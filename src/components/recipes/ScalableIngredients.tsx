@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Minus, Plus } from "lucide-react";
 import { groupBySection } from "@/lib/recipe-sections";
 import { cn } from "@/lib/utils";
+import { AddMissingToGroceryButton } from "./AddMissingToGroceryButton";
 
 export interface ScalableIngredient {
   quantity: number;
@@ -41,9 +42,12 @@ function hasEnough(stock: ScalableIngredient["stock"], needed: number): boolean 
 export function ScalableIngredients({
   ingredients,
   baseServings,
+  recipeId,
 }: {
   ingredients: ScalableIngredient[];
   baseServings: number;
+  // Set on the household's own recipe page to offer adding what's missing.
+  recipeId?: number;
 }) {
   const [servings, setServings] = useState(baseServings > 0 ? baseServings : 1);
   const factor = baseServings > 0 ? servings / baseServings : 1;
@@ -88,10 +92,15 @@ export function ScalableIngredients({
       </CardHeader>
       <CardContent className="space-y-5">
         {tracksPantry && required.length > 0 && (
-          <p className="flex items-center gap-2 rounded-xl bg-leaf-soft px-3.5 py-2.5 text-sm font-bold text-leaf-ink print:hidden">
-            <Check className="h-4 w-4" strokeWidth={2.5} />
-            {metCount} of {required.length} in your pantry
-          </p>
+          <div className="space-y-2">
+            <p className="flex items-center gap-2 rounded-xl bg-leaf-soft px-3.5 py-2.5 text-sm font-bold text-leaf-ink print:hidden">
+              <Check className="h-4 w-4" strokeWidth={2.5} />
+              {metCount} of {required.length} in your pantry
+            </p>
+            {recipeId !== undefined && metCount < required.length && (
+              <AddMissingToGroceryButton recipeId={recipeId} servings={servings} />
+            )}
+          </div>
         )}
         {groupBySection(ingredients).map((group, g) => (
           <div key={g}>

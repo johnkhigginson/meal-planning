@@ -172,6 +172,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         {/* Ingredients (hidden when none have been added yet), scalable by servings */}
         {recipe.ingredients.length > 0 && (
           <ScalableIngredients
+            recipeId={recipe.id}
             baseServings={recipe.servings}
             ingredients={recipe.ingredients.map((ri) => ({
               quantity: ri.quantity,

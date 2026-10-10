@@ -294,3 +294,97 @@ export async function saveGroceryList(
   ]);
   return existing.id;
 }
+
+export const EXTRAS_LIST_NAME = "Extra items";
+
+// Adds what a recipe needs beyond the pantry to the household's "Extra items"
+// list. It's kept apart from the weekly lists because regenerating a week
+// rewrites that list and would drop anything added by hand. "Missing" follows
+// the recipe page's pantry check (lib/matching.ts): stock in units that can't
+// be converted counts as enough. An ingredient already on the list is skipped.
+export async function addRecipeToGroceryList(
+  recipeId: number,
+  householdId: number,
+  servings?: number
+): Promise<{ groceryListId: number; added: string[]; alreadyListed: string[] } | null> {
+  const recipe = await prisma.recipe.findFirst({
+    where: { id: recipeId, householdId },
+    include: {
+      ingredients: {
+        where: { optional: false },
+        include: { ingredient: true },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+  if (!recipe) return null;
+
+  const ingredientIds = recipe.ingredients.map((ri) => ri.ingredientId);
+  const [inventory, conversions] = await Promise.all([
+    prisma.inventoryItem.findMany({
+      where: { householdId, ingredientId: { in: ingredientIds } },
+      select: { ingredientId: true, quantity: true, unitId: true },
+    }),
+    prisma.unitConversion.findMany(),
+  ]);
+  const inventoryMap = new Map(inventory.map((item) => [item.ingredientId, item]));
+  const scaleFactor = servings && recipe.servings > 0 ? servings / recipe.servings : 1;
+
+  // One row per ingredient, in the unit it first appears in.
+  const needs = new Map<number, { name: string; unitId: number; quantity: number }>();
+  for (const ri of recipe.ingredients) {
+    const qty = ri.quantity * scaleFactor;
+    const existing = needs.get(ri.ingredientId);
+    if (existing) {
+      const converted = convertQuantity(qty, ri.unitId, existing.unitId, conversions);
+      existing.quantity += converted ?? qty;
+    } else {
+      needs.set(ri.ingredientId, { name: ri.ingredient.name, unitId: ri.unitId, quantity: qty });
+    }
+  }
+
+  const missing: { ingredientId: number; name: string; unitId: number; quantity: number; inInventory: number }[] = [];
+  for (const [ingredientId, need] of needs) {
+    const inv = inventoryMap.get(ingredientId);
+    let inInventory = 0;
+    if (inv) {
+      const converted = convertQuantity(inv.quantity, inv.unitId, need.unitId, conversions);
+      if (converted === null && inv.quantity > 0) continue;
+      inInventory = converted ?? 0;
+      if (inInventory >= need.quantity - 1e-9) continue;
+    }
+    missing.push({ ingredientId, ...need, inInventory });
+  }
+
+  const list =
+    (await prisma.groceryList.findFirst({
+      where: { householdId, mealPlanId: null, name: EXTRAS_LIST_NAME },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      include: { items: { select: { ingredientId: true } } },
+    })) ??
+    (await prisma.groceryList.create({
+      data: { householdId, name: EXTRAS_LIST_NAME },
+      include: { items: { select: { ingredientId: true } } },
+    }));
+
+  const listed = new Set(list.items.map((item) => item.ingredientId));
+  const toAdd = missing.filter((m) => !listed.has(m.ingredientId));
+  if (toAdd.length > 0) {
+    await prisma.groceryListItem.createMany({
+      data: toAdd.map((m) => ({
+        groceryListId: list.id,
+        ingredientId: m.ingredientId,
+        unitId: m.unitId,
+        quantity: roundQuantity(m.quantity),
+        inInventory: roundQuantity(m.inInventory),
+        needed: roundQuantity(m.quantity - m.inInventory),
+      })),
+    });
+  }
+
+  return {
+    groceryListId: list.id,
+    added: toAdd.map((m) => m.name),
+    alreadyListed: missing.filter((m) => listed.has(m.ingredientId)).map((m) => m.name),
+  };
+}
