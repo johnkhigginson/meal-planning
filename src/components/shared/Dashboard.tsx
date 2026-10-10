@@ -14,6 +14,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { parseHiddenNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { TonightCard } from "./TonightCard";
 
 interface DashboardProps {
   userId: number;
@@ -147,6 +148,9 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
           </Link>
         </div>
       </div>
+
+      {/* Tonight */}
+      {shows("/meal-plan") && <TonightCard />}
 
       {/* This week */}
       {shows("/meal-plan") && (

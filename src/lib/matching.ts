@@ -29,6 +29,18 @@ export interface RecipeMatch {
   tags: { id: number; name: string }[];
 }
 
+// Pantry rule shared by What Can I Make? and the dashboard Tonight card:
+// enough stock after unit conversion, or any stock when units can't convert.
+export function hasEnoughInStock(
+  stock: { quantity: number; unitId: number },
+  requiredQty: number,
+  requiredUnitId: number,
+  conversions: UnitConversion[]
+): boolean {
+  const converted = convertQuantity(stock.quantity, stock.unitId, requiredUnitId, conversions);
+  return converted !== null ? converted >= requiredQty : stock.quantity > 0;
+}
+
 export async function findMatchingRecipes(
   householdId: number,
   minMatchScore: number = 0
@@ -70,13 +82,7 @@ export async function findMatchingRecipes(
       let isMet = false;
 
       if (invItem) {
-        const converted = convertQuantity(
-          invItem.quantity,
-          invItem.unitId,
-          ri.unitId,
-          conversions as UnitConversion[]
-        );
-        isMet = converted !== null ? converted >= ri.quantity : invItem.quantity > 0;
+        isMet = hasEnoughInStock(invItem, ri.quantity, ri.unitId, conversions as UnitConversion[]);
       }
 
       if (!ri.optional) {
