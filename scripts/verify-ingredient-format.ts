@@ -11,6 +11,8 @@ import {
   cleanIngredientNote,
   cleanIngredientText,
   formatIngredientText,
+  makeUnitLookup,
+  parseIngredientText,
   readQuantity,
 } from "../src/lib/ingredient-format";
 import { parseCookSteps, stripFootnoteMarkers } from "../src/lib/parse-steps";
@@ -165,6 +167,88 @@ const steps = parseCookSteps(recipe?.instructions).map((s) => s.text);
 eq("six steps", steps.length, 6);
 eq("no step has a stray asterisk", steps.filter((s) => s.includes("*")), []);
 eq("last step", steps[5], "Add the cream cheese to the skillet in chunks, then stir until it has melted into the sauce. Top the pasta with sliced green onions and serve.");
+
+// The units table as prisma/seed.ts fills it, for the import parser.
+const UNITS = [
+  ["teaspoon", "tsp"], ["tablespoon", "tbsp"], ["cup", "cup"], ["fluid ounce", "fl oz"],
+  ["pint", "pt"], ["quart", "qt"], ["gallon", "gal"], ["milliliter", "ml"], ["liter", "L"],
+  ["ounce", "oz"], ["pound", "lb"], ["gram", "g"], ["kilogram", "kg"], ["each", "ea"],
+  ["dozen", "doz"], ["pinch", "pinch"], ["dash", "dash"], ["clove", "clove"], ["bunch", "bunch"],
+  ["can", "can"], ["package", "pkg"], ["slice", "slice"],
+].map(([name, abbreviation]) => ({ name, abbreviation }));
+const lookup = makeUnitLookup(UNITS);
+// An imported line as the importer saves it: [quantity, unit, name, notes].
+function imported(line: string) {
+  const p = parseIngredientText(line, lookup);
+  return p && [p.quantity, p.unit?.name ?? null, p.name, p.notes];
+}
+
+console.log("Budget Bytes fixture, ingredients:");
+const expected: [number, string | null, string, string][] = [
+  [2, "teaspoon", "smoked paprika", ""],
+  [1, "teaspoon", "oregano", ""],
+  [1, "teaspoon", "thyme", ""],
+  [0.5, "teaspoon", "garlic powder", ""],
+  [0.5, "teaspoon", "onion powder", ""],
+  [0.25, "teaspoon", "cayenne pepper", ""],
+  [0.25, "teaspoon", "black pepper", ""],
+  [0.25, "teaspoon", "salt", ""],
+  [1, "tablespoon", "olive oil", ""],
+  [1, "tablespoon", "butter", ""],
+  [1, "pound", "boneless skinless chicken breast", ""],
+  [1, null, "yellow onion", "diced"],
+  [0.5, "pound", "penne pasta", "uncooked"],
+  [15, "ounce", "fire roasted diced tomatoes", ""],
+  [2, "cup", "chicken broth", ""],
+  [2, "ounce", "cream cheese", ""],
+  [3, null, "green onions", "sliced"],
+];
+const lines = recipe?.ingredients.map((i) => i.text) ?? [];
+eq("17 lines", lines.length, expected.length);
+lines.forEach((line, i) => eq(line, imported(line), expected[i]));
+
+console.log("Import: a word in the name or the note, not both:");
+eq("note in parens", imported("1/2 lb. penne pasta (uncooked) ($0.75)"), [0.5, "pound", "penne pasta", "uncooked"]);
+eq("state word in both", imported("1/2 lb uncooked penne pasta (uncooked)"), [0.5, "pound", "penne pasta", "uncooked"]);
+eq("prep word in both", imported("1 chopped onion, finely chopped"), [1, null, "onion", "finely chopped"]);
+eq("other repeat dropped", imported("1 cup Parmesan (parmesan)"), [1, "cup", "Parmesan", ""]);
+
+console.log("Import: sizes in parens are notes:");
+eq("weight after the name", imported("1.5 lb boneless skinless chicken breast (700 grams)"), [1.5, "pound", "boneless skinless chicken breast", "700 grams"]);
+eq("weight after the unit", imported("1.5 lb (700 grams) chicken boneless, skinless chicken breasts"), [1.5, "pound", "boneless skinless chicken breasts", "700 grams"]);
+eq("onions", imported("1 cup (150 grams) onions, chopped"), [1, "cup", "onions", "150 grams, chopped"]);
+eq("Greek yogurt", imported("1/2 cup (120 ml) Greek yogurt"), [0.5, "cup", "Greek yogurt", "120 ml"]);
+eq("tomatoes", imported("1 lb (500 grams) tomatoes"), [1, "pound", "tomatoes", "500 grams"]);
+eq("butter", imported("1/2 cup (1 stick) butter"), [0.5, "cup", "butter", "1 stick"]);
+eq("packages cream cheese", imported("2 (8 oz.) packages cream cheese"), [2, "package", "cream cheese", "8 oz"]);
+eq("package chocolate chips", imported("1 (11.5 oz) package milk chocolate chips"), [1, "package", "milk chocolate chips", "11.5 oz"]);
+eq("about 5 cups", imported("1 (about 5 cups) butternut squash, peeled and cut into 3/4 inch cubes"), [1, null, "butternut squash", "about 5 cups, peeled and cut into 3/4 inch cubes"]);
+eq("1 package", imported("1 (1 package) frozen mixed vegetables"), [1, null, "frozen mixed vegetables", "1 package"]);
+eq("Neufchatel", imported("1 (8 oz) pkg Neufchatel cheese*"), [1, "package", "Neufchatel cheese", "8 oz"]);
+eq("adjective list keeps its noun", imported("1 lb. boneless, skinless chicken breast"), [1, "pound", "boneless skinless chicken breast", ""]);
+
+console.log("Import: (s) units:");
+eq("teaspoon(s)", imported("1 teaspoon(s) baking powder"), [1, "teaspoon", "baking powder", ""]);
+eq("cup(s)", imported("2 cup(s) powdered sugar"), [2, "cup", "powdered sugar", ""]);
+eq("cup(s) then a size", imported("1/2 cup(s) (1 stick) unsalted butter"), [0.5, "cup", "unsalted butter", "1 stick"]);
+
+console.log("Import: prep phrases after the noun:");
+eq("very large onion", imported("1 very large yellow onion sliced fairly thin"), [1, null, "yellow onion", "very large, sliced fairly thin"]);
+eq("large potatoes", imported("3 large potatoes cut in small pieces"), [3, null, "potatoes", "large, cut in small pieces"]);
+eq("large onions chopped", imported("2 large onions chopped (diced)"), [2, null, "onions", "large, chopped, diced"]);
+eq("garlic minced", imported("3 cloves garlic minced"), [3, "clove", "garlic", "minced"]);
+eq("prep word before the noun stays", imported("1 cup shredded cheddar cheese"), [1, "cup", "shredded cheddar cheese", ""]);
+eq("crushed red pepper stays", imported("1/2 tsp crushed red pepper"), [0.5, "teaspoon", "crushed red pepper", ""]);
+eq("large eggs stay", imported("3 large eggs"), [3, null, "large eggs", ""]);
+
+console.log("Import: colors and sizes are never the whole name:");
+eq("color choice", imported("3 large red, yellow, or orange bell peppers"), [3, null, "bell peppers", "large, red, yellow, or orange"]);
+eq("red or green", imported("1 red or green bell pepper, diced"), [1, null, "bell pepper", "red or green, diced"]);
+eq("size before a color", imported("3 large red bell peppers, diced"), [3, null, "red bell peppers", "large, diced"]);
+eq("lone size word", imported("3 large, red bell peppers"), [3, null, "red bell peppers", "large"]);
+
+console.log("Import: to taste:");
+eq("Salt and pepper keeps its casing", imported("Salt and pepper, to taste"), [0, null, "Salt and pepper", "to taste"]);
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -313,7 +313,8 @@ export interface IngredientLine<U> {
   unit: U | null;
   // The rest of the line: the name and any comma or paren notes.
   name: string;
-  // Size words and to-taste phrases taken off the line: "heaping", "to taste".
+  // Size words, a size in parens after the amount and to-taste phrases taken
+  // off the line: "heaping", "8 oz", "to taste".
   notes: string[];
 }
 
@@ -331,6 +332,14 @@ export function readIngredientLine<U>(text: string, lookup: (word: string) => U 
       ({ unit, rest } = afterSize);
     } else {
       ({ unit, rest } = readUnit(afterQty, lookup));
+    }
+    // "2 (8 oz.) packages cream cheese", "1.5 lb (700 grams) chicken": a size
+    // in parens right after the amount is a note, and the unit can follow it.
+    const paren = rest.match(/^\(([^()]+)\)\s*/);
+    if (paren) {
+      notes.push(parenNote(paren[1]));
+      rest = rest.slice(paren[0].length);
+      if (unit === null) ({ unit, rest } = readUnit(rest, lookup));
     }
   } else {
     const small = afterQty.match(SMALL_AMOUNT);
@@ -371,4 +380,250 @@ export function formatIngredientText(text: string): string {
       : formatAmount(line.quantity, unit);
   const name = line.notes.length ? `${line.name} (${line.notes.join(", ")})` : line.name;
   return [amount, name].filter(Boolean).join(" ");
+}
+
+// ─── Import parsing ─────────────────────────────────────────────
+//
+// What the importer saves for one line: the amount, the unit, the ingredient
+// name and a note. Pure, so it can be checked without the database; the
+// importer (lib/ingredient-parse.ts) adds the ingredient and unit rows.
+
+// Unit spellings recipe sites use, to the unit names in the units table.
+const UNIT_ALIASES: Record<string, string> = {
+  "tsp": "teaspoon", "tsps": "teaspoon", "teaspoons": "teaspoon", "t": "teaspoon",
+  "tbsp": "tablespoon", "tbsps": "tablespoon", "tablespoons": "tablespoon", "tbs": "tablespoon",
+  "cup": "cup", "cups": "cup", "c": "cup",
+  "fl oz": "fluid ounce", "fluid ounces": "fluid ounce",
+  "pint": "pint", "pints": "pint", "pt": "pint",
+  "quart": "quart", "quarts": "quart", "qt": "quart",
+  "gallon": "gallon", "gallons": "gallon", "gal": "gallon",
+  "ml": "milliliter", "milliliters": "milliliter", "mls": "milliliter",
+  "l": "liter", "liters": "liter", "litres": "liter", "liter": "liter",
+  "oz": "ounce", "ounces": "ounce",
+  "lb": "pound", "lbs": "pound", "pounds": "pound",
+  "g": "gram", "grams": "gram", "gram": "gram",
+  "kg": "kilogram", "kilograms": "kilogram",
+  "each": "each",
+  "dozen": "dozen",
+  "pinch": "pinch", "pinches": "pinch",
+  "dash": "dash", "dashes": "dash",
+  "clove": "clove", "cloves": "clove",
+  "bunch": "bunch", "bunches": "bunch",
+  "can": "can", "cans": "can",
+  "package": "package", "packages": "package", "pkg": "package", "pkgs": "package",
+  "slice": "slice", "slices": "slice",
+  "jar": "each", "jars": "each",
+  "bottle": "each", "bottles": "each",
+  "bag": "each", "bags": "each",
+  "box": "each", "boxes": "each",
+  "stick": "each", "sticks": "each",
+  "head": "each", "heads": "each",
+  "sprig": "each", "sprigs": "each",
+  "stalk": "each", "stalks": "each",
+};
+
+// A unit word or abbreviation ("cups", "tsp", "cloves") to its row in the
+// units table, or null when it isn't one.
+export function makeUnitLookup<U extends { name: string; abbreviation: string }>(
+  units: U[]
+): (word: string) => U | null {
+  const byWord = new Map<string, U>();
+  for (const unit of units) {
+    byWord.set(unit.name.toLowerCase(), unit);
+    byWord.set(unit.abbreviation.toLowerCase(), unit);
+  }
+  return (word) => {
+    const alias = UNIT_ALIASES[word];
+    return byWord.get(word) ?? (alias ? byWord.get(alias) : undefined) ?? null;
+  };
+}
+
+const COLOR_WORDS = ["red", "green", "yellow", "orange", "white", "black", "purple", "brown", "golden"];
+const SIZE_NAME_WORDS = ["large", "small", "medium", "big", "jumbo", "very", "extra"];
+// Words that describe an ingredient but never name one. A list of them can
+// hold commas ("boneless, skinless chicken breast") without the rest of the
+// line being a note.
+const DESCRIPTORS = new Set([
+  ...COLOR_WORDS,
+  ...SIZE_NAME_WORDS,
+  "boneless", "skinless", "bone-in", "skin-on", "fresh", "frozen", "dried", "ripe", "raw",
+  "uncooked", "cooked", "lean", "unsalted", "salted", "whole", "plain", "organic", "thick",
+  "thin", "thick-cut", "hot", "mild", "light", "dark", "low-fat", "fat-free", "reduced-fat",
+  "low-sodium", "extra-virgin", "virgin", "firm", "soft", "sharp", "baby",
+]);
+
+// Prep words that start a note when they come after the noun: "yellow onion
+// sliced fairly thin", "potatoes cut in small pieces". Before the noun they
+// stay in the name ("diced tomatoes", "shredded cheese").
+const PREP_WORDS = new Set([
+  "chopped", "diced", "minced", "sliced", "cubed", "grated", "shredded", "crushed", "peeled",
+  "cut", "halved", "quartered", "beaten", "melted", "softened", "divided", "rinsed", "drained",
+  "thawed", "trimmed", "seeded", "cored", "pitted", "julienned", "mashed", "zested", "juiced",
+  "sifted", "toasted", "deveined", "torn",
+]);
+const PREP_ADVERBS = new Set([
+  "finely", "thinly", "roughly", "coarsely", "very", "fairly", "lightly", "well", "freshly",
+  "thickly", "evenly",
+]);
+// What can follow a prep word when it starts a note. Anything else means the
+// prep word describes a noun after it ("fire roasted diced tomatoes").
+const PREP_FOLLOWERS = new Set([
+  ...PREP_ADVERBS,
+  "in", "into", "to", "for", "and", "or", "then", "at", "on", "with", "about", "lengthwise",
+  "crosswise", "thin", "thick", "fine", "small", "large", "bite-size", "bite-sized",
+]);
+// Prep and state words the note keeps when they would be in both: "uncooked
+// penne pasta" with the note "uncooked" saves as "penne pasta", "uncooked".
+const STATE_WORDS = new Set([...PREP_WORDS, "uncooked", "cooked", "raw", "fresh", "frozen"]);
+
+const bare = (word: string) => word.toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9-]+$/g, "");
+const isDescriptor = (word: string) => DESCRIPTORS.has(bare(word));
+
+// True for "large red", "boneless", "red, yellow, or orange": descriptor words
+// only, with "and"/"or" between them. Never a whole ingredient name.
+function onlyDescriptors(text: string): boolean {
+  const list = text.split(/[\s,]+/).filter((w) => w && !/^(?:and|or)$/i.test(w));
+  return list.length > 0 && list.every(isDescriptor);
+}
+
+// "8 oz." -> "8 oz", for a size in parens.
+function parenNote(text: string): string {
+  return text.trim().replace(/\.$/, "");
+}
+
+// The words before a prep phrase that runs to the end of the name, and the
+// phrase: "yellow onion sliced fairly thin" -> "yellow onion", "sliced fairly
+// thin". The prep word has to follow a noun, so "diced tomatoes" stays whole.
+function splitPrepPhrase(name: string): { name: string; note: string } {
+  const words = name.split(/\s+/);
+  for (let k = 1; k < words.length; k++) {
+    if (!PREP_WORDS.has(bare(words[k]))) continue;
+    const next = words[k + 1];
+    if (next !== undefined && !PREP_FOLLOWERS.has(bare(next)) && !PREP_WORDS.has(bare(next))) continue;
+    let start = k;
+    while (start > 0 && PREP_ADVERBS.has(bare(words[start - 1]))) start--;
+    if (!words.slice(0, start).some((w) => !isDescriptor(w))) continue;
+    return { name: words.slice(0, start).join(" "), note: words.slice(start).join(" ") };
+  }
+  return { name, note: "" };
+}
+
+// Leading size words ("very large yellow onion") and a choice of colors ("red
+// or green bell pepper") go to the note, so the name is the thing to buy.
+// Eggs keep their size; "large eggs" is what the carton says. A name is
+// never left as only colors or sizes.
+const LEADING_SIZE = /^((?:(?:very|extra)[\s-]+)?(?:large|small|medium|big|jumbo)(?:-sized)?)\s+(.+)$/i;
+const LEADING_COLOR_CHOICE = new RegExp(
+  `^((?:${COLOR_WORDS.join("|")})(?:,?\\s+(?:(?:and|or)\\s+)?(?:${COLOR_WORDS.join("|")}))*,?\\s+or\\s+(?:${COLOR_WORDS.join("|")}))\\s+(.+)$`,
+  "i"
+);
+
+function takeLeadingDescriptors(name: string): { name: string; notes: string[] } {
+  const notes: string[] = [];
+  let rest = name;
+  const sized = rest.match(LEADING_SIZE);
+  if (sized && !/^eggs?\b/i.test(sized[2]) && !onlyDescriptors(sized[2])) {
+    notes.push(sized[1].toLowerCase());
+    rest = sized[2];
+  }
+  const colors = rest.match(LEADING_COLOR_CHOICE);
+  if (colors && !onlyDescriptors(colors[2])) {
+    notes.push(colors[1].toLowerCase());
+    rest = colors[2];
+  }
+  return { name: rest, notes };
+}
+
+// The name and notes of what is left of a line once the amount and unit are
+// read: "boneless, skinless chicken breast (700 grams)" -> "boneless skinless
+// chicken breast", ["700 grams"]. A comma starts the note, except inside a
+// list of descriptors before the noun.
+export function splitNameAndNote(text: string): { name: string; notes: string[] } {
+  let name = text.trim();
+  const tailNotes: string[] = [];
+
+  const paren = name.match(/^(.+?)\s*\(([^()]+)\)$/);
+  if (paren) {
+    name = paren[1];
+    tailNotes.push(parenNote(paren[2]));
+  }
+
+  const parts = name.split(",").map((p) => p.trim());
+  let used = 1;
+  let head = parts[0];
+  while (used < parts.length && onlyDescriptors(head)) head = `${head}, ${parts[used++]}`;
+  // "chicken boneless, skinless chicken breasts": the noun before the comma
+  // is repeated after it, so the comma is inside one name.
+  if (used === 1 && parts.length > 1) {
+    const headWords = head.split(/\s+/);
+    const tailWords = new Set(parts[1].split(/\s+/).map(bare));
+    const nouns = headWords.filter((w) => !isDescriptor(w));
+    if (isDescriptor(headWords[headWords.length - 1]) && nouns.length > 0 && nouns.every((w) => tailWords.has(bare(w)))) {
+      head = [...headWords.filter(isDescriptor), parts[1]].join(" ");
+      used = 2;
+    }
+  }
+  // "boneless, skinless chicken breast" reads as one name without commas; a
+  // choice ("red, yellow, or orange") keeps them.
+  if (!/\b(?:and|or)\b/i.test(head)) head = head.replace(/,/g, "");
+  const commaNote = parts.slice(used).join(", ").trim();
+  if (commaNote) tailNotes.unshift(commaNote);
+
+  const prep = splitPrepPhrase(head);
+  const lead = takeLeadingDescriptors(prep.name);
+  return { name: lead.name.trim(), notes: [...lead.notes, prep.note, ...tailNotes].filter(Boolean) };
+}
+
+// A word should be in the name or the note, not both. Prep and state words
+// ("uncooked", "chopped") stay in the note and leave the front of the name;
+// any other repeated part of the note is dropped. The name keeps at least
+// one word.
+export function dedupeNameAndNote(name: string, note: string): { name: string; note: string } {
+  const noteWords = new Set(words(note));
+  const nameWords = name.split(/\s+/);
+  while (nameWords.length > 1 && STATE_WORDS.has(bare(nameWords[0])) && noteWords.has(bare(nameWords[0]))) {
+    nameWords.shift();
+  }
+  const cleanName = nameWords.join(" ");
+  return { name: cleanName, note: cleanIngredientNote(note, cleanName) };
+}
+
+export interface ParsedIngredientText<U> {
+  // What is saved: the top of a range, or 0 for a line with no amount.
+  quantity: number;
+  unit: U | null;
+  name: string;
+  notes: string;
+  optional: boolean;
+}
+
+// One imported line ("1/2 lb. penne pasta (uncooked) ($0.75)") as it will be
+// saved. Null when nothing is left to name an ingredient.
+export function parseIngredientText<U extends { abbreviation: string }>(
+  raw: string,
+  lookup: (word: string) => U | null
+): ParsedIngredientText<U> | null {
+  let text = raw.trim();
+  const optional = /\boptional\b/i.test(text);
+  text = text.replace(/\(?\boptional\b\)?/i, "").trim();
+  // "($0.20)" and "garlic*" from sites that price or footnote each line.
+  text = cleanIngredientText(text);
+  if (!text) return null;
+
+  // A line with no number ("Salt and freshly ground black pepper") is saved
+  // with quantity 0: no amount, not a count of 1. A range ("1/2 to 1 tsp") is
+  // saved at its upper end so a grocery list covers the most the recipe could
+  // use, and the full range is kept in the notes.
+  const line = readIngredientLine(text, lookup);
+  const range =
+    line.quantityMax > line.quantity
+      ? formatRange(line.quantity, line.quantityMax, line.unit?.abbreviation ?? "ea")
+      : "";
+
+  const split = splitNameAndNote(line.name);
+  // "garlic, (minced)" leaves "garlic," before the note.
+  const name = cleanIngredientName(split.name);
+  if (!name) return null;
+  const deduped = dedupeNameAndNote(name, [range, ...line.notes, ...split.notes].filter(Boolean).join(", "));
+  return { quantity: line.quantityMax, unit: line.unit, name: deduped.name, notes: deduped.note, optional };
 }
