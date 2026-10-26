@@ -17,8 +17,13 @@ import {
   ingredientNameVariants,
   readQuantity,
 } from "../src/lib/ingredient-format";
-import { parseCookSteps, stripFootnoteMarkers } from "../src/lib/parse-steps";
+import { parseCookSteps, parseSteps, stripFootnoteMarkers } from "../src/lib/parse-steps";
 import { cleanScrapedRecipe, extractStructuredRecipe } from "../src/lib/recipe-scrape";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { OptionalBadge } from "../src/components/recipes/OptionalBadge";
+import { pantryStatus } from "../src/lib/pantry-status";
+import { cleanStepText } from "../src/lib/text-clean";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -433,6 +438,44 @@ eq("author casing kept", formatIngredientLine(0, "ea", "Salt and freshly ground 
 eq("no doubled to taste", formatIngredientLine(0, "ea", "salt, to taste"), "Salt, to taste");
 eq("measured salt unchanged", formatIngredientLine(0.25, "tsp", "salt"), "1/4 tsp salt");
 eq("to-taste note drops", cleanIngredientNote("to taste", formatIngredient(0, "ea", "salt and pepper").name), "");
+
+console.log("Optional label spacing:");
+// What a reader or a copy-paste sees: tags gone, the text between them as is.
+const plainText = (node: ReturnType<typeof createElement>) => renderToStaticMarkup(node).replace(/<[^>]*>/g, "");
+eq(
+  "space before optional after a note",
+  plainText(createElement("span", null, "garnish (for serving)", createElement(OptionalBadge))),
+  "garnish (for serving) optional"
+);
+eq(
+  "space before optional after a name",
+  plainText(createElement("span", null, "parsley", createElement(OptionalBadge))),
+  "parsley optional"
+);
+eq("badge is still the optional pill", renderToStaticMarkup(createElement(OptionalBadge)).includes(">optional<"), true);
+eq("print class is passed through", renderToStaticMarkup(createElement(OptionalBadge, { className: "print:hidden" })).includes("print:hidden"), true);
+// Every place that renders the label uses the shared component.
+for (const file of ["src/components/recipes/ScalableIngredients.tsx", "src/app/what-can-i-make/page.tsx", "src/app/share/[token]/page.tsx"]) {
+  const src = readFileSync(join(__dirname, "..", file), "utf8");
+  eq(`${file} uses OptionalBadge`, src.includes("<OptionalBadge"), true);
+  eq(`${file} has no bare optional pill`, />\s*optional\s*<\/Badge>/.test(src), false);
+}
+
+console.log("Step markdown:");
+eq("bold markers stripped", cleanStepText("Stir **well** until __smooth__."), "Stir well until smooth.");
+eq("blanks kept", cleanStepText("Sign: ____"), "Sign: ____");
+eq("steps drop stray markers", parseSteps("1. **Whisk** the eggs.\n2. Fold in __gently__."), ["Whisk the eggs.", "Fold in gently."]);
+eq(
+  "scraped steps drop stray markers",
+  cleanScrapedRecipe({ name: "x", description: "", instructions: "1. **Bake** it.", servings: 4, prepTimeMinutes: null, cookTimeMinutes: null, ingredients: [], imageUrl: null }).instructions,
+  "1. Bake it."
+);
+
+console.log("Pantry banner status:");
+eq("all in the pantry", pantryStatus(5, 5), "all");
+eq("some in the pantry", pantryStatus(2, 5), "some");
+eq("none in the pantry", pantryStatus(0, 5), "none");
+eq("nothing required is not a win", pantryStatus(0, 0), "none");
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

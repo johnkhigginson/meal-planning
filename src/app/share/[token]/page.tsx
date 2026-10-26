@@ -13,6 +13,7 @@ import { groupBySection } from "@/lib/recipe-sections";
 import { cleanIngredientNote, formatIngredient } from "@/lib/ingredient-format";
 import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
 import { decodeEntities } from "@/lib/text-clean";
+import { OptionalBadge } from "@/components/recipes/OptionalBadge";
 
 interface SharedRecipe {
   name: string;
@@ -26,6 +27,7 @@ interface SharedRecipe {
     quantity: number;
     unit: { abbreviation: string };
     notes: string | null;
+    optional?: boolean;
     section: string | null;
   }[];
   tags: { tag: { name: string } }[];
@@ -144,12 +146,13 @@ export default function SharePage() {
                   )}
                   <ul className="divide-y">
                     {group.items.map((i, idx) => {
-                      const shown = formatIngredient(i.quantity, i.unit.abbreviation, i.ingredient.name);
-                      const note = cleanIngredientNote(i.notes, shown.name);
+                      const shown = formatIngredient(i.quantity, i.unit.abbreviation, decodeEntities(i.ingredient.name));
+                      const note = cleanIngredientNote(decodeEntities(i.notes), shown.name);
                       return (
                         <li key={idx} className="py-2 text-[15px]">
                           <span className="font-bold tabular-nums">{shown.amount}</span> {shown.name}
                           {note ? <span className="text-muted-foreground"> ({note})</span> : ""}
+                          {i.optional && <OptionalBadge />}
                         </li>
                       );
                     })}

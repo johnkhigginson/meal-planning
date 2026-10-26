@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Clock, Users, Check, Heart, ChevronDown, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatIngredient } from "@/lib/ingredient-format";
+import { OptionalBadge } from "@/components/recipes/OptionalBadge";
 
 interface MatchedIngredient {
   ingredientId: number;
@@ -234,11 +235,7 @@ export default function WhatCanIMakePage() {
                               {shown.amount}
                             </span>{" "}
                             <span>{shown.name}</span>
-                            {ing.optional && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
-                                optional
-                              </Badge>
-                            )}
+                            {ing.optional && <OptionalBadge />}
                           </span>
                         </li>
                         );

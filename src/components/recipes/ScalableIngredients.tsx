@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, Minus, Plus } from "lucide-react";
+import { Check, Minus, Plus, ShoppingBasket } from "lucide-react";
 import { groupBySection } from "@/lib/recipe-sections";
 import { cleanIngredientNote, formatIngredient } from "@/lib/ingredient-format";
+import { decodeEntities } from "@/lib/text-clean";
+import { pantryStatus } from "@/lib/pantry-status";
 import { cn } from "@/lib/utils";
 import { AddMissingToGroceryButton } from "./AddMissingToGroceryButton";
+import { OptionalBadge } from "./OptionalBadge";
 
 export interface ScalableIngredient {
   quantity: number;
@@ -50,6 +52,7 @@ export function ScalableIngredients({
   const tracksPantry = ingredients.some((ri) => ri.stock !== undefined);
   const required = ingredients.filter((ri) => !ri.optional);
   const metCount = required.filter((ri) => hasEnough(ri.stock, ri.quantity * factor)).length;
+  const status = pantryStatus(metCount, required.length);
 
   return (
     <Card className="gap-5">
@@ -88,8 +91,19 @@ export function ScalableIngredients({
       <CardContent className="space-y-5">
         {tracksPantry && required.length > 0 && (
           <div className="space-y-2">
-            <p className="flex items-center gap-2 rounded-xl bg-leaf-soft px-3.5 py-2.5 text-sm font-bold text-leaf-ink print:hidden">
-              <Check className="h-4 w-4" strokeWidth={2.5} />
+            <p
+              className={cn(
+                "flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold print:hidden",
+                status === "all" && "bg-leaf-soft text-leaf-ink",
+                status === "some" && "bg-brand-soft text-foreground",
+                status === "none" && "bg-muted text-foreground"
+              )}
+            >
+              {status === "all" ? (
+                <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              ) : (
+                <ShoppingBasket className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              )}
               {metCount} of {required.length} in your pantry
             </p>
             {recipeId !== undefined && metCount < required.length && (
@@ -105,8 +119,8 @@ export function ScalableIngredients({
             <ul>
               {group.items.map((ri, i) => {
                 const enough = hasEnough(ri.stock, ri.quantity * factor);
-                const shown = formatIngredient(ri.quantity * factor, ri.unit, ri.name);
-                const note = cleanIngredientNote(ri.notes, shown.name);
+                const shown = formatIngredient(ri.quantity * factor, ri.unit, decodeEntities(ri.name));
+                const note = cleanIngredientNote(decodeEntities(ri.notes), shown.name);
                 return (
                   <li
                     key={i}
@@ -127,11 +141,7 @@ export function ScalableIngredients({
                       <span className="font-extrabold">{shown.amount}</span>{" "}
                       <span>{shown.name}</span>
                       {note && <span className="text-sm text-muted-foreground"> ({note})</span>}
-                      {ri.optional && (
-                        <Badge variant="secondary" className="ml-2 text-xs print:hidden">
-                          optional
-                        </Badge>
-                      )}
+                      {ri.optional && <OptionalBadge className="print:hidden" />}
                     </span>
                   </li>
                 );
