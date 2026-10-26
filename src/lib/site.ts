@@ -15,7 +15,16 @@ export function absoluteUrl(path: string | null | undefined): string | undefined
   return `${getSiteUrl()}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-export const SUPPORT_EMAIL = "support@example.com"; // TODO(John): choose the real support address
+// Public support address from NEXT_PUBLIC_SUPPORT_EMAIL. Undefined when unset
+// or not a plausible address, so pages can leave the email out instead of
+// showing a fake one.
+function readSupportEmail(): string | undefined {
+  const email = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim();
+  if (!email || !email.includes("@") || /\s/.test(email)) return undefined;
+  return email;
+}
+
+export const SUPPORT_EMAIL: string | undefined = readSupportEmail();
 
 // Shown as "Last updated" on the privacy, terms and contact pages. Bump it
 // whenever the legal text changes.

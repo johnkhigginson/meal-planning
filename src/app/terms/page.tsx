@@ -144,9 +144,18 @@ export default function TermsPage() {
 
         <LegalSection title="Contact">
           <p>
-            Questions about these terms? Email{" "}
-            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> or see our{" "}
-            <Link href="/contact">contact page</Link>.
+            {SUPPORT_EMAIL ? (
+              <>
+                Questions about these terms? Email{" "}
+                <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> or see our{" "}
+                <Link href="/contact">contact page</Link>.
+              </>
+            ) : (
+              <>
+                Questions about these terms? Contact us through the{" "}
+                <Link href="/contact">Contact page</Link>.
+              </>
+            )}
           </p>
         </LegalSection>
       </LegalDoc>

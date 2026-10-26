@@ -14,11 +14,18 @@ export default function ContactPage() {
   return (
     <PublicShell>
       <LegalDoc title="Contact us" lastUpdated={LEGAL_LAST_UPDATED}>
-        <p>
-          {SITE_NAME} is a small personal project. The best way to reach us is by email at{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Looking for how-to steps first?
-          Try the <Link href="/help">Help page</Link>.
-        </p>
+        {SUPPORT_EMAIL ? (
+          <p>
+            {SITE_NAME} is a small personal project. The best way to reach us is by email at{" "}
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Looking for how-to steps
+            first? Try the <Link href="/help">Help page</Link>.
+          </p>
+        ) : (
+          <p>
+            {SITE_NAME} is a small personal project. A support email address is coming soon. In
+            the meantime, see the <Link href="/help">Help page</Link>.
+          </p>
+        )}
 
         <LegalSection title="What to include">
           <ul>

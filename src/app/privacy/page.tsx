@@ -17,8 +17,16 @@ export default function PrivacyPage() {
         <p>
           {SITE_NAME} (mylemonkitchen.com) is a personal project run from the United States. This
           policy explains what we collect when you use the site, why, who helps us run it, and the
-          choices you have. If you have questions, email{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+          choices you have.{" "}
+          {SUPPORT_EMAIL ? (
+            <>
+              If you have questions, email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+            </>
+          ) : (
+            <>
+              If you have questions, contact us through the <Link href="/contact">Contact page</Link>.
+            </>
+          )}
         </p>
 
         <LegalSection title="What we collect">
@@ -116,7 +124,16 @@ export default function PrivacyPage() {
           <p>
             Copies may remain in backups and logs for a limited time before they are overwritten.
             We may keep some records longer if the law requires it. To ask for deletion or a copy
-            of your data, email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+            of your data,{" "}
+            {SUPPORT_EMAIL ? (
+              <>
+                email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+              </>
+            ) : (
+              <>
+                contact us through the <Link href="/contact">Contact page</Link>.
+              </>
+            )}
           </p>
         </LegalSection>
 
@@ -153,8 +170,18 @@ export default function PrivacyPage() {
 
         <LegalSection title="Contact">
           <p>
-            Questions about privacy? Email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{" "}
-            or see our <Link href="/contact">contact page</Link>.
+            {SUPPORT_EMAIL ? (
+              <>
+                Questions about privacy? Email{" "}
+                <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> or see our{" "}
+                <Link href="/contact">contact page</Link>.
+              </>
+            ) : (
+              <>
+                Questions about privacy? Contact us through the{" "}
+                <Link href="/contact">Contact page</Link>.
+              </>
+            )}
           </p>
         </LegalSection>
       </LegalDoc>

@@ -105,6 +105,7 @@ instead, so both need to point at the same database.
 | `AUTH_SECRET` | yes | NextAuth signing secret, also signs impersonation tokens |
 | `AUTH_TRUST_HOST` | yes | Set `true` when running behind a reverse proxy |
 | `NEXT_PUBLIC_SITE_URL` | no | Absolute base URL for SEO output (sitemap, RSS, Open Graph, JSON-LD) |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Support address shown on /contact, /privacy and /terms; omit to hide it |
 | `NEXT_PUBLIC_GA_ID` | no | Google Analytics 4 measurement ID; omit to disable analytics |
 | `GEMINI_API_KEY` | no | Enables photo recipe parsing, receipt scanning, ingredient extraction |
 | `AI_LIMIT_PER_MIN` | no | Per-user AI calls per minute (default 10) |
