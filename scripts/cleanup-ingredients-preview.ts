@@ -482,6 +482,20 @@ function typoOf(a: string, b: string): boolean {
   return editDistance(p, q) === 1;
 }
 
+// Saved names the owner approved as misspellings. The row is renamed to
+// the right spelling and keeps its lines; when another row already has
+// that name, the row is junk and its lines go there. A typo match can't
+// tell which spelling is right, so only these rows are renamed.
+export const RESPELL_ROWS = new Map<string, { name: string; note?: string }>([
+  ["tomatoe sauce", { name: "tomato sauce" }],
+  // "celery stocks" was celery sticks: "sticks" goes to each line's note.
+  ["celery stocks", { name: "celery", note: "sticks" }],
+]);
+// New names that mean a respelled row, with words for the note.
+const RESPELL_NAMES = new Map<string, { name: string; note: string }>([
+  ["celery sticks", { name: "celery", note: "sticks" }],
+]);
+
 // The name without stray punctuation or spacing around it: "garlic," ->
 // "garlic". A closing paren stays.
 export const tidyName = (name: string) => name.replace(/\s+/g, " ").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "");
@@ -662,22 +676,27 @@ export function analyze(snap: Snapshot, today: Date): Report {
   // name is what a match compares and what a proposal shows. The row is
   // renamed to it, and words the read took off go to its lines' notes.
   // When another row already has that name, the dirty row is junk: its
-  // lines repoint and it goes.
+  // lines repoint and it goes. An approved misspelling ("tomatoe sauce")
+  // is read as its right spelling the same way.
   const tidied = new Map<number, string>();
   const reads = new Map<number, DirtyRead>();
+  const respelt = new Set<number>();
   const tidyKeys = new Map<string, { id: number; name: string }>();
   for (const row of snap.ingredients) {
     if (!flagged(row.id) && tidyName(row.name) === row.name) tidyKeys.set(ingredientKey(row.name), row);
   }
   for (const row of [...snap.ingredients].sort((a, b) => a.id - b.id)) {
     const tidy = tidyName(row.name);
-    if (flagged(row.id) || tidy === row.name || !tidy) continue;
-    const read = readDirtyName(row.name, lookup);
+    if (flagged(row.id) || !tidy) continue;
+    const fix = RESPELL_ROWS.get(tidy.toLowerCase());
+    if (!fix && tidy === row.name) continue;
+    const read: DirtyRead | null = fix ? { name: fix.name, notes: fix.note ? [fix.note] : [], unit: null, lost: false } : readDirtyName(row.name, lookup);
     if (!read || badNameReasons(read.name, lookup).length) continue;
     reads.set(row.id, read);
+    if (fix) respelt.add(row.id);
     const same = tidyKeys.get(ingredientKey(read.name));
-    if (same) {
-      problems.get(row.id)!.junk.push(`stray punctuation, same name as "${same.name}" (#${same.id})`);
+    if (same && same.id !== row.id) {
+      problems.get(row.id)!.junk.push(`${fix ? "misspelled" : "stray punctuation"}, same name as "${same.name}" (#${same.id})`);
     } else {
       tidied.set(row.id, read.name);
       tidyKeys.set(ingredientKey(read.name), { id: row.id, name: read.name });
@@ -694,15 +713,25 @@ export function analyze(snap: Snapshot, today: Date): Report {
     const key = ingredientKey(row.name);
     byKey.set(key, [...(byKey.get(key) ?? []), row]);
   }
-  const findExisting = (name: string) => pickIngredientMatch(name, byKey.get(ingredientKey(name)) ?? []);
+  const pickRow = (name: string) => pickIngredientMatch(name, byKey.get(ingredientKey(name)) ?? []);
+  // The old spelling of a respelled row still finds it (or the row that
+  // already had the right spelling).
+  const respellTo = new Map<string, IngredientRow>();
+  for (const [old, fix] of RESPELL_ROWS) {
+    const to = pickRow(fix.name);
+    if (to && !byKey.has(ingredientKey(old))) respellTo.set(ingredientKey(old), to);
+  }
+  const findExisting = (name: string) => pickRow(name) ?? respellTo.get(ingredientKey(name)) ?? null;
   // "water" is an ingredient on its own, so "water or chicken broth" stays water.
-  const isNoun = (name: string) => byKey.has(ingredientKey(name));
+  const isNoun = (name: string) => byKey.has(ingredientKey(name)) || respellTo.has(ingredientKey(name));
   // New names that mean another name, filled once every line is read (see
   // "Spelling" below): "fresh garlic" -> garlic, note "fresh".
-  const spelling = new Map<string, { target: Target; notes: string[]; typo: boolean }>();
+  // "tail" words go after the line's note, so "4 to 5" stays in front.
+  const spelling = new Map<string, { target: Target; notes: string[]; tail?: string[]; typo: boolean }>();
   const respelled = (target: Target) => {
     let t = target;
     const notes: string[] = [];
+    const tail: string[] = [];
     const questions: string[] = [];
     const seen = new Set<string>();
     while ("create" in t && spelling.has(ingredientKey(t.create)) && !seen.has(ingredientKey(t.create))) {
@@ -710,10 +739,11 @@ export function analyze(snap: Snapshot, today: Date): Report {
       seen.add(key);
       const next = spelling.get(key)!;
       notes.push(...next.notes);
+      tail.push(...(next.tail ?? []));
       if (next.typo) questions.push(`Treat "${t.create}" as "${"create" in next.target ? next.target.create : "id" in next.target ? next.target.name : ""}"?`);
       t = next.target;
     }
-    return { target: t, notes, questions };
+    return { target: t, notes, tail, questions };
   };
   // One spelling per new name, so "onion" and "onions" create one row.
   const createNames = new Map<string, string>();
@@ -1169,6 +1199,12 @@ export function analyze(snap: Snapshot, today: Date): Report {
   const kept: string[] = [];
   const byUse = [...newUses].sort((a, b) => b[1].n - a[1].n || familiar(b[1].name) - familiar(a[1].name));
   for (const [key, { name }] of byUse) {
+    const alias = [...RESPELL_NAMES].find(([n]) => ingredientKey(n) === key)?.[1];
+    const aliasRow = alias ? findExisting(alias.name) : null;
+    if (alias && aliasRow) {
+      spelling.set(key, { target: { id: aliasRow.id, name: aliasRow.name }, notes: [], tail: [alias.note], typo: false });
+      continue;
+    }
     const peeled = peeledNames(name).reverse().find((p) => named(p.name, key));
     if (peeled) {
       spelling.set(key, { target: named(peeled.name, key)!, notes: peeled.notes, typo: false });
@@ -1187,7 +1223,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
     if (moved.target === t) continue;
     x.proposed.target = moved.target;
     const have = new Set(wordsOf(x.proposed.notes));
-    const notes = [...moved.notes.filter((n) => !have.has(n)), x.proposed.notes].filter(Boolean).join(", ");
+    const notes = [...moved.notes.filter((n) => !have.has(n)), x.proposed.notes, ...moved.tail.filter((n) => !have.has(n))].filter(Boolean).join(", ");
     x.proposed.notes = tidyIngredientNote(notes);
     let question = x.question;
     if ("id" in moved.target) question = question.replace(/No "[^"]+" row exists\. Create it for this line\?\s*/, "").trim();
@@ -1256,7 +1292,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
       recipeName: "",
       current: { quantity: null, unit: "", ingredientId: id, ingredientName: ing.name, notes: "" },
       proposed: { quantity: null, unit: "", target: { id, name }, notes: moved },
-      reason: `Stray punctuation or words in the name, and no other row is named "${name}". Rename the row${extra.length ? `; ${extra.join(", and ")}` : ""}; ${linesByIngredient.get(id)?.length ?? 0} recipe line(s) keep the link.`,
+      reason: `${respelt.has(id) ? "Owner-approved spelling fix" : "Stray punctuation or words in the name"}, and no other row is named "${name}". Rename the row${extra.length ? `; ${extra.join(", and ")}` : ""}; ${linesByIngredient.get(id)?.length ?? 0} recipe line(s) keep the link.`,
       ambiguous: read.lost,
       question: read.lost ? `Name was '${ing.name}'. Which ${name}?` : "",
     });
@@ -2335,6 +2371,41 @@ function selfTest(out: string | undefined): number {
   const onionLine = onion.proposals.find((x) => x.table === "RecipeIngredient" && x.rowId === 9978);
   check("medium yellow onion, -> existing yellow onion, note medium", same(onionLine ? [targetText(onionLine.proposed.target), onionLine.proposed.notes, onionLine.ambiguous] : null, ["yellow onion (#877)", "medium", false]));
   check("medium yellow onion, row is deleted, not renamed", onion.proposals.some((x) => x.category === "deletable_after_repoint" && x.rowId === 878) && !onion.proposals.some((x) => x.category === "rename_ingredient" && x.rowId === 878));
+
+  console.log("\nApproved respellings:");
+  // "tomatoe sauce" (#420) and "celery stocks" (#557) are renamed, and
+  // lines that name either spelling point at them.
+  const respellSnap = (extra: IngredientRow[] = []) => {
+    const snap = fixture();
+    const unit = (name: string) => snap.units.find((u) => u.name === name)!.id;
+    snap.ingredients.push({ id: 420, name: "tomatoe sauce" }, { id: 557, name: "celery stocks" }, { id: 880, name: "(8-oz) can tomato sauce" }, { id: 881, name: "(8 oz) tomatoe sauce" }, { id: 749, name: "-5 celery sticks" }, { id: 653, name: "chopped celery" }, ...extra);
+    snap.recipeLines.push(
+      { id: 9420, recipeId: riceRecipe, ingredientId: 420, quantity: 1, unitId: unit("can"), notes: null },
+      { id: 9880, recipeId: riceRecipe, ingredientId: 880, quantity: 1, unitId: unit("can"), notes: null },
+      { id: 9881, recipeId: riceRecipe, ingredientId: 881, quantity: 1, unitId: unit("can"), notes: null },
+      { id: 9557, recipeId: riceRecipe, ingredientId: 557, quantity: 2, unitId: unit("each"), notes: "chopped" },
+      { id: 9749, recipeId: riceRecipe, ingredientId: 749, quantity: 4, unitId: unit("each"), notes: null },
+      { id: 9653, recipeId: riceRecipe, ingredientId: 653, quantity: 1, unitId: unit("cup"), notes: null },
+    );
+    return analyze(snap, new Date("2026-10-26T12:00:00Z"));
+  };
+  const respell = respellSnap();
+  const respellLine = (r: Report, id: number) => r.proposals.find((x) => x.table === "RecipeIngredient" && x.rowId === id);
+  const renameTo = (r: Report, id: number) => r.proposals.find((x) => x.category === "rename_ingredient" && x.rowId === id)?.proposed.target;
+  check('"tomatoe sauce" #420 is renamed to "tomato sauce"', same(renameTo(respell, 420), { id: 420, name: "tomato sauce" }));
+  check('"celery stocks" #557 is renamed to "celery"', same(renameTo(respell, 557), { id: 557, name: "celery" }));
+  check("tomato sauce line -> #420, no spelling question", same(shownLine(respellLine(respell, 9880)), [1, "can", "tomato sauce (#420)", "8-oz", false]));
+  check("tomatoe sauce line -> #420", same(shownLine(respellLine(respell, 9881)), [1, "can", "tomato sauce (#420)", "8 oz", false]));
+  check("a line on #420 keeps its link", !respellLine(respell, 9420));
+  check('a line on #557 keeps its link, "sticks" in the note', same(shownLine(respellLine(respell, 9557)), [2, "each", "celery (#557)", "sticks, chopped", false]));
+  check('celery sticks line -> #557, "sticks" after the note, no spelling question', same(shownLine(respellLine(respell, 9749)), [5, "each", "celery (#557)", "4 to 5, sticks", true]) && respellLine(respell, 9749)!.question === "Amount would change from 4 each to 5 each. OK?");
+  check('chopped celery -> #557, no new "celery"', same(shownLine(respellLine(respell, 9653)), [1, "cup", "celery (#557)", "chopped", false]) && !respell.proposals.some((x) => "create" in x.proposed.target && /^celery/i.test(x.proposed.target.create)));
+  // With a "tomato sauce" row already there, #420 is not renamed: it is
+  // junk, and its lines go to that row.
+  const taken = respellSnap([{ id: 900, name: "tomato sauce" }]);
+  check("respelling onto a taken name: #420 is not renamed", !renameTo(taken, 420));
+  check("its line and the tomatoe sauce line go to the existing row", targetText(respellLine(taken, 9420)!.proposed.target) === "tomato sauce (#900)" && targetText(respellLine(taken, 9881)!.proposed.target) === "tomato sauce (#900)" && targetText(respellLine(taken, 9880)!.proposed.target) === "tomato sauce (#900)");
+  check("and #420 is deleted after the repoint", taken.proposals.some((x) => x.category === "deletable_after_repoint" && x.rowId === 420));
 
   console.log("\nSanity check on proposed names:");
   for (const [name, want] of [

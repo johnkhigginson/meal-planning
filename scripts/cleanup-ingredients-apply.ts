@@ -29,6 +29,7 @@ import { basename, join, resolve } from "node:path";
 import {
   COOKED_LEAD,
   QUERIES,
+  RESPELL_ROWS,
   analyze,
   appRequire,
   connectionConfig,
@@ -780,7 +781,7 @@ export function buildPlan(snap: Snapshot, report: Report, extraRefs: Map<number,
       renameSteps.push({
         seq: 0, kind: "update", table: "Ingredient", rowId: id, ref: null, before: { name: old }, after: { name },
         beforeText: `${old} (#${id})`, afterText: `${name} (#${id})`, category: "rename_ingredient",
-        rules: [nameKey(name) === "garlic" ? "approve:garlic" : nameKey(name) === "yeast" ? "approve:yeast" : "approve:rename"],
+        rules: [nameKey(name) === "garlic" ? "approve:garlic" : nameKey(name) === "yeast" ? "approve:yeast" : RESPELL_ROWS.has(nameKey(old)) ? "approve:spelling_rename" : "approve:rename"],
         reason: x.reason, question: x.question, recipe: "",
       });
     }
@@ -1627,6 +1628,59 @@ async function selfTest(out: string | undefined): Promise<number> {
   const uniqueInserts = new Set(plan.steps.filter((s) => s.kind === "insert").map((s) => nameKey(String(s.after!.name))));
   check("no two inserts share a name", uniqueInserts.size === plan.counts.inserts);
   check("no insert takes an existing name", plan.steps.filter((s) => s.kind === "insert").every((s) => !snap.ingredients.some((i) => nameKey(i.name) === nameKey(String(s.after!.name)))));
+
+  console.log("\nApproved respellings:");
+  // "tomatoe sauce" (#420) and "celery stocks" (#557) are renamed; lines
+  // naming either spelling point at them, and no "celery" is created.
+  const respellSnap = (extra: { id: number; name: string }[] = []) => {
+    const s = testSnapshot();
+    const unit = (name: string) => s.units.find((u) => u.name === name)!.id;
+    const soup = s.recipes[0].id;
+    s.ingredients.push({ id: 420, name: "tomatoe sauce" }, { id: 557, name: "celery stocks" }, { id: 880, name: "(8-oz) can tomato sauce" }, { id: 749, name: "-5 celery sticks" }, { id: 653, name: "chopped celery" }, ...extra);
+    s.recipeLines.push(
+      { id: 7420, recipeId: soup, ingredientId: 420, quantity: 1, unitId: unit("can"), notes: null },
+      { id: 7880, recipeId: soup, ingredientId: 880, quantity: 1, unitId: unit("each"), notes: null },
+      { id: 7557, recipeId: soup, ingredientId: 557, quantity: 2, unitId: unit("each"), notes: "chopped" },
+      { id: 7749, recipeId: soup, ingredientId: 749, quantity: 4, unitId: unit("each"), notes: null },
+      { id: 7653, recipeId: soup, ingredientId: 653, quantity: 1, unitId: unit("cup"), notes: null },
+    );
+    // In id order, as the undo's reinsert leaves them.
+    s.ingredients.sort((a, b) => a.id - b.id);
+    return s;
+  };
+  const rsnap = respellSnap();
+  const rplan = buildPlan(rsnap, analyze(rsnap, new Date("2026-10-26T12:00:00Z")));
+  const rline = (p: Plan, id: number) => p.steps.find((s) => s.kind === "update" && s.table === "RecipeIngredient" && s.rowId === id);
+  const rshown = (s: Step | undefined) => (s ? [s.after!.quantity, rsnap.units.find((u) => u.id === s.after!.unitId)?.name, s.afterText.split(" | ")[1], s.after!.notes] : null);
+  const renameStep = (p: Plan, id: number) => p.steps.find((s) => s.kind === "update" && s.table === "Ingredient" && s.rowId === id);
+  check('#420 "tomatoe sauce" -> "tomato sauce", before and after in the plan', same([renameStep(rplan, 420)?.before, renameStep(rplan, 420)?.after, renameStep(rplan, 420)?.rules], [{ name: "tomatoe sauce" }, { name: "tomato sauce" }, ["approve:spelling_rename"]]));
+  check('#557 "celery stocks" -> "celery"', same([renameStep(rplan, 557)?.before, renameStep(rplan, 557)?.after], [{ name: "celery stocks" }, { name: "celery" }]));
+  check("tomato sauce line -> #420", same(rshown(rline(rplan, 7880)), [1, "can", "tomato sauce (#420)", "8-oz"]), rshown(rline(rplan, 7880)));
+  check("a line on #420 is not touched", !rline(rplan, 7420));
+  check('a line on #557 stays, "sticks" in the note', same(rshown(rline(rplan, 7557)), [2, "each", "celery (#557)", "sticks, chopped"]), rshown(rline(rplan, 7557)));
+  check('-5 celery sticks -> 4 celery (#557), note "4 to 5, sticks"', same(rshown(rline(rplan, 7749)), [4, "each", "celery (#557)", "4 to 5, sticks"]), rshown(rline(rplan, 7749)));
+  check("chopped celery -> #557", same(rshown(rline(rplan, 7653)), [1, "cup", "celery (#557)", "chopped"]), rshown(rline(rplan, 7653)));
+  check('no "celery" or "tomato sauce" insert', !rplan.steps.some((s) => s.kind === "insert" && ["celery", "tomato sauce", "celery sticks"].includes(nameKey(String(s.after!.name)))));
+  check("#420 and #557 are kept", !rplan.steps.some((s) => s.kind === "delete" && (s.rowId === 420 || s.rowId === 557)));
+  const rfake = new FakeDb(rsnap);
+  const roriginal = rfake.dump();
+  const rlogPath = join(mkdtempSync(join(tmpdir(), "mlk-respell-test-")), "undo.json");
+  rfake.begin();
+  const rlog = await applyPlan(rfake, rplan, { logPath: rlogPath, expect: rplan.counts });
+  rfake.commit();
+  check("renames run with no duplicate name", rfake.rows.Ingredient.filter((r) => r.name === "celery").length === 1 && rfake.rows.Ingredient.find((r) => r.id === 420)?.name === "tomato sauce");
+  check("undo log has the renames with before and after", same(rlog.entries.filter((e) => e.table === "Ingredient" && e.kind === "update" && (e.id === 420 || e.id === 557)).map((e) => [e.id, e.before, e.after]), [[420, { name: "tomatoe sauce" }, { name: "tomato sauce" }], [557, { name: "celery stocks" }, { name: "celery" }]]));
+  rfake.begin();
+  await undoLog(rfake, { ...rlog, status: "committed" });
+  rfake.commit();
+  check("undo puts the old names back", rfake.dump() === roriginal);
+  // With a "celery" row already there, #557 is not renamed: its lines and
+  // the celery lines go to that row, and #557 goes.
+  const csnap = respellSnap([{ id: 901, name: "celery" }]);
+  const cplan = buildPlan(csnap, analyze(csnap, new Date("2026-10-26T12:00:00Z")));
+  check("respelling onto a taken name: #557 is not renamed", !renameStep(cplan, 557));
+  check("its lines go to the existing celery row", [7557, 7749, 7653].every((id) => rline(cplan, id)?.after!.ingredientId === 901));
+  check("and #557 is deleted", cplan.steps.some((s) => s.kind === "delete" && s.rowId === 557));
 
   console.log("\nWrite guard:");
   for (const good of [SQL.updateLine("RecipeIngredient"), SQL.updateLine("LibraryRecipeIngredient"), SQL.rename, SQL.insert, SQL.delete]) {
