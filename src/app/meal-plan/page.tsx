@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,20 +9,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SearchInput } from "@/components/shared/SearchInput";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { toast } from "sonner";
+import { SLOT_LABELS, addMealToPlan, formatDate, getMonday, parseDate } from "@/lib/meal-plan";
 import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2, Move } from "lucide-react";
 
 const ALL_MEAL_SLOTS = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"] as const;
-const SLOT_LABELS: Record<string, string> = {
-  BREAKFAST: "Breakfast",
-  LUNCH: "Lunch",
-  DINNER: "Dinner",
-  SNACK: "Snack",
-};
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface MealPlanEntry {
@@ -69,19 +66,6 @@ interface RecipeOption {
   servings: number;
 }
 
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
-
 function isToday(date: Date): boolean {
   const today = new Date();
   return (
@@ -93,7 +77,11 @@ function isToday(date: Date): boolean {
 
 export default function MealPlanPage() {
   const router = useRouter();
-  const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
+  // ?week=YYYY-MM-DD opens the week containing that day ("View meal plan" on a recipe).
+  const searchParams = useSearchParams();
+  const [currentMonday, setCurrentMonday] = useState(() =>
+    getMonday(parseDate(searchParams.get("week") ?? "") ?? new Date())
+  );
   const [plan, setPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -192,19 +180,20 @@ export default function MealPlanPage() {
   const canAdd = pickerMode === "recipe" ? !!selectedRecipe : !!customName.trim();
 
   async function addEntry() {
-    if (!plan || !pickerSlot || !canAdd) return;
+    if (!pickerSlot || !canAdd) return;
     setSaving(true);
-    const payload =
+    const ok = await addMealToPlan(
+      pickerSlot.date,
+      pickerSlot.mealSlot,
       pickerMode === "recipe"
         ? { recipeId: selectedRecipe!.id, servings }
-        : { customName: customName.trim(), servings: 1 };
-    const res = await fetch(`/api/meal-plans/${plan.id}/entries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, date: pickerSlot.date, mealSlot: pickerSlot.mealSlot }),
-    });
+        : { customName: customName.trim(), servings: 1 }
+    );
     setSaving(false);
-    if (!res.ok) return;
+    if (!ok) {
+      toast.error("Couldn't add that meal. Please try again.");
+      return;
+    }
     setPickerOpen(false);
     loadPlan();
   }
@@ -425,10 +414,15 @@ export default function MealPlanPage() {
                             </div>
                           </div>
                         ))}
+                        {/* An empty cell is one big button, so a click anywhere
+                            in it (or Enter/Space when focused) adds a meal. */}
                         <button
-                          onClick={() => openPicker(formatDate(date), slot)}
+                          type="button"
+                          onClick={() => openPicker(dateStr, slot)}
                           aria-label={`Add ${SLOT_LABELS[slot].toLowerCase()} on ${DAY_LABELS[dayIdx]} ${date.getDate()}`}
-                          className="mt-auto flex w-full items-center justify-center rounded-xl p-1.5 text-muted-foreground opacity-0 transition-[opacity,background-color,color] duration-200 ease-out group-hover/cell:opacity-100 hover:bg-card hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring [@media(hover:none)]:opacity-100"
+                          className={`flex w-full items-center justify-center rounded-xl p-1.5 text-muted-foreground opacity-0 transition-[opacity,background-color,color] duration-200 ease-out group-hover/cell:opacity-100 hover:bg-card hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-ring [@media(hover:none)]:opacity-100 ${
+                            entries.length === 0 ? "-m-1.5 flex-1 cursor-pointer rounded-2xl" : "mt-auto"
+                          }`}
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
@@ -497,7 +491,9 @@ export default function MealPlanPage() {
                           </div>
                         ) : (
                           <button
+                            type="button"
                             onClick={() => openPicker(formatDate(date), slot)}
+                            aria-label={`Add ${SLOT_LABELS[slot].toLowerCase()} on ${DAY_LABELS[i]} ${date.getDate()}`}
                             className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-input text-sm font-bold text-muted-foreground transition-colors duration-200 ease-out hover:bg-muted hover:text-foreground"
                           >
                             <Plus className="h-3.5 w-3.5" />
@@ -519,13 +515,20 @@ export default function MealPlanPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add to plan</DialogTitle>
+            {pickerSlot && (
+              <DialogDescription>
+                {SLOT_LABELS[pickerSlot.mealSlot]} on{" "}
+                {parseDate(pickerSlot.date)?.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </DialogDescription>
+            )}
           </DialogHeader>
           <div className="space-y-4">
             {/* Choose a saved recipe, or just jot down a meal name. */}
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5" role="group" aria-label="Meal type">
               <Button
                 type="button"
                 size="sm"
+                aria-pressed={pickerMode === "recipe"}
                 variant={pickerMode === "recipe" ? "default" : "outline"}
                 onClick={() => setPickerMode("recipe")}
               >
@@ -534,6 +537,7 @@ export default function MealPlanPage() {
               <Button
                 type="button"
                 size="sm"
+                aria-pressed={pickerMode === "custom"}
                 variant={pickerMode === "custom" ? "default" : "outline"}
                 onClick={() => setPickerMode("custom")}
               >
@@ -543,27 +547,32 @@ export default function MealPlanPage() {
 
             {pickerMode === "recipe" ? (
               <>
-                <SearchInput value={recipeSearch} onChange={setRecipeSearch} placeholder="Search recipes..." />
-                <div className="max-h-48 space-y-0.5 overflow-y-auto">
-                  {recipeOptions.map((recipe) => (
-                    <button
-                      key={recipe.id}
-                      type="button"
-                      aria-pressed={selectedRecipe?.id === recipe.id}
-                      className={`w-full cursor-pointer rounded-xl px-3 py-2.5 text-left text-sm transition-colors duration-200 ease-out ${
-                        selectedRecipe?.id === recipe.id
-                          ? "bg-brand font-bold text-brand-foreground"
-                          : "hover:bg-muted"
-                      }`}
-                      onClick={() => { setSelectedRecipe(recipe); setServings(recipe.servings); }}
-                    >
-                      {recipe.name}
-                    </button>
-                  ))}
-                  {recipeOptions.length === 0 && (
-                    <p className="py-6 text-center text-sm text-muted-foreground">No recipes found</p>
-                  )}
-                </div>
+                {/* The server does the searching, so cmdk's own filter is off.
+                    Arrow keys move through results; Enter picks one. */}
+                <Command shouldFilter={false} label="Recipes" className="rounded-2xl! border">
+                  <CommandInput
+                    value={recipeSearch}
+                    onValueChange={setRecipeSearch}
+                    placeholder="Search recipes..."
+                    aria-label="Search recipes"
+                    autoFocus
+                  />
+                  <CommandList className="max-h-48">
+                    <CommandEmpty className="text-muted-foreground">No recipes found</CommandEmpty>
+                    {recipeOptions.map((recipe) => (
+                      <CommandItem
+                        key={recipe.id}
+                        value={String(recipe.id)}
+                        data-checked={selectedRecipe?.id === recipe.id}
+                        aria-checked={selectedRecipe?.id === recipe.id}
+                        className="cursor-pointer py-2.5"
+                        onSelect={() => { setSelectedRecipe(recipe); setServings(recipe.servings); }}
+                      >
+                        {recipe.name}
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
                 {selectedRecipe && (
                   <div className="space-y-2">
                     <Label htmlFor="servings">Servings</Label>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pencil, Heart, BookOpen, Globe, UserRound } from "lucide-react";
 import { DeleteRecipeButton } from "@/components/recipes/DeleteRecipeButton";
 import { ShareRecipeButton } from "@/components/recipes/ShareRecipeButton";
+import { AddToMealPlanButton } from "@/components/recipes/AddToMealPlanButton";
 import { RecipeNotes } from "@/components/recipes/RecipeNotes";
 import { ScalableIngredients } from "@/components/recipes/ScalableIngredients";
 import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
@@ -55,7 +56,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
   // Authorship is only meaningful in a shared household. Pantry markers only
   // show for households that keep a pantry, so non-users don't see "0 of 9".
   const ingredientIds = recipe.ingredients.map((ri) => ri.ingredientId);
-  const [memberCount, pantryCount, stockItems] = await Promise.all([
+  const [memberCount, pantryCount, stockItems, settings] = await Promise.all([
     prisma.user.count({ where: { householdId } }),
     prisma.inventoryItem.count({ where: { householdId } }),
     ingredientIds.length > 0
@@ -64,6 +65,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           select: { ingredientId: true, quantity: true, unitId: true },
         })
       : Promise.resolve([]),
+    prisma.user.findUnique({ where: { id: user.userId }, select: { enabledMealSlots: true } }),
   ]);
   const conversions = stockItems.length > 0 ? await prisma.unitConversion.findMany() : [];
   const stockById = new Map(stockItems.map((s) => [s.ingredientId, s]));
@@ -112,6 +114,12 @@ export default async function RecipeDetailPage({ params }: PageProps) {
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <CookMode recipeName={recipe.name} steps={parseCookSteps(recipe.instructions)} />
+          <AddToMealPlanButton
+            recipeId={recipe.id}
+            recipeName={recipe.name}
+            servings={recipe.servings}
+            enabledMealSlots={settings?.enabledMealSlots ?? ""}
+          />
           <PrintButton />
           <ShareRecipeButton recipeId={recipe.id} />
           <Link href={`/recipes/${recipe.id}/edit`}>

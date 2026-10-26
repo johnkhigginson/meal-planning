@@ -5,6 +5,8 @@ import { addMealPlanEntrySchema } from "@/lib/validators";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const householdId = await requireHouseholdId();
   const { id } = await params;
@@ -20,8 +22,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { recipeId, customName } = parsed.data;
 
   // The meal plan must belong to the caller's household.
-  const plan = await prisma.mealPlan.findFirst({ where: { id: mealPlanId, householdId }, select: { id: true } });
+  const plan = await prisma.mealPlan.findFirst({
+    where: { id: mealPlanId, householdId },
+    select: { id: true, weekStartDate: true },
+  });
   if (!plan) return NextResponse.json({ error: "Meal plan not found" }, { status: 404 });
+
+  // Each week is its own MealPlan, so the day has to fall inside this one.
+  const date = new Date(parsed.data.date);
+  const offset = date.getTime() - plan.weekStartDate.getTime();
+  if (offset < 0 || offset >= 7 * DAY_MS) {
+    return NextResponse.json({ error: "That day isn't in this week's plan" }, { status: 400 });
+  }
 
   // A recipe-backed entry's recipe must belong to the household too. Free-text
   // meals reference nothing, so there's nothing further to authorize.
@@ -38,7 +50,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       mealPlanId,
       recipeId: recipeId ?? null,
       customName: recipeId != null ? null : customName!.trim(),
-      date: new Date(parsed.data.date),
+      date,
       mealSlot: parsed.data.mealSlot,
       servings: parsed.data.servings,
     },
