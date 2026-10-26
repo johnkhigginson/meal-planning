@@ -45,6 +45,11 @@ export default function WhatCanIMakePage() {
   const [minMatch, setMinMatch] = useState(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  // A recipe with no structured ingredients can't be matched, so it would rank
+  // as "0/0 ingredients". List those apart with a nudge to add ingredients.
+  const ranked = results.filter((r) => r.ingredients.length > 0);
+  const unlisted = results.filter((r) => r.ingredients.length === 0);
+
   useEffect(() => {
     fetch(`/api/what-can-i-make?minMatch=${minMatch}`)
       .then((r) => r.json())
@@ -89,7 +94,7 @@ export default function WhatCanIMakePage() {
 
       {loading ? (
         <p className="text-muted-foreground" role="status">Analyzing your pantry...</p>
-      ) : results.length === 0 ? (
+      ) : ranked.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input px-6 py-12 text-center">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
             <Lightbulb className="h-6 w-6" />
@@ -107,7 +112,7 @@ export default function WhatCanIMakePage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {results.map((match) => {
+          {ranked.map((match) => {
             const pct = Math.round(match.matchScore * 100);
             const full = pct === 100;
             const isExpanded = expandedId === match.recipeId;
@@ -169,7 +174,9 @@ export default function WhatCanIMakePage() {
                     <div className="flex items-center gap-3 sm:text-right">
                       <div className="space-y-1.5">
                         <div className="text-sm font-bold tabular-nums">
-                          {match.matchedCount}/{match.totalRequired} ingredients
+                          {match.totalRequired > 0
+                            ? `${match.matchedCount}/${match.totalRequired} ingredients`
+                            : "All ingredients optional"}
                         </div>
                         <Progress
                           value={pct}
@@ -252,6 +259,40 @@ export default function WhatCanIMakePage() {
             );
           })}
         </div>
+      )}
+
+      {!loading && unlisted.length > 0 && (
+        <section aria-labelledby="unlisted-heading" className="space-y-3">
+          <div className="space-y-1">
+            <h2 id="unlisted-heading" className="font-heading text-2xl font-semibold">
+              No ingredient list yet
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              These recipes can&apos;t be matched to your pantry until they have ingredients.
+            </p>
+          </div>
+          <ul className="divide-y rounded-2xl border bg-card">
+            {unlisted.map((recipe) => (
+              <li
+                key={recipe.recipeId}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3"
+              >
+                <Link
+                  href={`/recipes/${recipe.recipeId}`}
+                  className="min-w-0 font-bold underline-offset-4 hover:underline"
+                >
+                  {recipe.recipeName}
+                </Link>
+                <Link
+                  href={`/recipes/${recipe.recipeId}/edit`}
+                  className="text-sm font-bold text-primary underline-offset-4 hover:underline"
+                >
+                  Edit to add ingredients
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );
