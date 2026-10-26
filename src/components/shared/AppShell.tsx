@@ -7,7 +7,7 @@ import { MobileNav } from "./MobileNav";
 import { PageLoader } from "./PageLoader";
 import { ImpersonationBanner } from "./ImpersonationBanner";
 
-const authPages = ["/login", "/register"];
+const authPages = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();

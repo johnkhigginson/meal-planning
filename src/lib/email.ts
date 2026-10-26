@@ -6,6 +6,17 @@ function getClient() {
   return new ServerClient(apiKey);
 }
 
+// Account emails (password reset, verification) are optional in local and
+// preview setups. Without a Postmark key, log a warning and skip sending
+// instead of failing the request. Returns whether an email was sent.
+function getClientOrWarn(kind: string): ServerClient | null {
+  if (!process.env.POSTMARK_API_KEY) {
+    console.warn(`[email] POSTMARK_API_KEY not set; skipped sending ${kind} email`);
+    return null;
+  }
+  return getClient();
+}
+
 export async function sendCommentNotificationEmail(opts: {
   toEmail: string;
   commenterName: string;
@@ -168,4 +179,41 @@ export async function sendHouseholdInviteEmail(
     TextBody: `${inviterName} invited you to ${householdName} on My Lemon Kitchen.\n\nYou'll share recipes, pantry items, meal plans, and grocery lists.\n\nSign up at ${signUpUrl} with this email (${toEmail}) and you'll automatically join the household.`,
     MessageStream: "outbound",
   });
+}
+
+// Password reset link. Expires in an hour and works once.
+export async function sendPasswordResetEmail(toEmail: string, resetUrl: string): Promise<boolean> {
+  const client = getClientOrWarn("password reset");
+  if (!client) return false;
+
+  await client.sendEmail({
+    From: "hello@mylemonkitchen.com",
+    To: toEmail,
+    Subject: "Reset your My Lemon Kitchen password",
+    HtmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <span style="font-size: 24px; font-weight: 700;">My Lemon Kitchen</span>
+        </div>
+        <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 16px;">Reset your password</h1>
+        <p style="color: #555; line-height: 1.6; margin: 0 0 24px;">
+          We got a request to reset the password for your account. Click the button below to choose a new one.
+          The link works once and expires in 1 hour.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${resetUrl}" style="display: inline-block; background: #000; color: #FFF700; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Reset password
+          </a>
+        </div>
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          If you didn't ask for this, you can ignore this email. Your password won't change.
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+        <p style="color: #bbb; font-size: 12px; text-align: center;">My Lemon Kitchen</p>
+      </div>
+    `,
+    TextBody: `Reset your My Lemon Kitchen password:\n\n${resetUrl}\n\nThe link works once and expires in 1 hour. If you didn't ask for this, you can ignore this email.`,
+    MessageStream: "outbound",
+  });
+  return true;
 }

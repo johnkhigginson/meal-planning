@@ -40,11 +40,29 @@ model User {
   avatarUrl        String?  @db.NVarChar(2000) // public author photo
   createdAt        DateTime @default(now())
   lastLogin        DateTime?
+  emailVerifiedAt  DateTime? // set when the user follows the verification link; null = unverified (never blocks sign-in)
 
   household          Household                @relation(fields: [householdId], references: [id], onDelete: Cascade)
   authoredRecipes    Recipe[]                 @relation("RecipeAuthor")
   bookCollaborations RecipeBookCollaborator[]
   blogSubscriptions  BlogSubscriber[]
+  authTokens         AuthToken[]
+}
+
+// Single-use emailed tokens (password reset, email verification). Only the
+// sha256 of the token is stored, so a leaked table can't be used to log in.
+model AuthToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  purpose   String    @db.NVarChar(20) // PASSWORD_RESET, VERIFY_EMAIL
+  tokenHash String    @unique @db.NVarChar(64) // hex sha256 of the emailed token
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
 }
 
 model HouseholdInvite {
