@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextMiddleware, type NextRequest } from "next/server";
 
 // Routes that don't require authentication
 const publicPaths = [
@@ -15,7 +15,7 @@ const publicPaths = [
   "/contact",
 ];
 
-export default auth((req) => {
+const authMiddleware = auth((req) => {
   const { pathname } = req.nextUrl;
 
   // Allow public paths (including the public recipe blog) and the API routes
@@ -44,7 +44,14 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}) as unknown as NextMiddleware | Promise<NextMiddleware>;
+
+// The auth config is built per request (see src/lib/auth.ts), and in that mode
+// next-auth's auth(handler) hands back a promise of the middleware rather than
+// the middleware itself (its types don't say so), so resolve it here.
+export default async function middleware(req: NextRequest, ev: NextFetchEvent) {
+  return (await authMiddleware)(req, ev);
+}
 
 export const runtime = "nodejs";
 
