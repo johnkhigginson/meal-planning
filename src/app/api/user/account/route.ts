@@ -3,11 +3,14 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { auth, getCurrentUser } from "@/lib/auth";
 import { deleteUserAccount } from "@/lib/account-deletion";
+import { normalizeEmail } from "@/lib/email-normalize";
 import { audit, clientIp } from "@/lib/audit";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
 // Permanently delete the signed-in user's account. Requires the password and
-// the word DELETE typed out. The client signs out afterwards.
+// the word DELETE typed out. An account with no password (created through
+// Google or Apple sign-in) types its email address instead of the password.
+// The client signs out afterwards.
 export async function DELETE(request: NextRequest) {
   const current = await getCurrentUser();
   if (!current) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -24,22 +27,26 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { password, confirm } = await request.json().catch(() => ({}));
+  const { password, email, confirm } = await request.json().catch(() => ({}));
   if (confirm !== "DELETE") {
     return NextResponse.json({ error: "Type DELETE to confirm" }, { status: 400 });
-  }
-  if (typeof password !== "string" || !password) {
-    return NextResponse.json({ error: "Password is required" }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({
     where: { id: current.userId },
-    select: { id: true, name: true, householdId: true, passwordHash: true, systemRole: true },
+    select: { id: true, name: true, email: true, householdId: true, passwordHash: true, systemRole: true },
   });
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  if (!(await bcrypt.compare(password, user.passwordHash))) {
-    return NextResponse.json({ error: "Password is incorrect" }, { status: 400 });
+  if (user.passwordHash) {
+    if (typeof password !== "string" || !password) {
+      return NextResponse.json({ error: "Password is required" }, { status: 400 });
+    }
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
+      return NextResponse.json({ error: "Password is incorrect" }, { status: 400 });
+    }
+  } else if (typeof email !== "string" || normalizeEmail(email) !== user.email) {
+    return NextResponse.json({ error: "Type your account email to confirm" }, { status: 400 });
   }
 
   // Keep at least one admin so the admin area stays reachable.

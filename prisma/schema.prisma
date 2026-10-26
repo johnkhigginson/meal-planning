@@ -29,7 +29,7 @@ model User {
   id               Int      @id @default(autoincrement())
   email            String   @unique @db.NVarChar(320)
   name             String   @db.NVarChar(200)
-  passwordHash     String   @db.NVarChar(200)
+  passwordHash     String?  @db.NVarChar(200) // null for accounts created through Google or Apple sign-in
   householdId      Int
   role             String   @default("OWNER") @db.NVarChar(20) // OWNER, MEMBER (household role)
   systemRole       String   @default("USER") @db.NVarChar(20) // USER, CONTRIBUTOR, ADMIN
@@ -47,6 +47,7 @@ model User {
   bookCollaborations RecipeBookCollaborator[]
   blogSubscriptions  BlogSubscriber[]
   authTokens         AuthToken[]
+  oauthAccounts      UserOAuthAccount[]
 }
 
 // Single-use emailed tokens (password reset, email verification). Only the
@@ -63,6 +64,23 @@ model AuthToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose])
+}
+
+// A Google or Apple identity linked to a user. Returning sign-ins resolve by
+// (provider, providerAccountId), so an Apple private relay address or a
+// changed Google email still reaches the same account.
+model UserOAuthAccount {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  provider          String   @db.NVarChar(20) // google, apple
+  providerAccountId String   @db.NVarChar(255) // the provider's stable subject id
+  email             String   @db.NVarChar(320) // email the provider reported when the link was made
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model HouseholdInvite {

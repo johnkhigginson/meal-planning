@@ -37,7 +37,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!checkRateLimit(`login:${ip}:${email}`, 10, 15 * 60_000).ok) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+        // Accounts created through Google or Apple have no password until they
+        // set one, so they fail like any other wrong password.
+        if (!user || !user.passwordHash) return null;
 
         // Bot protection on sign-in. The auto-login right after registration
         // sends no token and is exempt because the register endpoint already

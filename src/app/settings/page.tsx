@@ -49,6 +49,8 @@ interface UserSettings {
   bio: string | null;
   avatarUrl: string | null;
   role: string;
+  hasPassword: boolean;
+  oauthAccounts: { provider: string; email: string; createdAt: string }[];
   household: {
     id: number;
     name: string;
@@ -83,10 +85,11 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState("");
 
   // Account deletion state
   const [deletePassword, setDeletePassword] = useState("");
+  const [deleteEmail, setDeleteEmail] = useState(""); // stands in for the password on accounts without one
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -194,7 +197,7 @@ export default function SettingsPage() {
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError("");
-    setPasswordSuccess(false);
+    setPasswordSuccess("");
     if (newPassword !== confirmPassword) {
       setPasswordError("New passwords don't match");
       return;
@@ -209,7 +212,9 @@ export default function SettingsPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordSuccess(true);
+      setPasswordSuccess(settings?.hasPassword ? "Password changed" : "Password set");
+      // From here on the form asks for the current password.
+      setSettings((prev) => (prev ? { ...prev, hasPassword: true } : prev));
     } else {
       const data = await res.json().catch(() => ({}));
       setPasswordError(data.error || "Failed to change password");
@@ -225,7 +230,7 @@ export default function SettingsPage() {
     const res = await fetch("/api/user/account", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: deletePassword, confirm: deleteConfirm }),
+      body: JSON.stringify({ password: deletePassword, email: deleteEmail, confirm: deleteConfirm }),
     });
     if (res.ok) {
       await signOut({ callbackUrl: "/" });
@@ -240,6 +245,8 @@ export default function SettingsPage() {
 
   const isOwner = settings.role === "OWNER";
   const isLastMember = settings.household.members.length <= 1;
+  const hasPassword = settings.hasPassword;
+  const providerLabel = (p: string) => (p === "google" ? "Google" : p === "apple" ? "Apple" : p);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -460,17 +467,36 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword">Current password</Label>
-              <Input
-                id="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => { setCurrentPassword(e.target.value); setPasswordSuccess(false); }}
-                required
-              />
-            </div>
+            {settings.oauthAccounts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm font-semibold">Linked sign-in</p>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {settings.oauthAccounts.map((a) => (
+                    <li key={`${a.provider}:${a.email}:${a.createdAt}`}>
+                      {providerLabel(a.provider)} ({a.email})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {hasPassword ? (
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Current password</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => { setCurrentPassword(e.target.value); setPasswordSuccess(""); }}
+                  required
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                You sign in with {settings.oauthAccounts.map((a) => providerLabel(a.provider)).join(" or ") || "a linked account"}.
+                Set a password to also sign in with your email.
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="newPassword">New password</Label>
               <Input
@@ -478,7 +504,7 @@ export default function SettingsPage() {
                 type="password"
                 autoComplete="new-password"
                 value={newPassword}
-                onChange={(e) => { setNewPassword(e.target.value); setPasswordSuccess(false); }}
+                onChange={(e) => { setNewPassword(e.target.value); setPasswordSuccess(""); }}
                 required
                 minLength={8}
               />
@@ -491,7 +517,7 @@ export default function SettingsPage() {
                 type="password"
                 autoComplete="new-password"
                 value={confirmPassword}
-                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordSuccess(false); }}
+                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordSuccess(""); }}
                 required
                 minLength={8}
               />
@@ -500,9 +526,9 @@ export default function SettingsPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" variant="outline" disabled={changingPassword}>
                 {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Change password
+                {hasPassword ? "Change password" : "Set a password"}
               </Button>
-              {passwordSuccess && <span role="status" className="text-sm font-semibold text-leaf-ink">Password changed</span>}
+              {passwordSuccess && <span role="status" className="text-sm font-semibold text-leaf-ink">{passwordSuccess}</span>}
             </div>
           </form>
         </CardContent>
@@ -524,17 +550,31 @@ export default function SettingsPage() {
                 : `Your household and its recipes stay with the other members.${isOwner ? " If you're the only owner, ownership passes to another member." : ""}`}{" "}
               Recipes you wrote in other cookbooks stay, without your name on them. This can&apos;t be undone.
             </p>
-            <div className="space-y-2">
-              <Label htmlFor="deletePassword">Password</Label>
-              <Input
-                id="deletePassword"
-                type="password"
-                autoComplete="current-password"
-                value={deletePassword}
-                onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(""); }}
-                required
-              />
-            </div>
+            {hasPassword ? (
+              <div className="space-y-2">
+                <Label htmlFor="deletePassword">Password</Label>
+                <Input
+                  id="deletePassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={deletePassword}
+                  onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(""); }}
+                  required
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="deleteEmail">Type your account email ({settings.email})</Label>
+                <Input
+                  id="deleteEmail"
+                  type="email"
+                  value={deleteEmail}
+                  onChange={(e) => { setDeleteEmail(e.target.value); setDeleteError(""); }}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="deleteConfirm">Type DELETE to confirm</Label>
               <Input
@@ -549,7 +589,7 @@ export default function SettingsPage() {
             <Button
               type="submit"
               variant="destructive"
-              disabled={deleting || deleteConfirm !== "DELETE" || !deletePassword}
+              disabled={deleting || deleteConfirm !== "DELETE" || !(hasPassword ? deletePassword : deleteEmail)}
             >
               {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
               Delete my account

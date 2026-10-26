@@ -15,6 +15,11 @@ export async function GET() {
       bio: true,
       avatarUrl: true,
       role: true,
+      passwordHash: true,
+      oauthAccounts: {
+        select: { provider: true, email: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
       household: {
         select: {
           id: true,
@@ -24,7 +29,10 @@ export async function GET() {
       },
     },
   });
-  return NextResponse.json(user);
+  if (!user) return NextResponse.json(user);
+  // The client only needs to know whether a password exists, never the hash.
+  const { passwordHash, ...rest } = user;
+  return NextResponse.json({ ...rest, hasPassword: passwordHash !== null });
 }
 
 export async function PUT(request: NextRequest) {
