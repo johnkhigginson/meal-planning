@@ -105,6 +105,7 @@ export function cleanIngredientText(text: string): string {
     .replace(COST_IN_PARENS, " ")
     .replace(BARE_COST, " ")
     .replace(/\*+/g, "")
+    .replace(/\s*\/\s*/g, "/")
     .replace(/\s+/g, " ")
     .replace(/\(\s*\)/g, "")
     .replace(/\(\s+/g, "(")
@@ -137,15 +138,21 @@ export function cleanIngredientName(name: string): string {
 }
 
 // A note as it should show beside its ingredient: costs and markers out, and
-// any comma-separated part that only repeats the name dropped. Empty when
-// nothing is left.
+// any comma-separated part that only repeats the name, or an earlier part,
+// dropped. Empty when nothing is left.
 export function cleanIngredientNote(note: string | null | undefined, name: string): string {
   if (!note) return "";
   const cleaned = cleanIngredientText(note).replace(/^\(([^()]*)\)$/, "$1");
+  const seen = new Set<string>();
   return cleanIngredientText(
     cleaned
       .split(",")
-      .filter((part) => !repeatsName(part, name))
+      .filter((part) => {
+        const key = part.trim().toLowerCase();
+        if (seen.has(key) && key) return false;
+        seen.add(key);
+        return !repeatsName(part, name);
+      })
       .join(",")
   );
 }
@@ -279,6 +286,8 @@ const LEADING_NUMBER = new RegExp(`^(${NUMBER})\\s*`);
 const RANGE_END = new RegExp(`^(?:[-–]|to\\b)\\s*(${NUMBER})(?![\\d/])\\s*`, "i");
 // The same, left at the front of a saved name by older imports.
 const RANGE_IN_NAME = new RegExp(`^(?:[-–]|to\\b)\\s*(${NUMBER})\\s+(.+)$`, "i");
+// Only a dash: "-5 chicken breasts".
+const RANGE_FRAGMENT = new RegExp(`^[-–]\\s*(${NUMBER})\\s+(.+)$`);
 
 function numberValue(text: string): number {
   let total = 0;
@@ -372,6 +381,20 @@ export function readIngredientLine<U>(text: string, lookup: (word: string) => U 
       notes.push(parenNote(paren[1]));
       rest = rest.slice(paren[0].length);
       if (unit === null) ({ unit, rest } = readUnit(rest, lookup));
+      else {
+        // "1 can (8 oz) cans tomato sauce": the unit said twice.
+        const again = readUnit(rest, lookup);
+        if (again.unit === unit) rest = again.rest;
+      }
+    } else if (unit === null) {
+      // "1 16 oz. can tomatoes": the same size without parens.
+      const size = readQuantity(rest);
+      const sizeUnit = size.quantity > 0 ? readUnit(size.rest, lookup) : null;
+      const container = sizeUnit?.unit != null ? readUnit(sizeUnit.rest, lookup) : null;
+      if (sizeUnit && container?.unit != null) {
+        notes.push(parenNote(rest.slice(0, rest.length - sizeUnit.rest.length)));
+        ({ unit, rest } = container);
+      }
     }
   } else {
     const small = afterQty.match(SMALL_AMOUNT);
@@ -495,7 +518,7 @@ const PREP_WORDS = new Set([
 ]);
 const PREP_ADVERBS = new Set([
   "finely", "thinly", "roughly", "coarsely", "very", "fairly", "lightly", "well", "freshly",
-  "thickly", "evenly",
+  "thickly", "evenly", "slightly",
 ]);
 // What can follow a prep word when it starts a note. Anything else means the
 // prep word describes a noun after it ("fire roasted diced tomatoes").
@@ -508,8 +531,77 @@ const PREP_FOLLOWERS = new Set([
 // penne pasta" with the note "uncooked" saves as "penne pasta", "uncooked".
 const STATE_WORDS = new Set([...PREP_WORDS, "uncooked", "cooked", "raw", "fresh", "frozen"]);
 
+// Descriptors that recipes sometimes write after the noun: "chicken
+// boneless" reads as "boneless chicken".
+const AFTER_NOUN_DESCRIPTORS = new Set([
+  "boneless", "skinless", "fresh", "frozen", "dried", "ground", "cooked", "raw", "unsalted", "salted",
+  "low-sodium",
+]);
+// Words that can stand on either side of "or" before one noun: "fresh or
+// frozen peas", "rotisserie or left-over chicken".
+const ALT_MODIFIERS = new Set([
+  ...DESCRIPTORS, ...PREP_WORDS, "rotisserie", "leftover", "left-over", "canned", "homemade", "store-bought",
+]);
+// The last word two choices can share: "chicken or vegetable broth" is
+// chicken broth or vegetable broth.
+const SHARED_NOUNS = new Set([
+  "broth", "stock", "oil", "vinegar", "sauce", "juice", "cheese", "pasta", "beans", "sugar", "flour",
+  "milk", "cream", "wine", "rice", "noodles",
+]);
+// "lg. russet potatoes".
+const SIZE_ABBREVIATIONS: Record<string, string> = { lg: "large", sm: "small", med: "medium" };
+
 const bare = (word: string) => word.toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9-]+$/g, "");
 const isDescriptor = (word: string) => DESCRIPTORS.has(bare(word));
+const isModifier = (word: string) => ALT_MODIFIERS.has(bare(word)) || /^\d/.test(word);
+
+// How many parens are open at a point in the text.
+function parenDepth(text: string, end: number): number {
+  let depth = 0;
+  for (let i = 0; i < end; i++) {
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")" && depth > 0) depth--;
+  }
+  return depth;
+}
+
+// The text split at each match outside parens, so "cheese (such as cheddar,
+// jack), grated" splits at its last comma only. The pattern must be global.
+function splitOutsideParens(text: string, separator: RegExp): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  for (const m of text.matchAll(separator)) {
+    if (parenDepth(text, m.index) > 0) continue;
+    parts.push(text.slice(start, m.index));
+    start = m.index + m[0].length;
+  }
+  parts.push(text.slice(start));
+  return parts;
+}
+
+// A paren group that ends the text, nested parens and all: "tomatoes
+// (pureed or 10 oz. (1 cup) puree)" -> "tomatoes", "pureed or 10 oz. (1 cup)
+// puree". Null when the text doesn't end in one or nothing comes before it.
+function takeTrailingParen(text: string): { before: string; inner: string } | null {
+  const t = text.trim();
+  if (!t.endsWith(")")) return null;
+  let depth = 0;
+  for (let i = t.length - 1; i >= 0; i--) {
+    if (t[i] === ")") depth++;
+    else if (t[i] === "(" && --depth === 0) {
+      const before = t.slice(0, i).trim();
+      return before ? { before, inner: t.slice(i + 1, -1) } : null;
+    }
+  }
+  return null;
+}
+
+// "(aka light cream cheese)" -> "aka light cream cheese", for one part of a
+// note. Anything else is left as it is.
+function unwrapParen(text: string): string {
+  const t = text.trim();
+  return t.startsWith("(") && takeTrailingParen(`x ${t}`)?.before === "x" ? t.slice(1, -1).trim() : t;
+}
 
 // True for "large red", "boneless", "red, yellow, or orange": descriptor words
 // only, with "and"/"or" between them. Never a whole ingredient name.
@@ -534,7 +626,9 @@ function splitPrepPhrase(name: string): { name: string; note: string } {
     if (next !== undefined && !PREP_FOLLOWERS.has(bare(next)) && !PREP_WORDS.has(bare(next))) continue;
     let start = k;
     while (start > 0 && PREP_ADVERBS.has(bare(words[start - 1]))) start--;
-    if (!words.slice(0, start).some((w) => !isDescriptor(w))) continue;
+    // "peeled and cut in cubes butternut squash" has no noun before the phrase.
+    const noun = (w: string) => !isDescriptor(w) && !PREP_WORDS.has(bare(w)) && !/^(?:and|or)$/i.test(w);
+    if (!words.slice(0, start).some(noun)) continue;
     return { name: words.slice(0, start).join(" "), note: words.slice(start).join(" ") };
   }
   return { name, note: "" };
@@ -552,9 +646,16 @@ const LEADING_COLOR_CHOICE = new RegExp(
 
 function takeLeadingDescriptors(name: string): { name: string; notes: string[] } {
   const notes: string[] = [];
-  let rest = name;
+  let rest = name.replace(/^(lg|sm|med)\.?(?=\s)/i, (abbr) => SIZE_ABBREVIATIONS[abbr.toLowerCase().replace(/\.$/, "")]);
+  // "shredded cooked chicken": cooked chicken is the thing to buy.
+  const prepped = rest.match(/^(\S+)\s+((?:un)?cooked\s+.+)$/i);
+  if (prepped && PREP_WORDS.has(bare(prepped[1]))) {
+    notes.push(prepped[1].toLowerCase());
+    rest = prepped[2];
+  }
   const sized = rest.match(LEADING_SIZE);
-  if (sized && !/^eggs?\b/i.test(sized[2]) && !onlyDescriptors(sized[2])) {
+  // "large or 40 small tomatoes" is a choice; splitAlternative reads it.
+  if (sized && !/^eggs?\b/i.test(sized[2]) && !/^or\b/i.test(sized[2]) && !onlyDescriptors(sized[2])) {
     notes.push(sized[1].toLowerCase());
     rest = sized[2];
   }
@@ -566,21 +667,83 @@ function takeLeadingDescriptors(name: string): { name: string; notes: string[] }
   return { name: rest, notes };
 }
 
+// A choice in the name. "kale or Swiss chard": the first is the name and the
+// rest a note. "rotisserie or left-over chicken", "large or 40 small
+// tomatoes": a choice of words before one noun, which is the name. Names
+// joined by "and" ("salt and pepper", "half and half") are left whole.
+function splitAlternative(name: string): { name: string; note: string } {
+  const words = name.split(/\s+/);
+  const at = words.findIndex((w, i) => i > 0 && i < words.length - 1 && w.toLowerCase() === "or");
+  if (at < 0 || name.includes("(")) return { name, note: "" };
+  const left = words.slice(0, at);
+  const right = words.slice(at + 1);
+  let shared = 0;
+  while (shared < right.length - 1 && isModifier(right[shared])) shared++;
+  if (shared > 0 && isModifier(left[left.length - 1])) {
+    const keep = onlyDescriptors(left.join(" ")) ? 0 : left.length - 1;
+    return {
+      name: [...left.slice(0, keep), ...right.slice(shared)].join(" "),
+      note: [...left.slice(keep), "or", ...right.slice(0, shared)].join(" "),
+    };
+  }
+  const last = right[right.length - 1];
+  const head = right.length > 1 && SHARED_NOUNS.has(bare(last)) && !SHARED_NOUNS.has(bare(left[left.length - 1]));
+  return { name: [...left, ...(head ? [last] : [])].join(" "), note: `or ${right.join(" ")}` };
+}
+
+// "whole peeled tomatoes from a can", "chicken breast in water": a short
+// phrase after the noun is a note. Not after a prep word ("cut in cubes"),
+// and the name keeps a noun.
+function splitTrailingPhrase(name: string): { name: string; note: string } {
+  const words = name.split(/\s+/);
+  for (let k = 1; k < words.length - 1; k++) {
+    if (!/^(?:with|in|from)$/i.test(words[k]) || words.length - k > 4) continue;
+    const head = words.slice(0, k);
+    if (PREP_WORDS.has(bare(head[head.length - 1])) || !head.some((w) => !isDescriptor(w))) continue;
+    return { name: head.join(" "), note: words.slice(k).join(" ") };
+  }
+  return { name, note: "" };
+}
+
+// "chicken boneless" -> "boneless chicken". The name keeps a noun.
+function frontAfterNounDescriptors(name: string): string {
+  const words = name.split(/\s+/);
+  const moved: string[] = [];
+  while (
+    words.length > 1 &&
+    AFTER_NOUN_DESCRIPTORS.has(bare(words[words.length - 1])) &&
+    words.slice(0, -1).some((w) => !isDescriptor(w))
+  ) {
+    moved.unshift(words.pop()!);
+  }
+  return [...moved, ...words].join(" ");
+}
+
+// "green onions - chopped": a dash with spaces (hyphen, en or em dash)
+// starts the prep note.
+const PREP_DASH = /\s+[-\u2013\u2014]\s+/g;
+
 // The name and notes of what is left of a line once the amount and unit are
 // read: "boneless, skinless chicken breast (700 grams)" -> "boneless skinless
-// chicken breast", ["700 grams"]. A comma starts the note, except inside a
-// list of descriptors before the noun.
+// chicken breast", ["700 grams"]. A comma or a spaced dash starts the note,
+// except inside parens or a list of descriptors before the noun.
 export function splitNameAndNote(text: string): { name: string; notes: string[] } {
   let name = text.trim();
   const tailNotes: string[] = [];
 
-  const paren = name.match(/^(.+?)\s*\(([^()]+)\)$/);
+  const paren = takeTrailingParen(name);
   if (paren) {
-    name = paren[1];
-    tailNotes.push(parenNote(paren[2]));
+    name = paren.before;
+    tailNotes.push(parenNote(paren.inner));
   }
 
-  const parts = name.split(",").map((p) => p.trim());
+  const dashed = splitOutsideParens(name, PREP_DASH);
+  if (dashed.length > 1 && dashed[0].trim()) {
+    name = dashed[0];
+    tailNotes.unshift(dashed.slice(1).join(" - ").trim());
+  }
+
+  const parts = splitOutsideParens(name, /,/g).map((p) => p.trim());
   let used = 1;
   let head = parts[0];
   while (used < parts.length && onlyDescriptors(head)) head = `${head}, ${parts[used++]}`;
@@ -598,12 +761,21 @@ export function splitNameAndNote(text: string): { name: string; notes: string[] 
   // "boneless, skinless chicken breast" reads as one name without commas; a
   // choice ("red, yellow, or orange") keeps them.
   if (!/\b(?:and|or)\b/i.test(head)) head = head.replace(/,/g, "");
-  const commaNote = parts.slice(used).join(", ").trim();
+  const commaNote = parts.slice(used).map(unwrapParen).filter(Boolean).join(", ").trim();
   if (commaNote) tailNotes.unshift(commaNote);
+  // "cheese (such as cheddar, jack)", once ", grated" is off.
+  const headParen = takeTrailingParen(head);
+  if (headParen) {
+    head = headParen.before;
+    tailNotes.unshift(parenNote(headParen.inner));
+  }
 
   const prep = splitPrepPhrase(head);
-  const lead = takeLeadingDescriptors(prep.name);
-  return { name: lead.name.trim(), notes: [...lead.notes, prep.note, ...tailNotes].filter(Boolean) };
+  const phrase = splitTrailingPhrase(prep.name);
+  const lead = takeLeadingDescriptors(phrase.name);
+  const alt = splitAlternative(lead.name);
+  const named = frontAfterNounDescriptors(alt.name.trim());
+  return { name: named, notes: [...lead.notes, alt.note, phrase.note, prep.note, ...tailNotes].filter(Boolean) };
 }
 
 // A word should be in the name or the note, not both. Prep and state words
@@ -627,6 +799,9 @@ export interface ParsedIngredientText<U> {
   name: string;
   notes: string;
   optional: boolean;
+  // What the line didn't explain: a range end with no start after a real
+  // unit. The importer saves the line anyway; a reviewer should look.
+  doubts: string[];
 }
 
 // One imported line ("1/2 lb. penne pasta (uncooked) ($0.75)") as it will be
@@ -647,17 +822,36 @@ export function parseIngredientText<U extends { abbreviation: string }>(
   // saved at its upper end so a grocery list covers the most the recipe could
   // use, and the full range is kept in the notes.
   const line = readIngredientLine(text, lookup);
-  const range =
-    line.quantityMax > line.quantity
-      ? formatRange(line.quantity, line.quantityMax, line.unit?.abbreviation ?? "ea")
-      : "";
+  const doubts: string[] = [];
+  let { quantityMax, unit, name: rest } = line;
+  const each = lookup("each");
+  const counted = unit === null || unit === each;
 
-  const split = splitNameAndNote(line.name);
+  // "4" saved with the name "-5 chicken breasts": the end of the range "4-5".
+  // After a real unit ("2 lb -5 chicken breasts") it can't be read that way.
+  const fragment = rest.match(RANGE_FRAGMENT);
+  if (fragment) {
+    const high = numberValue(fragment[1]);
+    if (counted && line.quantity > 0 && high > line.quantity && quantityMax === line.quantity) quantityMax = high;
+    else doubts.push(`"${fragment[0].trim().split(/\s+/)[0]}" before the name looks like the end of a range whose start was lost.`);
+    rest = fragment[2];
+  }
+  const range =
+    quantityMax > line.quantity ? formatRange(line.quantity, quantityMax, unit?.abbreviation ?? "ea") : "";
+
+  const split = splitNameAndNote(rest);
   // "garlic, (minced)" leaves "garlic," before the note.
-  const name = cleanIngredientName(split.name);
+  let name = cleanIngredientName(split.name);
   if (!name) return null;
+  // "2 garlic cloves": the unit is clove.
+  const cloves = name.match(/^(.*\bgarlic)\s+cloves?$/i);
+  const clove = cloves && counted ? lookup("clove") : null;
+  if (cloves && clove) {
+    name = cloves[1];
+    unit = clove;
+  }
   const deduped = dedupeNameAndNote(name, [range, ...line.notes, ...split.notes].filter(Boolean).join(", "));
-  return { quantity: line.quantityMax, unit: line.unit, name: deduped.name, notes: deduped.note, optional };
+  return { quantity: quantityMax, unit, name: deduped.name, notes: deduped.note, optional, doubts };
 }
 
 // ─── Matching a name to the Ingredient table ────────────────────

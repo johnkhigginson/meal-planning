@@ -252,6 +252,64 @@ eq("lone size word", imported("3 large, red bell peppers"), [3, null, "red bell 
 console.log("Import: to taste:");
 eq("Salt and pepper keeps its casing", imported("Salt and pepper, to taste"), [0, null, "Salt and pepper", "to taste"]);
 
+console.log("Import: a spaced dash starts the prep note:");
+eq("green onions - chopped", imported("4 green onions - chopped"), [4, null, "green onions", "chopped"]);
+eq("smoked bacon - chopped", imported("1/2 lb smoked bacon - chopped"), [0.5, "pound", "smoked bacon", "chopped"]);
+eq("lg. russet potatoes", imported("2 lg. russet potatoes - scrubbed clean and cubed"), [2, null, "russet potatoes", "large, scrubbed clean and cubed"]);
+eq("garlic cloves - peeled", imported("2 garlic cloves - peeled, crushed"), [2, "clove", "garlic", "peeled, crushed"]);
+eq("small onion - peeled", imported("1 small onion - peeled, chopped"), [1, null, "onion", "small, peeled, chopped"]);
+eq("kale or Swiss chard", imported("2 cups kale or Swiss chard - chopped or torn"), [2, "cup", "kale", "or Swiss chard, chopped or torn"]);
+eq("rosemary - crushed", imported("1/2 tsp rosemary - crushed"), [0.5, "teaspoon", "rosemary", "crushed"]);
+eq("lemon peel - shredded", imported("1/2 tsp lemon peel - shredded"), [0.5, "teaspoon", "lemon peel", "shredded"]);
+eq("en dash", imported("1/2 tsp rosemary \u2013 crushed"), [0.5, "teaspoon", "rosemary", "crushed"]);
+eq("em dash", imported("1/2 tsp rosemary \u2014 crushed"), [0.5, "teaspoon", "rosemary", "crushed"]);
+eq("dash inside parens stays", imported("1 1/2 cups (150 grams) onions (fine chopped, 1x - 1 large or 2 medium)"), [1.5, "cup", "onions", "150 grams, fine chopped, 1x - 1 large or 2 medium"]);
+eq("hyphenated words stay", imported("1 cup all-purpose flour"), [1, "cup", "all-purpose flour", ""]);
+eq("sm. and med.", [imported("1 sm. onion"), imported("2 med. carrots")], [[1, null, "onion", "small"], [2, null, "carrots", "medium"]]);
+eq("lg. eggs keep their size", imported("2 lg. eggs"), [2, null, "large eggs", ""]);
+
+console.log("Import: a range end left at the front of a name:");
+const fragmentLine = (line: string) => { const p = parseIngredientText(line, lookup); return p && [p.quantity, p.unit?.name ?? null, p.name, p.notes, p.doubts.length]; };
+eq("4-5 chicken breasts", fragmentLine("4-5 chicken breasts cut in pieces or 12-ish chicken tenders"), [5, null, "chicken breasts", "4 to 5, cut in pieces or 12-ish chicken tenders", 0]);
+eq("4 -5 chicken breasts (saved count)", fragmentLine("4 -5 chicken breasts cut in pieces or 12-ish chicken tenders"), [5, null, "chicken breasts", "4 to 5, cut in pieces or 12-ish chicken tenders", 0]);
+eq("4 each -5 chicken breasts", fragmentLine("4 each -5 chicken breasts cut in pieces or 12-ish chicken tenders"), [5, "each", "chicken breasts", "4 to 5, cut in pieces or 12-ish chicken tenders", 0]);
+eq("2 lb -5 chicken breasts is a doubt", fragmentLine("2 lb -5 chicken breasts cut in pieces or 12-ish chicken tenders"), [2, "pound", "chicken breasts", "cut in pieces or 12-ish chicken tenders", 1]);
+eq("-5 with no amount is a doubt", fragmentLine("-5 chicken breasts"), [0, null, "chicken breasts", "", 1]);
+eq("matches Chicken Breast", pickIngredientMatch("chicken breasts", [{ id: 73, name: "Chicken Breast" }])?.id, 73);
+
+console.log("Import: choices with \"or\":");
+eq("first noun is the name", imported("1 cup butter or margarine, softened"), [1, "cup", "butter", "or margarine, softened"]);
+eq("baguette or french bread", imported("1 baguette or french bread sliced lengthwise"), [1, null, "baguette", "or french bread, sliced lengthwise"]);
+eq("shared last word", imported("2 cups chicken or vegetable broth"), [2, "cup", "chicken broth", "or vegetable broth"]);
+eq("rotisserie or left-over chicken", imported("2 1/2 cups shredded cooked rotisserie or left-over chicken*"), [2.5, "cup", "cooked chicken", "shredded, rotisserie or left-over"]);
+eq("large or 40 small tomatoes", imported("20 large or 40 small tomatoes"), [20, null, "tomatoes", "large or 40 small"]);
+eq("crushed or diced tomatoes", imported("1 (14-ounce) can crushed or diced tomatoes"), [1, "can", "tomatoes", "14-ounce, crushed or diced"]);
+eq("fresh or frozen", imported("1 cup fresh or frozen peas"), [1, "cup", "peas", "fresh or frozen"]);
+eq("salt and pepper stays whole", imported("Salt and pepper"), [0, null, "Salt and pepper", ""]);
+eq("half and half stays whole", imported("1 cup half and half"), [1, "cup", "half and half", ""]);
+eq("salt and freshly ground black pepper stays whole", imported("Salt and freshly ground black pepper"), [0, null, "Salt and freshly ground black pepper", ""]);
+
+console.log("Import: parens across the name and the note:");
+eq("cheese (such as cheddar, jack, and/or fontina), grated", imported("1 lb cheese (such as cheddar, jack, and/or fontina), grated"), [1, "pound", "cheese", "such as cheddar, jack, and/or fontina, grated"]);
+eq("cheese (such as cheddar)", imported("1 cheese (such as cheddar)"), [1, null, "cheese", "such as cheddar"]);
+eq("nested parens stay in the note", imported("1.35 lb (500 grams) tomatoes (pureed/chopped or 10 oz. (1 cup) tomato puree/ passata or 14 oz can peeled tomatoes, read notes)"), [1.35, "pound", "tomatoes", "500 grams, pureed/chopped or 10 oz. (1 cup) tomato puree/passata or 14 oz can peeled tomatoes, read notes"]);
+eq("parenthetical comma parts unwrap", imported("1 (8 oz) pkg Neufchatel cheese*, (aka light cream cheese), (cut into small cubes, softened)"), [1, "package", "Neufchatel cheese", "8 oz, aka light cream cheese, cut into small cubes, softened"]);
+
+console.log("Import: descriptors after the noun:");
+eq("chicken boneless", imported("1.5 lb (700 grams) chicken boneless (Preferably thighs, or breasts)"), [1.5, "pound", "boneless chicken", "700 grams, Preferably thighs, or breasts"]);
+eq("beef ground", imported("1 lb beef ground"), [1, "pound", "ground beef", ""]);
+eq("cooked ham stays cooked", imported("1 (or so) cup cooked ham, diced"), [1, "cup", "cooked ham", "or so, diced"]);
+
+console.log("Import: other saved shapes:");
+eq("size before the unit, no parens", imported("1 16 oz. can tomatoes, cut up"), [1, "can", "tomatoes", "16 oz, cut up"]);
+eq("unit said twice", imported("1 can (8 oz) cans tomato sauce, 8 oz"), [1, "can", "tomato sauce", "8 oz"]);
+eq("slightly beaten", imported("2 eggs slightly beaten"), [2, null, "eggs", "slightly beaten"]);
+eq("from a can", imported("28 oz (800 grams) whole peeled tomatoes from a can, San Marzano"), [28, "ounce", "whole peeled tomatoes", "800 grams, from a can, San Marzano"]);
+eq("in water", imported("2 cans (4.5 ounces each) white chunk chicken breast in water, drained"), [2, "can", "white chunk chicken breast", "4.5 ounces each, in water, drained"]);
+eq("with juice", imported("1 (14.5-ounce) can diced tomatoes with juice"), [1, "can", "diced tomatoes", "14.5-ounce, with juice"]);
+eq("cut in cubes stays a prep note", imported("3 lb butternut squash cut in 3/4 inch cubes"), [3, "pound", "butternut squash", "cut in 3/4 inch cubes"]);
+eq("cream of chicken soup stays whole", imported("1 can cream of chicken soup"), [1, "can", "cream of chicken soup", ""]);
+
 console.log("Matching a name to the Ingredient table:");
 const rows = [
   { id: 1, name: "garlic parmesan breading" },
