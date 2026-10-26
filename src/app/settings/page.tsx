@@ -13,8 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Save, UserPlus, X, Users, LayoutDashboard, Upload } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Loader2, Save, UserPlus, X, Users, LayoutDashboard, Upload, KeyRound, Trash2 } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import SettingsSkeleton from "./loading";
 import { OPTIONAL_NAV_ITEMS, parseHiddenNav } from "@/lib/nav";
 
@@ -75,6 +75,20 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState("");
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Account deletion state
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     fetch("/api/user/settings")
@@ -176,9 +190,55 @@ export default function SettingsPage() {
     setInvites((prev) => prev.filter((i) => i.id !== id));
   }
 
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess(false);
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords don't match");
+      return;
+    }
+    setChangingPassword(true);
+    const res = await fetch("/api/user/password", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    if (res.ok) {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordSuccess(true);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setPasswordError(data.error || "Failed to change password");
+    }
+    setChangingPassword(false);
+  }
+
+  async function handleDeleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    if (deleteConfirm !== "DELETE") return;
+    setDeleting(true);
+    setDeleteError("");
+    const res = await fetch("/api/user/account", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: deletePassword, confirm: deleteConfirm }),
+    });
+    if (res.ok) {
+      await signOut({ callbackUrl: "/" });
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setDeleteError(data.error || "Failed to delete account");
+    setDeleting(false);
+  }
+
   if (!settings) return <SettingsSkeleton />;
 
   const isOwner = settings.role === "OWNER";
+  const isLastMember = settings.household.members.length <= 1;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -388,6 +448,114 @@ export default function SettingsPage() {
         </Button>
         {saved && <span role="status" className="text-sm font-semibold text-leaf-ink">Settings saved</span>}
       </div>
+
+      {/* Password */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-primary" aria-hidden="true" />
+            <CardTitle className="text-xl">Password</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current password</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => { setCurrentPassword(e.target.value); setPasswordSuccess(false); }}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); setPasswordSuccess(false); }}
+                required
+                minLength={8}
+              />
+              <p className="text-xs text-muted-foreground">At least 8 characters</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm new password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setPasswordSuccess(false); }}
+                required
+                minLength={8}
+              />
+            </div>
+            {passwordError && <p role="alert" className="text-sm text-destructive">{passwordError}</p>}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" variant="outline" disabled={changingPassword}>
+                {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Change password
+              </Button>
+              {passwordSuccess && <span role="status" className="text-sm font-semibold text-leaf-ink">Password changed</span>}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Delete account */}
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" aria-hidden="true" />
+            <CardTitle className="text-xl">Delete account</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleDeleteAccount} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {isLastMember
+                ? "You're the only member of your household, so deleting your account also deletes the household and everything in it: recipes, cookbooks, meal plans, pantry, grocery lists and stores."
+                : `Your household and its recipes stay with the other members.${isOwner ? " If you're the only owner, ownership passes to another member." : ""}`}{" "}
+              Recipes you wrote in other cookbooks stay, without your name on them. This can&apos;t be undone.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="deletePassword">Password</Label>
+              <Input
+                id="deletePassword"
+                type="password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(""); }}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deleteConfirm">Type DELETE to confirm</Label>
+              <Input
+                id="deleteConfirm"
+                value={deleteConfirm}
+                onChange={(e) => { setDeleteConfirm(e.target.value); setDeleteError(""); }}
+                autoComplete="off"
+                required
+              />
+            </div>
+            {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={deleting || deleteConfirm !== "DELETE" || !deletePassword}
+            >
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete my account
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
