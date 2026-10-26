@@ -13,10 +13,7 @@ import { ArrowLeft, Clock, Users, Globe } from "lucide-react";
 import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
-import { absoluteUrl, getSiteUrl } from "@/lib/site";
-import { recipeAuthorName } from "@/lib/recipe-author";
-import { parseInstructionSections } from "@/lib/recipe-sections";
-import { formatIngredientLine } from "@/lib/ingredient-format";
+import { buildRecipeBreadcrumbJsonLd, buildRecipeJsonLd, jsonLdString, recipeMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -28,75 +25,7 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug, recipeSlug } = await params;
   const data = await getPublishedRecipe(slug, recipeSlug);
   if (!data) notFound();
-
-  const { recipe } = data;
-  const url = `${getSiteUrl()}/blog/${slug}/${recipe.slug ?? recipe.id}`;
-  return {
-    title: recipe.name,
-    description: recipe.description ?? undefined,
-    alternates: { canonical: url },
-    openGraph: {
-      type: "article",
-      title: recipe.name,
-      description: recipe.description ?? undefined,
-      url,
-      // No `images` key: the generated opengraph-image.tsx beside this page
-      // is only used when this metadata leaves images unset.
-      publishedTime: recipe.publishedAt?.toISOString(),
-      authors: recipeAuthorName(recipe) ? [recipeAuthorName(recipe)!] : undefined,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: recipe.name,
-      description: recipe.description ?? undefined,
-    },
-  };
-}
-
-function isoDuration(min: number | null): string | undefined {
-  return min && min > 0 ? `PT${min}M` : undefined;
-}
-
-// Schema.org Recipe JSON-LD for Google rich results. Emitted when we have
-// enough to be a real recipe (ingredients or instructions).
-function recipeJsonLd(recipe: Awaited<ReturnType<typeof getPublishedRecipe>>) {
-  if (!recipe) return null;
-  const r = recipe.recipe;
-  const ingredients = r.ingredients.map(
-    (ri) => formatIngredientLine(ri.quantity, ri.unit.abbreviation, ri.ingredient.name)
-  );
-  // Section heading lines ("--- Pot Pie Filling ---") become HowToSections
-  // rather than being published as steps of their own.
-  const toSteps = (body: string) =>
-    body
-      .split("\n")
-      .map((s) => s.replace(/^\s*\d+\.\s*/, "").trim())
-      .filter(Boolean)
-      .map((text) => ({ "@type": "HowToStep", text }));
-  const sections = parseInstructionSections(r.instructions || "");
-  const steps = sections.flatMap((s) => toSteps(s.body));
-  const instructionsLd = sections.flatMap((s): Record<string, unknown>[] =>
-    s.name ? [{ "@type": "HowToSection", name: s.name, itemListElement: toSteps(s.body) }] : toSteps(s.body)
-  );
-  if (ingredients.length === 0 && steps.length === 0) return null;
-
-  const image = absoluteUrl(r.imageUrl);
-  const data: Record<string, unknown> = {
-    "@context": "https://schema.org",
-    "@type": "Recipe",
-    name: r.name,
-    description: r.description ?? undefined,
-    image: image ? [image] : undefined,
-    datePublished: r.publishedAt?.toISOString(),
-    author: recipeAuthorName(r) ? { "@type": "Person", name: recipeAuthorName(r) } : undefined,
-    recipeYield: r.servings ? String(r.servings) : undefined,
-    prepTime: isoDuration(r.prepTimeMinutes),
-    cookTime: isoDuration(r.cookTimeMinutes),
-    recipeIngredient: ingredients.length ? ingredients : undefined,
-    recipeInstructions: steps.length ? instructionsLd : undefined,
-    keywords: r.tags.length ? r.tags.map((t) => t.tag.name).join(", ") : undefined,
-  };
-  return JSON.stringify(data).replace(/</g, "\\u003c");
+  return recipeMetadata(data.recipe, data.book);
 }
 
 export default async function BlogRecipePage({ params }: PageProps) {
@@ -111,7 +40,8 @@ export default async function BlogRecipePage({ params }: PageProps) {
   const user = await getCurrentUser();
   const canModerate = !!user && (user.isAdmin || user.householdId === recipe.householdId);
 
-  const jsonLd = recipeJsonLd(data);
+  const recipeLd = buildRecipeJsonLd(recipe, book);
+  const breadcrumbLd = buildRecipeBreadcrumbJsonLd(recipe, book);
 
   return (
     <BlogShell
@@ -120,9 +50,10 @@ export default async function BlogRecipePage({ params }: PageProps) {
       aboutHref={`/blog/${book.slug}/about`}
       headerAction={book.slug ? <FollowButton bookId={book.id} slug={book.slug} /> : undefined}
     >
-      {jsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdString(recipeLd ? [recipeLd, breadcrumbLd] : breadcrumbLd) }}
+      />
       <Link
         href={`/blog/${book.slug}`}
         className="mb-4 inline-flex items-center gap-1 rounded text-sm font-bold text-muted-foreground transition-colors duration-200 ease-out hover:text-foreground focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring print:hidden"
@@ -207,6 +138,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
                 unit: ri.unit.abbreviation,
                 name: ri.ingredient.name,
                 notes: ri.notes,
+                optional: ri.optional,
                 section: ri.section,
               }))}
             />
