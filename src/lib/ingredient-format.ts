@@ -179,19 +179,47 @@ export function formatRange(low: number, high: number, unit: string): string {
 // as a size when a unit follows; "2 medium onions" keeps "medium" in the name.
 const SIZE_WORDS = /^(heaping|heaped|level|scant|rounded|generous|large|small|medium)\s+(.+)$/i;
 
+// Salt and pepper, which a recipe seasons to taste when it gives no amount.
+const SEASONING =
+  /^(?:(?:kosher|sea|table|fine|flaky|coarse)\s+)?salt\b|^(?:freshly\s+)?(?:ground\s+)?(?:black|white)\s+pepper\b/i;
 // Names that never take a count. Older imports saved these as "1 each", which
 // showed as "1 Salt and freshly ground black pepper".
-const UNMEASURED_NAME =
-  /\b(?:to taste|as needed|for serving|for garnish|optional)\b|^(?:an?\s+)?(?:pinch|dash) of\b|^(?:(?:kosher|sea|table|fine|flaky|coarse)\s+)?salt\b|^(?:freshly\s+)?(?:ground\s+)?(?:black|white)\s+pepper\b/i;
+const UNMEASURED_NAME = new RegExp(
+  `\\b(?:to taste|as needed|for serving|for garnish|optional)\\b|^(?:an?\\s+)?(?:pinch|dash) of\\b|${SEASONING.source}`,
+  "i"
+);
+
+// "salt and pepper" with no amount -> "Salt and pepper, to taste". It starts
+// the line, so it starts with a capital; the rest keeps its case.
+function seasonToTaste(name: string): string {
+  const named = name.charAt(0).toUpperCase() + name.slice(1);
+  return /\b(?:to taste|as needed)\b/i.test(named) ? named : `${named}, to taste`;
+}
+
+// A size in parens at the front of a saved name: "(8 oz.) packages cream
+// cheese" -> "8 oz", "packages cream cheese". Older imports saved these.
+function takeLeadingParen(name: string, into: string[]): string {
+  const paren = name.match(/^\(([^()]+)\)\s*(.+)$/);
+  if (!paren) return name;
+  into.push(parenNote(paren[1]));
+  return paren[2];
+}
+
+// A unit at the front of a saved name: "cup(s)", "pkg", "Tbsp.".
+function nameUnit(word: string): string | null {
+  return unitWord(word) ?? UNIT_ABBREVIATIONS[word.toLowerCase().replace(/\.$/, "")] ?? null;
+}
 
 // The amount and the name apart, so a page can style them differently. A
 // line the importer couldn't read a unit from was saved as a plain count with
 // the unit left in the name ("cup(s) powdered sugar"); that unit is used.
 // Older imports also left the end of a range ("to 1 teaspoon red pepper
-// flakes") or a size word ("Heaping teaspoon ground cinnamon") in the name;
-// those are read back out here too.
+// flakes"), a size word ("Heaping teaspoon ground cinnamon") or a size in
+// parens ("(8 oz.) packages cream cheese") in the name; those are read back
+// out here too. Salt and pepper with no amount read "to taste".
 export function formatIngredient(quantity: number, unit: string, name: string): { amount: string; name: string } {
-  let rest = cleanIngredientName(name);
+  const sizes: string[] = [];
+  let rest = takeLeadingParen(cleanIngredientName(name), sizes);
   let upper = 0;
   const range = rest.match(RANGE_IN_NAME);
   if (range) {
@@ -211,15 +239,19 @@ export function formatIngredient(quantity: number, unit: string, name: string): 
   let shownUnit = unit;
   let shownName = stripLeadingUnit(rest, unit);
   const lead = rest.match(/^(\S+)\s+(.+)$/);
-  if (COUNT_UNITS.has(unit.trim().toLowerCase()) && lead && unitWord(lead[1])) {
+  if (COUNT_UNITS.has(unit.trim().toLowerCase()) && lead && nameUnit(lead[1])) {
     shownUnit = lead[1];
     shownName = lead[2];
   }
-  if (size) shownName = `${shownName} (${size})`;
+  // "cup(s) (1 stick) unsalted butter": the size can follow the unit.
+  shownName = takeLeadingParen(shownName, sizes);
+  if (size) sizes.push(size);
+  if (sizes.length) shownName = `${shownName} (${sizes.join(", ")})`;
 
   let amount = formatAmount(quantity, shownUnit);
   if (COUNT_UNITS.has(shownUnit.trim().toLowerCase()) && UNMEASURED_NAME.test(shownName)) amount = "";
   else if (quantity > 0 && upper > quantity) amount = formatRange(quantity, upper, shownUnit);
+  if (!amount && SEASONING.test(shownName)) shownName = seasonToTaste(shownName);
   return { amount, name: shownName };
 }
 
@@ -626,4 +658,56 @@ export function parseIngredientText<U extends { abbreviation: string }>(
   if (!name) return null;
   const deduped = dedupeNameAndNote(name, [range, ...line.notes, ...split.notes].filter(Boolean).join(", "));
   return { quantity: line.quantityMax, unit: line.unit, name: deduped.name, notes: deduped.note, optional };
+}
+
+// ─── Matching a name to the Ingredient table ────────────────────
+//
+// Ingredient names are unique, and SQL Server compares them without case.
+// A line matches a row only when they name the same thing: the same words,
+// ignoring case and a plural on the last word ("onions" is "onion"). A
+// shorter name never matches a longer one, so "garlic" is never "garlic
+// parmesan breading".
+
+// "Onions" -> "Onion", "berries" -> "berry". Rough, but both sides of a
+// match go through it, so it only has to be consistent.
+function singular(word: string): string {
+  if (/(?:ss|us|is)$/i.test(word)) return word;
+  if (/ies$/i.test(word) && word.length > 4) return `${word.slice(0, -3)}y`;
+  if (/(?:oes|ches|shes|xes)$/i.test(word)) return word.slice(0, -2);
+  if (/s$/i.test(word) && word.length > 2) return word.slice(0, -1);
+  return word;
+}
+
+// "Green  Onions" -> "green onion". Two names with the same key are the same
+// ingredient.
+export function ingredientKey(name: string): string {
+  const parts = name.trim().toLowerCase().split(/\s+/);
+  parts[parts.length - 1] = singular(parts[parts.length - 1]);
+  return parts.join(" ");
+}
+
+// The spellings to look up for a name: as written, singular, and plural.
+export function ingredientNameVariants(name: string): string[] {
+  const clean = name.trim().replace(/\s+/g, " ");
+  const parts = clean.split(" ");
+  const last = parts.pop() ?? "";
+  const one = singular(last);
+  const stem = parts.length ? `${parts.join(" ")} ` : "";
+  const forms = [last, one, `${one}s`, `${one}es`];
+  if (/y$/i.test(one)) forms.push(`${one.slice(0, -1)}ies`);
+  return [...new Set(forms.map((f) => stem + f))];
+}
+
+// The row a name should use: the same name exactly, then the same name in
+// another case, then the same name singular or plural. Null when none is the
+// same ingredient.
+export function pickIngredientMatch<T extends { name: string }>(name: string, rows: T[]): T | null {
+  const clean = name.trim().replace(/\s+/g, " ");
+  const key = ingredientKey(clean);
+  return (
+    rows.find((r) => r.name === clean) ??
+    rows.find((r) => r.name.toLowerCase() === clean.toLowerCase()) ??
+    rows.find((r) => ingredientKey(r.name) === key) ??
+    null
+  );
 }

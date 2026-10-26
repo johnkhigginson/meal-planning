@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { createIngredientSchema } from "@/lib/validators";
 import { guessIngredientCategory } from "@/lib/ingredient-category";
+import { findIngredient } from "@/lib/ingredient-parse";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -27,8 +28,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  // Upsert by unique name so duplicates return the existing row, not a 500. A
-  // new ingredient gets a best-guess aisle for the grocery list.
+  // An existing row with the same name (any case, singular or plural) is
+  // returned instead of a duplicate. A new ingredient gets a best-guess aisle
+  // for the grocery list.
+  const existing = await findIngredient(parsed.data.name);
+  if (existing) return NextResponse.json(existing, { status: 201 });
+
+  // Upsert so two saves adding the same new name at once both get the row,
+  // not a 500.
   const ingredient = await prisma.ingredient.upsert({
     where: { name: parsed.data.name },
     update: {},

@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeImportedIngredients } from "@/lib/recipe-sections";
 import { guessIngredientCategory } from "@/lib/ingredient-category";
-import { makeUnitLookup, parseIngredientText } from "@/lib/ingredient-format";
+import {
+  ingredientNameVariants,
+  makeUnitLookup,
+  parseIngredientText,
+  pickIngredientMatch,
+} from "@/lib/ingredient-format";
 
 // Parses free-text ingredient lines ("2 cups flour", "1/2 tsp salt (fine)")
 // into structured rows, matching/creating Ingredient records and resolving
@@ -18,6 +23,18 @@ export interface ParsedIngredient {
   // Ingredient group the line came from ("Cheddar Bay Biscuits"), when the
   // source recipe split its list into sections.
   section: string | null;
+}
+
+// The Ingredient row for a name: the same name in any case, singular or
+// plural ("onions" uses "onion"). Never a longer name that only contains this
+// one; "garlic" used to land on "garlic parmesan breading". Null when there
+// is none.
+export async function findIngredient(name: string) {
+  const rows = await prisma.ingredient.findMany({
+    where: { name: { in: ingredientNameVariants(name) } },
+    include: { defaultUnit: true },
+  });
+  return pickIngredientMatch(name, rows);
 }
 
 // Accepts plain lines or `{ text, section }` rows, which is what the scraper and
@@ -40,19 +57,11 @@ export async function parseIngredientLines(
     const unit = parsed.unit ?? { id: eachUnit?.id ?? 1, name: "each", abbreviation: "ea" };
     const ingredientText = parsed.name;
 
-    let ingredient = await prisma.ingredient.findFirst({
-      where: { name: { equals: ingredientText } },
-    });
-    if (!ingredient) {
-      ingredient = await prisma.ingredient.findFirst({
-        where: { name: { contains: ingredientText } },
-      });
-    }
-    if (!ingredient) {
-      ingredient = await prisma.ingredient.create({
+    const ingredient =
+      (await findIngredient(ingredientText)) ??
+      (await prisma.ingredient.create({
         data: { name: ingredientText, category: guessIngredientCategory(ingredientText) },
-      });
-    }
+      }));
 
     results.push({
       ingredientId: ingredient.id,

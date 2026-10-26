@@ -13,6 +13,8 @@ import {
   formatIngredientText,
   makeUnitLookup,
   parseIngredientText,
+  pickIngredientMatch,
+  ingredientNameVariants,
   readQuantity,
 } from "../src/lib/ingredient-format";
 import { parseCookSteps, stripFootnoteMarkers } from "../src/lib/parse-steps";
@@ -62,7 +64,7 @@ eq("unit stuck in name of a count", formatIngredientLine(1.5, "ea", "cup(s) powd
 eq("plain count", formatIngredientLine(3, "ea", "eggs"), "3 eggs");
 eq("name that starts like a word is kept", formatIngredientLine(1, "cup", "cupcake liners"), "1 cup cupcake liners");
 eq("split parts", formatIngredient(1, "cup", "milk,"), { amount: "1 cup", name: "milk" });
-eq("no amount", formatIngredientLine(0, "cup", "salt"), "salt");
+eq("no amount", formatIngredientLine(0, "cup", "salt"), "Salt, to taste");
 
 console.log("Friendly fractions:");
 eq("0.5 -> 1/2", formatQuantity(0.5), "1/2");
@@ -115,9 +117,9 @@ eq("as needed", formatIngredientText("Olive oil, as needed"), "Olive oil (as nee
 eq("for garnish in parens", formatIngredientText("Fresh parsley (for garnish)"), "Fresh parsley (for garnish)");
 eq("pinch of with no number", formatIngredientText("pinch of salt"), "salt (a pinch)");
 eq("plus more to taste keeps the amount", formatIngredientText("1/2 tsp salt, plus more to taste"), "1/2 tsp salt (plus more to taste)");
-eq("saved as 1 each shows no count", formatIngredientLine(1, "ea", "Salt and freshly ground black pepper"), "Salt and freshly ground black pepper");
-eq("saved total of 3 each shows no count", formatIngredientLine(3, "ea", "kosher salt"), "kosher salt");
-eq("saved with no amount", formatIngredientLine(0, "ea", "Salt and freshly ground black pepper"), "Salt and freshly ground black pepper");
+eq("saved as 1 each shows no count", formatIngredientLine(1, "ea", "Salt and freshly ground black pepper"), "Salt and freshly ground black pepper, to taste");
+eq("saved total of 3 each shows no count", formatIngredientLine(3, "ea", "kosher salt"), "Kosher salt, to taste");
+eq("saved with no amount", formatIngredientLine(0, "ea", "Salt and freshly ground black pepper"), "Salt and freshly ground black pepper, to taste");
 eq("a real count is kept", formatIngredientLine(1, "ea", "red bell pepper"), "1 red bell pepper");
 eq("salted butter is not salt", formatIngredientLine(2, "ea", "salted butter sticks"), "2 salted butter sticks");
 
@@ -249,6 +251,45 @@ eq("lone size word", imported("3 large, red bell peppers"), [3, null, "red bell 
 
 console.log("Import: to taste:");
 eq("Salt and pepper keeps its casing", imported("Salt and pepper, to taste"), [0, null, "Salt and pepper", "to taste"]);
+
+console.log("Matching a name to the Ingredient table:");
+const rows = [
+  { id: 1, name: "garlic parmesan breading" },
+  { id: 2, name: "uncooked penne pasta" },
+  { id: 3, name: "onion" },
+  { id: 4, name: "salt and pepper" },
+  { id: 5, name: "Tomatoes" },
+  { id: 6, name: "berries" },
+];
+const match = (name: string) => pickIngredientMatch(name, rows)?.id ?? null;
+eq("garlic is not garlic parmesan breading", match("garlic"), null);
+eq("penne pasta is not uncooked penne pasta", match("penne pasta"), null);
+eq("plural finds the singular", match("onions"), 3);
+eq("singular finds the plural", match("tomato"), 5);
+eq("ies plural", match("berry"), 6);
+eq("case doesn't matter", match("Salt and Pepper"), 4);
+eq("exact wins over a plural", pickIngredientMatch("onion", [{ id: 7, name: "onions" }, { id: 3, name: "onion" }])?.id, 3);
+eq("a longer name never matches", match("salt"), null);
+eq("variants hold both forms", ["green onions", "green onion"].every((v) => ingredientNameVariants("green onions").includes(v)), true);
+
+console.log("Display: saved names with a size in front:");
+eq("(8 oz.) packages", formatIngredientLine(2, "ea", "(8 oz.) packages cream cheese"), "2 packages cream cheese (8 oz)");
+eq("(1 stick) butter", formatIngredientLine(0.5, "cup", "(1 stick) butter"), "1/2 cup butter (1 stick)");
+eq("(700 grams) chicken", formatIngredient(1.5, "lb", "(700 grams) chicken boneless"), { amount: "1 1/2 lb", name: "chicken boneless (700 grams)" });
+eq("(about 5 cups)", formatIngredientLine(1, "ea", "(about 5 cups) butternut squash"), "1 butternut squash (about 5 cups)");
+eq("(11.5 oz) package", formatIngredientLine(1, "ea", "(11.5 oz) package milk chocolate chips"), "1 package milk chocolate chips (11.5 oz)");
+eq("Neufchatel", formatIngredientLine(1, "ea", "(8 oz) pkg Neufchatel cheese*"), "1 pkg Neufchatel cheese (8 oz)");
+eq("cup(s) then a size", formatIngredientLine(1, "ea", "cup(s) (1 stick) unsalted butter"), "1 cup unsalted butter (1 stick)");
+eq("teaspoon(s)", formatIngredientLine(1, "ea", "teaspoon(s) baking powder"), "1 tsp baking powder");
+eq("teaspoon(s) with its unit", formatIngredientLine(1, "tsp", "teaspoon(s) baking powder"), "1 tsp baking powder");
+eq("Neufchatel as imported now", formatIngredientLine(1, "pkg", "Neufchatel cheese"), "1 pkg Neufchatel cheese");
+
+console.log("Display: seasoning with no amount:");
+eq("to taste", formatIngredientLine(0, "ea", "salt and pepper"), "Salt and pepper, to taste");
+eq("author casing kept", formatIngredientLine(0, "ea", "Salt and freshly ground black pepper"), "Salt and freshly ground black pepper, to taste");
+eq("no doubled to taste", formatIngredientLine(0, "ea", "salt, to taste"), "Salt, to taste");
+eq("measured salt unchanged", formatIngredientLine(0.25, "tsp", "salt"), "1/4 tsp salt");
+eq("to-taste note drops", cleanIngredientNote("to taste", formatIngredient(0, "ea", "salt and pepper").name), "");
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);
