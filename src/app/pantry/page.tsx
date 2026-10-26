@@ -22,8 +22,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
-import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package } from "lucide-react";
+import Link from "next/link";
+import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package, ChevronDown } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { formatAmount } from "@/lib/ingredient-format";
 
 interface Unit {
@@ -46,6 +48,7 @@ interface PantryItem {
 interface Ingredient {
   id: number;
   name: string;
+  defaultUnitId?: number | null;
 }
 
 interface ParsedReceiptItem {
@@ -75,9 +78,15 @@ export default function PantryPage() {
   const [suggestions, setSuggestions] = useState<Ingredient[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
-  const [addQty, setAddQty] = useState<number>(1);
+  // Kept as typed so the box can be cleared; blank saves as 1.
+  const [addQty, setAddQty] = useState("1");
   const [addUnitId, setAddUnitId] = useState<number>(0);
+  const [defaultUnitId, setDefaultUnitId] = useState<number>(0);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addStatus, setAddStatus] = useState<string | null>(null);
+  const [savingAdd, setSavingAdd] = useState(false);
   const suggestRef = useRef<HTMLDivElement>(null);
+  const addNameRef = useRef<HTMLInputElement>(null);
 
   // Inline edit state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -99,7 +108,11 @@ export default function PantryPage() {
     ]).then(([inv, u]) => {
       setItems(inv);
       setUnits(u);
-      if (u.length > 0) setAddUnitId(u.find((x: Unit) => x.name === "each")?.id || u[0].id);
+      if (u.length > 0) {
+        const each = u.find((x: Unit) => x.name === "each")?.id || u[0].id;
+        setAddUnitId(each);
+        setDefaultUnitId(each);
+      }
       setLoading(false);
     });
   }, []);
@@ -133,19 +146,69 @@ export default function PantryPage() {
     return match?.id ?? null;
   }
 
-  async function addItem() {
-    if (!selectedIngredient || addQty <= 0 || !addUnitId) return;
-    const res = await fetch("/api/inventory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ingredientId: selectedIngredient.id,
-        quantity: addQty,
-        unitId: addUnitId,
-      }),
-    });
-    if (res.ok) {
-      const item = await res.json();
+  // Pick a suggestion: use it, and its usual unit when it has one.
+  function chooseIngredient(ingredient: Ingredient) {
+    setSelectedIngredient(ingredient);
+    setAddQuery(ingredient.name);
+    setShowSuggestions(false);
+    setAddError(null);
+    if (ingredient.defaultUnitId) setAddUnitId(ingredient.defaultUnitId);
+  }
+
+  // One submit handles every path: a picked suggestion, an exact match, or a
+  // new name (the ingredients endpoint returns an existing row for a name it
+  // already knows, so this never makes duplicates). The form stays open and
+  // the name box keeps focus, so several items can go in one after another.
+  async function addItem(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (savingAdd) return;
+    const name = addQuery.trim();
+    if (!name) {
+      setAddError("Type an ingredient name.");
+      addNameRef.current?.focus();
+      return;
+    }
+    const qty = addQty.trim() === "" ? 1 : Number(addQty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setAddError("Enter an amount above 0, or leave it blank for 1.");
+      return;
+    }
+    if (!addUnitId) {
+      setAddError("Pick a unit.");
+      return;
+    }
+
+    setSavingAdd(true);
+    setAddError(null);
+    setAddStatus(null);
+    try {
+      let ingredient =
+        selectedIngredient ?? suggestions.find((s) => s.name.toLowerCase() === name.toLowerCase()) ?? null;
+      if (!ingredient) {
+        const created = await fetch("/api/ingredients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        if (!created.ok) {
+          setAddError("Couldn't add that ingredient. Please try again.");
+          return;
+        }
+        ingredient = await created.json();
+      }
+      if (!ingredient) return;
+
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredientId: ingredient.id, quantity: qty, unitId: addUnitId }),
+      });
+      if (!res.ok) {
+        setAddError("Couldn't save that item. Please try again.");
+        return;
+      }
+      const item: PantryItem = await res.json();
+      const replaced = items.some((i) => i.ingredientId === item.ingredientId);
       setItems((prev) => {
         const idx = prev.findIndex((i) => i.ingredientId === item.ingredientId);
         if (idx >= 0) {
@@ -157,30 +220,30 @@ export default function PantryPage() {
           a.ingredient.name.localeCompare(b.ingredient.name)
         );
       });
-      resetAdd();
+      setAddStatus(
+        `${replaced ? "Updated" : "Added"} ${item.ingredient.name}: ${formatAmount(item.quantity, item.unit.abbreviation)}.`
+      );
+      clearAddFields();
+      addNameRef.current?.focus();
+    } finally {
+      setSavingAdd(false);
     }
   }
 
-  async function createAndAddIngredient() {
-    if (!addQuery.trim()) return;
-    const res = await fetch("/api/ingredients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: addQuery.trim() }),
-    });
-    if (res.ok) {
-      const ingredient = await res.json();
-      setSelectedIngredient(ingredient);
-      setAddQuery(ingredient.name);
-      setShowSuggestions(false);
-    }
+  function clearAddFields() {
+    setAddQuery("");
+    setSelectedIngredient(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setAddQty("1");
+    setAddUnitId(defaultUnitId);
+    setAddError(null);
   }
 
   function resetAdd() {
+    clearAddFields();
+    setAddStatus(null);
     setShowAdd(false);
-    setAddQuery("");
-    setSelectedIngredient(null);
-    setAddQty(1);
   }
 
   async function saveEdit(item: PantryItem) {
@@ -384,6 +447,11 @@ export default function PantryPage() {
     i.ingredient.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Saving a name already in the pantry replaces its amount, so say so first.
+  const existingMatch = addQuery.trim()
+    ? items.find((i) => i.ingredient.name.toLowerCase() === addQuery.trim().toLowerCase())
+    : undefined;
+
   if (loading) return <PageLoader />;
 
   return (
@@ -427,69 +495,117 @@ export default function PantryPage() {
         </Card>
       )}
 
-      <SearchInput
-        value={search}
-        onChange={setSearch}
-        placeholder="Search pantry..."
-      />
+      {/* What scanning does, before someone hands over a photo. Checked
+          against /api/receipts/parse: the image is read in memory, sent to
+          Gemini, and never written to disk or the database. */}
+      <details className="group rounded-2xl border bg-card px-4 py-3 text-sm">
+        <summary className="flex cursor-pointer list-none items-center gap-2 font-bold [&::-webkit-details-marker]:hidden">
+          <Receipt className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          How receipt scanning works
+          <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="mt-3 space-y-3 text-muted-foreground">
+          <p>
+            Take or pick a photo of a grocery receipt. We read the items on it and add the food
+            ones to your pantry.
+          </p>
+          <div>
+            <p className="font-semibold text-foreground">For a good read</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              <li>Lay the receipt flat in good light, with no shadow across it.</li>
+              <li>Fit the whole receipt in the frame. Long ones can go in two photos.</li>
+              <li>Hold steady so the text is sharp.</li>
+            </ul>
+          </div>
+          <p>
+            You check the list before anything is saved. Food is ticked for you and other items are
+            skipped, and you can change either. Items already in your pantry take the amount from the
+            receipt. If the store matches one of your stores, prices are saved there too.
+          </p>
+          <p>
+            The photo is sent to Google&apos;s Gemini AI to read it. We don&apos;t keep the image: it is
+            not saved on our servers or in your account. See our{" "}
+            <Link href="/privacy" className="font-bold text-primary underline-offset-4 hover:underline">
+              privacy policy
+            </Link>
+            .
+          </p>
+        </div>
+      </details>
 
-      {/* Add Item Form */}
+      {items.length > 0 && (
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search pantry..."
+        />
+      )}
+
+      {/* Add Item Form. Enter saves from any field; the form stays open for
+          the next item until Done. */}
       {showAdd && (
-        <div className="rounded-2xl border bg-card p-4 sm:p-5">
+        <form
+          onSubmit={addItem}
+          noValidate
+          className="rounded-2xl border bg-card p-4 sm:p-5"
+        >
           <div className="space-y-3">
             <div ref={suggestRef} className="relative">
               <Input
+                ref={addNameRef}
                 aria-label="Ingredient name"
-                placeholder="Ingredient name"
+                placeholder="What do you have? e.g. eggs"
                 value={addQuery}
                 onChange={(e) => {
                   setAddQuery(e.target.value);
                   setShowSuggestions(true);
                   setSelectedIngredient(null);
+                  setAddError(null);
                 }}
                 onFocus={() => addQuery.length >= 2 && setShowSuggestions(true)}
+                onKeyDown={(e) => {
+                  // Escape closes the suggestions first, then the form.
+                  if (e.key !== "Escape") return;
+                  if (showSuggestions && suggestions.length > 0) setShowSuggestions(false);
+                  else resetAdd();
+                }}
+                aria-invalid={addError !== null && !addQuery.trim()}
+                aria-describedby="pantry-add-help"
+                autoComplete="off"
                 autoFocus
               />
-              {showSuggestions && addQuery.length >= 2 && (
+              {showSuggestions && addQuery.length >= 2 && suggestions.length > 0 && (
                 <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border bg-popover shadow-md">
-                  {suggestions.map((s) => (
+                  {suggestions.slice(0, 8).map((s) => (
                     <button
                       key={s.id}
                       type="button"
                       className="w-full px-3 py-2.5 text-left text-sm transition-colors duration-200 ease-out hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                       onClick={() => {
-                        setSelectedIngredient(s);
-                        setAddQuery(s.name);
-                        setShowSuggestions(false);
+                        chooseIngredient(s);
+                        addNameRef.current?.focus();
                       }}
                     >
                       {s.name}
                     </button>
                   ))}
-                  {!suggestions.some(
-                    (s) => s.name.toLowerCase() === addQuery.toLowerCase()
-                  ) && (
-                    <button
-                      type="button"
-                      className="w-full border-t px-3 py-2.5 text-left text-sm font-bold text-primary transition-colors duration-200 ease-out hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-                      onClick={createAndAddIngredient}
-                    >
-                      Create &quot;{addQuery}&quot;
-                    </button>
-                  )}
                 </div>
               )}
             </div>
             <div className="flex gap-2">
               <Input
                 type="number"
+                inputMode="decimal"
                 min={0}
                 step="any"
                 value={addQty}
-                onChange={(e) => setAddQty(parseFloat(e.target.value) || 0)}
-                className="w-20"
-                placeholder="Qty"
-                aria-label="Quantity"
+                onChange={(e) => {
+                  setAddQty(e.target.value);
+                  setAddError(null);
+                }}
+                className="w-24"
+                placeholder="1"
+                aria-label="Quantity (blank means 1)"
               />
               <Select
                 value={addUnitId ? addUnitId.toString() : undefined}
@@ -520,34 +636,50 @@ export default function PantryPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div id="pantry-add-help" aria-live="polite" className="min-h-5 text-sm">
+              {addError ? (
+                <p className="font-semibold text-destructive">{addError}</p>
+              ) : existingMatch ? (
+                <p className="text-muted-foreground">
+                  Already in your pantry ({formatAmount(existingMatch.quantity, existingMatch.unit.abbreviation) || `0 ${existingMatch.unit.abbreviation}`}). Saving replaces that amount.
+                </p>
+              ) : addStatus ? (
+                <p className="font-semibold text-leaf-ink">{addStatus} Add another, or tap Done.</p>
+              ) : (
+                <p className="text-muted-foreground">Press Enter to save. New names are added for you.</p>
+              )}
+            </div>
             <div className="flex gap-2">
-              <Button size="lg" className="flex-1" onClick={addItem} disabled={!selectedIngredient}>
-                <Save className="h-4 w-4" />
+              <Button type="submit" size="lg" className="flex-1" disabled={savingAdd}>
+                {savingAdd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save
               </Button>
-              <Button size="lg" variant="outline" onClick={resetAdd}>
-                Cancel
+              <Button type="button" size="lg" variant="outline" onClick={resetAdd}>
+                Done
               </Button>
             </div>
           </div>
-        </div>
+        </form>
       )}
 
       {/* Pantry items */}
-      {filtered.length === 0 && !showAdd ? (
-        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input px-6 py-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
-            <Package className="h-6 w-6" />
-          </div>
-          <p className="font-heading text-xl">No items in pantry</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Tap &quot;Add item&quot; or &quot;Scan receipt&quot; to get started.
-          </p>
-          <Button size="lg" className="mt-1" onClick={() => setShowAdd(true)}>
+      {items.length === 0 && !showAdd ? (
+        <EmptyState
+          icon={Package}
+          title="Your pantry is empty"
+          description="Keep track of what you have at home, so you can see what you can cook and skip it on your grocery list."
+        >
+          <Button size="lg" onClick={() => setShowAdd(true)}>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Add item
+            Add your first item
           </Button>
-        </div>
+          <Button size="lg" variant="outline" onClick={() => receiptInputRef.current?.click()} disabled={parsingReceipt}>
+            <Receipt className="h-4 w-4 text-primary" />
+            Scan a receipt
+          </Button>
+        </EmptyState>
+      ) : filtered.length === 0 && items.length > 0 ? (
+        <p className="text-sm text-muted-foreground">Nothing in your pantry matches &quot;{search}&quot;.</p>
       ) : (
         <ul className="space-y-2">
           {filtered.map((item) => (
@@ -630,7 +762,7 @@ export default function PantryPage() {
           </DialogHeader>
           <div className="max-h-96 space-y-2 overflow-y-auto">
             <p className="text-sm text-muted-foreground">
-              Ingredients are auto-selected. Non-food items are skipped. Prices are saved for smart shopping.
+              Check the list before importing. Food is ticked for you and other items are skipped; tap any item to change that.
             </p>
 
             {/* Ingredients */}
