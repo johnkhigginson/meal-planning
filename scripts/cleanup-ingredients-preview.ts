@@ -12,11 +12,12 @@
 // Run:
 //   npx tsx scripts/cleanup-ingredients-preview.ts --out <dir>
 //   npx tsx scripts/cleanup-ingredients-preview.ts --self-test [--out <dir>]   (no database)
+//   npx tsx scripts/cleanup-ingredients-preview.ts --from-csv <proposed-changes.csv> [--out <dir>]   (no database)
 
 import "dotenv/config";
 import { createRequire } from "node:module";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import {
   cleanIngredientName,
   ingredientKey,
@@ -195,9 +196,18 @@ const UNIT_NOUNS: Record<string, string[]> = {
   stalk: ["celery", "lemongrass"],
   sprig: ["thyme", "rosemary", "parsley", "cilantro", "mint", "dill", "oregano", "basil"],
 };
+// Descriptors a name can carry after its noun ("chicken boneless"); the
+// parser moves them to the front.
+const AFTER_NOUN_DESCRIPTORS = new Set([
+  "boneless", "skinless", "fresh", "frozen", "dried", "ground", "cooked", "raw", "unsalted", "salted",
+  "low-sodium",
+]);
 // A leading word an old contains-match could have added: "uncooked penne
 // pasta" for a line that said "penne pasta".
-const STATE_LEAD = /^(uncooked|cooked|raw)\s+(.+)$/i;
+const STATE_LEAD = /^(uncooked)\s+(.+)$/i;
+// "cooked rice" is its own ingredient, not "rice" with a stray word. Lines
+// keep their link; the report asks once per name.
+const COOKED_LEAD = /^cooked\s+(.+)$/i;
 // "large or 40 small tomatoes": a second amount inside the name.
 const ALT_AMOUNT = /^(large|small|medium)\s+or\s+(\d+(?:\.\d+)?)\s+(large|small|medium)\s+(.+)$/i;
 
@@ -217,6 +227,40 @@ function unbalanced(text: string): boolean {
   }
   return depth !== 0;
 }
+
+// Parens left open at the end, and ")" with no "(" before it.
+function parenCounts(text: string): { open: number; stray: number } {
+  let open = 0;
+  let stray = 0;
+  for (const ch of text) {
+    if (ch === "(") open++;
+    else if (ch === ")") {
+      if (open > 0) open--;
+      else stray++;
+    }
+  }
+  return { open, stray };
+}
+
+// "(Preferably thighs, or breasts)": one paren group from start to end.
+function wholeParen(text: string): boolean {
+  const t = text.trim();
+  if (!t.startsWith("(") || !t.endsWith(")")) return false;
+  let depth = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "(") depth++;
+    else if (t[i] === ")" && --depth === 0 && i < t.length - 1) return false;
+  }
+  return depth === 0;
+}
+
+// The name with its paren groups taken out, to look for a dash or "or"
+// that isn't inside one.
+const outsideParens = (text: string) => {
+  let t = text;
+  while (/\([^()]*\)/.test(t)) t = t.replace(/\([^()]*\)/g, " ");
+  return t;
+};
 
 type UnitLookup = (word: string) => UnitRow | null;
 
@@ -238,6 +282,9 @@ interface NameProblems {
   nounless: boolean;
   // The prep phrase the parser would move to the note ("sliced fairly thin").
   prep: string;
+  // A note written into the name some other way: " - chopped", "or Swiss
+  // chard", "lg.", "chicken boneless".
+  layout: string[];
 }
 
 function nameProblems(name: string, lookup: UnitLookup): NameProblems {
@@ -252,9 +299,40 @@ function nameProblems(name: string, lookup: UnitLookup): NameProblems {
   const nounless = onlyNounless(name);
   if (nounless) junk.push("only size or color words");
   if (ALT_AMOUNT.test(name)) junk.push("has a second amount");
-  const split = splitNameAndNote(cleanIngredientName(name));
+  if (/^\s*[-\u2013]\s*\d/.test(name)) junk.push("starts with the end of a range");
+  const clean = cleanIngredientName(name);
+  const split = splitNameAndNote(clean);
   const prep = split.notes.find((n) => PREP_WORDS.has(bare(n.split(/\s+/)[0]))) ?? "";
-  return { junk, nounless, prep };
+  const layout: string[] = [];
+  const open = outsideParens(clean);
+  if (/\s[-\u2013\u2014]\s/.test(open)) layout.push('has " - "');
+  if (/\sor\s/i.test(open)) layout.push('has "or"');
+  if (/^(?:lg|sm|med)\.\s/i.test(clean)) layout.push("abbreviated size");
+  const nameWords = clean.split(/\s+/);
+  if (nameWords.length > 1 && AFTER_NOUN_DESCRIPTORS.has(bare(nameWords[nameWords.length - 1]))) {
+    layout.push("descriptor after the noun");
+  }
+  return { junk, nounless, prep, layout };
+}
+
+// A proposed name that still looks wrong after the parser, for the last
+// check on every proposal. Empty when it looks fine.
+const NAME_ONLY_DESCRIPTORS = new Set([...TRAILING_DESCRIPTORS, ...PREP_WORDS]);
+function badNameReasons(name: string, lookup: UnitLookup): string[] {
+  const t = name.trim();
+  const reasons: string[] = [];
+  if (/^[^\p{L}\p{N}]|[^\p{L}\p{N})]$/u.test(t)) reasons.push("leading or trailing punctuation");
+  if (unbalanced(t)) reasons.push("unbalanced parens");
+  if (/^\d/.test(t)) reasons.push("starts with a digit");
+  if (/\sor\s/i.test(t)) reasons.push('has " or "');
+  if (/\s[-\u2013\u2014]\s/.test(t)) reasons.push('has " - "');
+  if (leadingUnit(t, lookup)) reasons.push("starts with a unit word");
+  // "and" doesn't count, so "salt and freshly ground black pepper" passes.
+  if (t.split(/\s+/).filter((w) => w.toLowerCase() !== "and").length > 5) reasons.push("more than 5 words");
+  const list = t.split(/[\s,]+/).map(bare).filter((w) => w && w !== "and" && w !== "or");
+  if (list.length && list.every((w) => NAME_ONLY_DESCRIPTORS.has(w))) reasons.push("only descriptor or color words");
+  if (/[$*]/.test(t)) reasons.push('has "$" or "*"');
+  return reasons;
 }
 
 // The filter the first count used, as LIKE patterns: '(%', '%(s)%', '%*%',
@@ -267,6 +345,7 @@ function matchesLikeFilter(name: string): boolean {
 
 type Category =
   | "wrong_link"
+  | "cooked_separate"
   | "lost_noun"
   | "prep_in_name"
   | "garbled_name_note"
@@ -275,7 +354,7 @@ type Category =
 type Confidence = "high" | "medium" | "low";
 
 const CATEGORIES: Category[] = [
-  "wrong_link", "lost_noun", "prep_in_name", "garbled_name_note", "junk_ingredient_repoint", "deletable_after_repoint",
+  "wrong_link", "cooked_separate", "lost_noun", "prep_in_name", "garbled_name_note", "junk_ingredient_repoint", "deletable_after_repoint",
 ];
 
 // An existing Ingredient id, or a name to create. "delete" for category F.
@@ -345,8 +424,12 @@ interface ListReport {
   itemsAmbiguous: number;
 }
 
+interface SanityFailure { name: string; reasons: string[]; proposal: Proposal }
+
 interface Report {
   proposals: Proposal[];
+  // Proposals whose proposed name failed badNameReasons.
+  sanityFailures: SanityFailure[];
   ingredients: IngredientReport[];
   lists: ListReport[];
   unreferencedClean: number;
@@ -370,7 +453,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
   const problems = new Map(snap.ingredients.map((i) => [i.id, nameProblems(i.name, lookup)]));
   const flagged = (id: number) => {
     const p = problems.get(id);
-    return !!p && (p.junk.length > 0 || p.prep !== "");
+    return !!p && (p.junk.length > 0 || p.prep !== "" || p.layout.length > 0);
   };
 
   // Rows a name can point at: clean rows only, found the way the importer
@@ -436,7 +519,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
   const wrongLink = (line: Line): Proposal | null => {
     const ing = ingById.get(line.row.ingredientId);
     const unit = unitById.get(line.row.unitId);
-    if (!ing || !unit) return null;
+    if (!ing || !unit || COOKED_LEAD.test(ing.name.trim())) return null;
     const nameWords = ing.name.trim().split(/\s+/);
     if (nameWords.length < 2) return null;
     const notes = line.row.notes ?? "";
@@ -526,12 +609,20 @@ export function analyze(snap: Snapshot, today: Date): Report {
   };
 
   // The line as the source most likely wrote it, read back through the
-  // importer's parser.
+  // importer's parser. A note that is one paren group follows the name in
+  // parens, so it stays a note. A paren the import split across the name and
+  // the note ("cheese (such as cheddar" + "jack, and/or fontina), grated")
+  // is joined back up; any other stray paren in the note is closed.
   const lineText = (quantity: number, unit: UnitRow | null, name: string, notes: string) => {
     const amount = quantity > 0 ? String(quantity) : "";
     const unitWord = quantity > 0 && !isEach(unit) ? unit!.name : "";
     const note = notes.trim();
-    const tail = !note ? "" : note.startsWith("(") ? ` ${note}` : `, ${note}`;
+    const counts = parenCounts(note);
+    let tail = "";
+    if (!note) tail = "";
+    else if (parenCounts(name).open > 0 && counts.stray > 0) tail = `, ${note}`;
+    else if (wholeParen(note)) tail = ` ${note}`;
+    else tail = `, ${"(".repeat(counts.stray)}${note}${")".repeat(counts.open)}`;
     return [amount, unitWord, name].filter(Boolean).join(" ") + tail;
   };
 
@@ -545,14 +636,14 @@ export function analyze(snap: Snapshot, today: Date): Report {
     const lastWord = bare(ing.name.trim().split(/\s+/).pop() ?? "");
     const firstNote = bare(notes.split(/[\s,]+/)[0] ?? "");
     const splitWrong = !p.nounless && TRAILING_DESCRIPTORS.has(lastWord) && TRAILING_DESCRIPTORS.has(firstNote);
-    if (!p.junk.length && !p.prep && !splitWrong) return null;
+    if (!p.junk.length && !p.prep && !p.layout.length && !splitWrong) return null;
 
     const category: Category = p.nounless
       ? "lost_noun"
       : p.junk.length || splitWrong
         ? "garbled_name_note"
         : "prep_in_name";
-    const reasons = [...p.junk, ...(splitWrong ? ["name and note read as one phrase"] : [])];
+    const reasons = [...p.junk, ...(splitWrong ? ["name and note read as one phrase"] : []), ...p.layout];
     if (p.prep) reasons.push(`prep "${p.prep}" in name`);
     const current = currentOf(line);
     const base = {
@@ -602,41 +693,46 @@ export function analyze(snap: Snapshot, today: Date): Report {
         confidence = "low";
       }
     }
-    if (unbalanced(name)) {
+    // Closed here unless the note holds the other half (see lineText).
+    if (unbalanced(name) && !(parenCounts(name).open > 0 && parenCounts(notes).stray > 0)) {
       const open = (name.match(/\(/g) ?? []).length - (name.match(/\)/g) ?? []).length;
       name = open > 0 ? name + ")".repeat(open) : name.replace(/\)(?![^(]*\))/, "");
       confidence = lower(confidence, "medium");
     }
 
-    let parsedName: string;
-    let parsedNotes: string;
-    let parsedUnit: UnitRow | null;
+    // "large or 40 small tomatoes": the parser keeps the noun and notes the
+    // choice, but which amount the recipe meant is a question.
     const alt = name.match(ALT_AMOUNT);
     if (alt) {
-      // The parser has no reading for a second amount, so the name keeps
-      // the noun and the note keeps the alternative.
-      const rest = parseIngredientText(alt[4], lookup);
-      parsedName = rest?.name ?? alt[4];
-      parsedNotes = [alt[1].toLowerCase(), `or ${alt[2]} ${alt[3].toLowerCase()}`, rest?.notes, notes].filter(Boolean).join(", ");
-      parsedUnit = unit;
       questions.push(`"${ing.name}" holds two amounts. Keep ${quantity} ${alt[1].toLowerCase()} and note "or ${alt[2]} ${alt[3].toLowerCase()}"?`);
       confidence = "low";
-    } else {
-      const parsed = parseIngredientText(lineText(quantity, unit, name, notes), lookup);
-      if (!parsed) {
-        return {
-          ...base,
-          confidence: "low",
-          proposed: { ...current, target: { create: "?" }, notes },
-          reason: `${reasons.join("; ")}. The parser could not read a name.`,
-          ambiguous: true,
-          question: "What should this line be?",
-        };
-      }
-      parsedName = parsed.name;
-      parsedNotes = parsed.notes;
-      parsedUnit = parsed.unit ?? (quantity > 0 ? eachUnit : unit);
-      quantity = parsed.quantity || quantity;
+    }
+    const parsed = parseIngredientText(lineText(quantity, unit, name, notes), lookup);
+    if (!parsed) {
+      return {
+        ...base,
+        confidence: "low",
+        proposed: { ...current, target: { create: "?" }, notes },
+        reason: `${reasons.join("; ")}. The parser could not read a name.`,
+        ambiguous: true,
+        question: "What should this line be?",
+      };
+    }
+    const parsedName = parsed.name;
+    const parsedNotes = parsed.notes;
+    const parsedUnit = parsed.unit ?? (quantity > 0 ? eachUnit : unit);
+    quantity = parsed.quantity || quantity;
+    for (const doubt of parsed.doubts) {
+      questions.push(`${doubt} Kept ${quantity} ${parsedUnit?.name ?? "each"}. Check the source recipe.`);
+      confidence = "low";
+    }
+    // "chicken boneless" read as "boneless chicken". Not when the note
+    // holds the rest of the phrase; that one is joined back up.
+    const savedWords = cleanIngredientName(ing.name).split(/\s+/);
+    const savedLast = savedWords[savedWords.length - 1] ?? "";
+    if (!splitWrong && savedWords.length > 1 && AFTER_NOUN_DESCRIPTORS.has(bare(savedLast)) && !parsedName.toLowerCase().endsWith(bare(savedLast))) {
+      questions.push(`Saved name ends in "${savedLast}"; a fresh import reads it as "${parsedName}". OK?`);
+      confidence = lower(confidence, "medium");
     }
 
     // What the parser left still looks wrong: a trailing descriptor, no noun.
@@ -680,6 +776,49 @@ export function analyze(snap: Snapshot, today: Date): Report {
     const proposal = flagged(line.row.ingredientId) ? reparse(line) : (wrongLink(line) ?? reparse(line));
     if (proposal) proposals.push(proposal);
   }
+
+  // ── A2. Cooked X: its own ingredient, one question per name ──
+  const cookedAsked = new Set<string>();
+  for (const line of lines) {
+    const ing = ingById.get(line.row.ingredientId);
+    const cooked = ing?.name.trim().match(COOKED_LEAD);
+    if (!ing || !cooked || flagged(ing.id) || cookedAsked.has(ingredientKey(ing.name))) continue;
+    cookedAsked.add(ingredientKey(ing.name));
+    const plain = findExisting(cooked[1]);
+    const uses = linesByIngredient.get(ing.id)?.length ?? 0;
+    proposals.push({
+      category: "cooked_separate",
+      confidence: "low",
+      table: "Ingredient",
+      rowId: ing.id,
+      recipeId: null,
+      recipeName: "",
+      current: { quantity: null, unit: "", ingredientId: ing.id, ingredientName: ing.name, notes: "" },
+      proposed: { quantity: null, unit: "", target: { id: ing.id, name: ing.name }, notes: "" },
+      reason: `${uses} recipe line(s) use "${ing.name}". Cooked is its own ingredient, so no line is repointed.${plain ? ` "${plain.name}" (#${plain.id}) also exists.` : ""}`,
+      ambiguous: true,
+      question: `Keep "${ing.name}" separate from "${cooked[1]}"?`,
+    });
+  }
+
+  // Every proposed name gets one last look. One that still looks wrong is
+  // a question, not a change.
+  const sanityFailures: SanityFailure[] = [];
+  const sanityChecked = new Set<Proposal>();
+  const sanityCheck = (x: Proposal) => {
+    if (sanityChecked.has(x)) return;
+    sanityChecked.add(x);
+    const t = x.proposed.target;
+    const name = "create" in t ? t.create : "id" in t ? t.name : "";
+    if (!name || name === "?") return;
+    const reasons = badNameReasons(name, lookup);
+    if (!reasons.length) return;
+    x.ambiguous = true;
+    x.confidence = "low";
+    x.question = [x.question, `Proposed name looks wrong: "${name}" (${reasons.join(", ")}).`].filter(Boolean).join(" ");
+    sanityFailures.push({ name, reasons, proposal: x });
+  };
+  proposals.forEach(sanityCheck);
   const lineProposals = [...proposals];
 
   // ── E. Junk rows, and where everything that uses them should point ──
@@ -687,7 +826,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
   const rowTarget = new Map<number, { target: Target; ambiguous: boolean; unitChange: boolean }>();
   for (const ing of snap.ingredients) {
     const p = problems.get(ing.id)!;
-    if (!p.junk.length && !p.prep) continue;
+    if (!p.junk.length && !p.prep && !p.layout.length) continue;
     const mine = lineProposals.filter((x) => x.current.ingredientId === ing.id && !("create" in x.proposed.target && x.proposed.target.create === "?"));
     const counts = new Map<string, { target: Target; n: number }>();
     for (const x of mine) {
@@ -718,7 +857,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
       id: ing.id,
       name: ing.name,
       kind: p.nounless ? "lost_noun" : p.junk.length ? "junk" : "prep_in_name",
-      reasons: p.prep ? [...p.junk, `prep "${p.prep}" in name`] : p.junk,
+      reasons: [...p.junk, ...p.layout, ...(p.prep ? [`prep "${p.prep}" in name`] : [])],
       likeFilter: matchesLikeFilter(ing.name),
       target,
       targetAmbiguous: ambiguous,
@@ -763,7 +902,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
       recipeName: "",
       current: { quantity: row.quantity, unit, ingredientId: ing.id, ingredientName: ing.name, notes: "" },
       proposed: { quantity: row.quantity, unit, target: plan.target, notes: "" },
-      reason: `Ingredient row is ${p.junk.length ? p.junk.join(", ") : `prep "${p.prep}" in name`}. ${where}.`,
+      reason: `Ingredient row is ${p.junk.length ? p.junk.join(", ") : p.prep ? `prep "${p.prep}" in name` : p.layout.join(", ")}. ${where}.`,
       ambiguous: questions.length > 0,
       question: questions.join(" "),
     });
@@ -816,6 +955,8 @@ export function analyze(snap: Snapshot, today: Date): Report {
       question: `The quantity may mix "${cause.current.ingredientName}" from other recipes. Repoint, split, or regenerate the list?`,
     });
   }
+
+  proposals.forEach(sanityCheck);
 
   // ── F. Rows left with no references ──
   const refs = new Map<number, Record<RefTable, number>>();
@@ -913,6 +1054,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
 
   return {
     proposals,
+    sanityFailures,
     ingredients: ingredientReports,
     lists,
     unreferencedClean,
@@ -1040,6 +1182,15 @@ function summaryMd(report: Report, meta: { mode: string; isolation: string; gene
     ""
   );
 
+  const failedNames = sanityByName(report);
+  md.push("## Sanity check on proposed names", "");
+  md.push(
+    `${report.sanityFailures.length} proposals (${failedNames.length} distinct names) have a proposed name that still looks wrong. Each is marked ambiguous with the question "Proposed name looks wrong: ...".`,
+    ""
+  );
+  for (const f of failedNames) md.push(`- "${f.name}" (${f.reasons.join(", ")}): ${f.rows} row(s)`);
+  if (failedNames.length) md.push("");
+
   md.push("## Examples", "");
   for (const c of CATEGORIES) {
     const sample = proposals.filter((x) => x.category === c).slice(0, 8);
@@ -1068,11 +1219,23 @@ function summaryMd(report: Report, meta: { mode: string; isolation: string; gene
   return md.join("\n");
 }
 
+// Sanity-check failures by name, most rows first.
+function sanityByName(report: Report): { name: string; reasons: string[]; rows: number }[] {
+  const byName = new Map<string, { name: string; reasons: string[]; rows: number }>();
+  for (const f of report.sanityFailures) {
+    const seen = byName.get(f.name) ?? { name: f.name, reasons: f.reasons, rows: 0 };
+    seen.rows++;
+    byName.set(f.name, seen);
+  }
+  return [...byName.values()].sort((a, b) => b.rows - a.rows || a.name.localeCompare(b.name));
+}
+
 function countsLine(report: Report): string[] {
   const byCategory = countBy(report.proposals, (x) => x.category);
   return [
     `proposals: ${report.proposals.length} (ambiguous ${report.proposals.filter((x) => x.ambiguous).length})`,
     ...CATEGORIES.map((c) => `  ${c}: ${byCategory.get(c) ?? 0}`),
+    `sanity-check failures: ${report.sanityFailures.length}`,
     `junk ingredient rows: like filter ${report.likeFilterCount}, detector ${report.detectorCount}`,
     `affected grocery lists: ${report.lists.length}`,
   ];
@@ -1090,6 +1253,127 @@ function writeReport(report: Report, dir: string, meta: { mode: string; isolatio
   return files.map(([file]) => join(dir, file));
 }
 
+// ─── Offline input from an earlier report ──────────────────────
+//
+// Rebuilds the recipe lines from the current_* columns of a
+// proposed-changes.csv this script wrote, so the analysis can be rerun
+// without the database. Only rows the report names are known: clean rows
+// come from the targets in junk-ingredients.csv and summary.md beside it, not
+// the whole Ingredient table, and there are no grocery, inventory or price
+// rows.
+
+// The units prisma/seed.ts creates.
+const SEED_UNITS: [string, string, string][] = [
+  ["teaspoon", "tsp", "VOLUME"], ["tablespoon", "tbsp", "VOLUME"], ["cup", "cup", "VOLUME"],
+  ["fluid ounce", "fl oz", "VOLUME"], ["pint", "pt", "VOLUME"], ["quart", "qt", "VOLUME"],
+  ["gallon", "gal", "VOLUME"], ["milliliter", "ml", "VOLUME"], ["liter", "L", "VOLUME"],
+  ["ounce", "oz", "WEIGHT"], ["pound", "lb", "WEIGHT"], ["gram", "g", "WEIGHT"], ["kilogram", "kg", "WEIGHT"],
+  ["each", "ea", "COUNT"], ["dozen", "doz", "COUNT"], ["pinch", "pinch", "OTHER"], ["dash", "dash", "OTHER"],
+  ["clove", "clove", "OTHER"], ["bunch", "bunch", "OTHER"], ["can", "can", "OTHER"], ["package", "pkg", "OTHER"],
+  ["slice", "slice", "OTHER"],
+];
+
+// RFC 4180, the reverse of toCsv.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else field += ch;
+  }
+  if (field || row.length) rows.push([...row, field]);
+  return rows;
+}
+
+function readCsvObjects(path: string): Record<string, string>[] {
+  const [header, ...rows] = parseCsv(readFileSync(path, "utf8"));
+  return rows.map((r) => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ""])));
+}
+
+function snapshotFromCsv(path: string): Snapshot {
+  const rows = readCsvObjects(path);
+  const units: UnitRow[] = SEED_UNITS.map(([name, abbreviation, unitType], i) => ({ id: i + 1, name, abbreviation, unitType }));
+  const unitId = (name: string) => {
+    const found = units.find((u) => u.name === name);
+    if (found) return found.id;
+    units.push({ id: units.length + 1, name, abbreviation: name, unitType: "OTHER" });
+    return units.length;
+  };
+
+  const names = new Map<number, string>();
+  for (const r of rows) names.set(Number(r.current_ingredient_id), r.current_ingredient_name);
+  // Clean target rows: "butter (#6)" in the report beside the CSV.
+  const named = (text: string) => {
+    const m = text.trim().match(/^(.+) \(#(\d+)\)$/);
+    if (m && !names.has(Number(m[2]))) names.set(Number(m[2]), m[1]);
+  };
+  const dir = dirname(path);
+  if (existsSync(join(dir, "junk-ingredients.csv"))) {
+    for (const r of readCsvObjects(join(dir, "junk-ingredients.csv"))) r.all_targets.split(" | ").forEach(named);
+  }
+  if (existsSync(join(dir, "summary.md"))) {
+    for (const quoted of readFileSync(join(dir, "summary.md"), "utf8").match(/`[^`]+`/g) ?? []) {
+      quoted.slice(1, -1).split(" | ").forEach(named);
+    }
+  }
+
+  const recipes = new Map<number, RecipeRow>();
+  const libraryRecipes = new Map<number, LibraryRecipeRow>();
+  const recipeLines: LineRow[] = [];
+  const libraryLines: LineRow[] = [];
+  for (const r of rows) {
+    if (r.table !== "RecipeIngredient" && r.table !== "LibraryRecipeIngredient") continue;
+    const recipeId = Number(r.recipe_id);
+    const line: LineRow = {
+      id: Number(r.row_id),
+      recipeId,
+      ingredientId: Number(r.current_ingredient_id),
+      quantity: Number(r.current_quantity),
+      unitId: unitId(r.current_unit),
+      notes: r.current_notes || null,
+    };
+    if (r.table === "RecipeIngredient") {
+      recipes.set(recipeId, { id: recipeId, householdId: 0, name: r.recipe_name });
+      recipeLines.push(line);
+    } else {
+      libraryRecipes.set(recipeId, { id: recipeId, name: r.recipe_name });
+      libraryLines.push(line);
+    }
+  }
+  return {
+    units,
+    ingredients: [...names].map(([id, name]) => ({ id, name })),
+    recipes: [...recipes.values()],
+    recipeLines,
+    libraryRecipes: [...libraryRecipes.values()],
+    libraryLines,
+    groceryLists: [],
+    groceryItems: [],
+    inventory: [],
+    storePrices: [],
+    mealPlans: [],
+    mealPlanEntries: [],
+  };
+}
+
 // ─── Self-test ──────────────────────────────────────────────────
 //
 // Real production lines, in memory. No database.
@@ -1099,6 +1383,7 @@ function fixture(): Snapshot {
     ["teaspoon", "tsp", "VOLUME"], ["tablespoon", "tbsp", "VOLUME"], ["cup", "cup", "VOLUME"],
     ["ounce", "oz", "WEIGHT"], ["pound", "lb", "WEIGHT"], ["gram", "g", "WEIGHT"],
     ["each", "ea", "COUNT"], ["clove", "clove", "OTHER"], ["package", "pkg", "OTHER"], ["can", "can", "OTHER"],
+    ["slice", "slice", "OTHER"],
   ];
   const units = unitNames.map(([name, abbreviation, unitType], i) => ({ id: i + 1, name, abbreviation, unitType }));
   const unitId = (name: string) => units.find((u) => u.name === name)!.id;
@@ -1111,7 +1396,7 @@ function fixture(): Snapshot {
     return ingredients.length;
   };
   // Clean rows, to be left alone or used as targets.
-  for (const name of ["garlic", "large eggs", "butter", "baking powder"]) ingredientId(name);
+  for (const name of ["garlic", "large eggs", "butter", "baking powder", "Chicken Breast", "rice", "white rice"]) ingredientId(name);
 
   const recipes: RecipeRow[] = [];
   const recipeLines: LineRow[] = [];
@@ -1146,6 +1431,26 @@ function fixture(): Snapshot {
   add("Fajitas", 3, "each", "large red", "yellow, or orange bell peppers");
   add("Tomato Sauce", 20, "each", "large or 40 small tomatoes");
   add("Alfredo", 2, "clove", "garlic", "crushed");
+  // Proposals the first live run got wrong.
+  add("Potato Soup", 4, "each", "green onions - chopped");
+  add("Potato Soup", 0.5, "pound", "smoked bacon - chopped");
+  add("Potato Soup", 2, "each", "lg. russet potatoes - scrubbed clean and cubed");
+  add("Potato Soup", 2, "each", "garlic cloves - peeled", "crushed");
+  add("Potato Soup", 1, "each", "small onion - peeled", "chopped");
+  add("Potato Soup", 2, "cup", "kale or Swiss chard - chopped or torn");
+  add("Potato Soup", 0.5, "teaspoon", "rosemary - crushed");
+  add("Potato Soup", 0.5, "teaspoon", "lemon peel - shredded");
+  add("Chicken Parmesan", 4, "each", "-5 chicken breasts cut in pieces or 12-ish chicken tenders");
+  add("Chicken Parmesan Bake", 2, "pound", "-5 chicken breasts cut in pieces or 12-ish chicken tenders");
+  add("Mac and Cheese", 1, "pound", "cheese (such as cheddar", "jack, and/or fontina), grated");
+  add("Tikka Gravy", 1.35, "pound", "(500 grams) tomatoes", "(pureed/chopped or 10 oz. (1 cup) tomato puree/ passata or 14 oz can peeled tomatoes, read notes)");
+  add("Chicken Pot Pie", 2.5, "cup", "shredded cooked rotisserie or left-over chicken*");
+  add("Ham Casserole", 1, "each", "(or so) cup cooked ham", "diced");
+  add("Fried Rice", 4, "cup", "cooked rice");
+  add("Rice Pudding", 1, "cup", "cooked rice", "Chilled");
+  add("Burrito Bowl", 2.5, "cup", "Cooked white rice", "Shredded Chicken");
+  add("Chicken Tortilla Soup", 2, "cup", "cooked chicken breasts", "shredded or cut into bite-size pieces");
+  add("Zucchini Bake", 3, "cup", "(1/4-inch-thick) slices small zucchini");
 
   const groceryLists: GroceryListRow[] = [{ id: 1, householdId: 1, mealPlanId: 1, name: "This week" }];
   const groceryItems: GroceryItemRow[] = [
@@ -1238,7 +1543,72 @@ function selfTest(out: string | undefined): number {
   check("two amounts asks", !!line("Tomato Sauce", "large or 40 small tomatoes")?.ambiguous);
   check("Neufchatel unit change asks", !!line("Cheesecake", "(8 oz) pkg Neufchatel cheese*")?.ambiguous);
   check("clean rows untouched", !report.proposals.some((x) => ["garlic", "large eggs", "butter"].includes(x.current.ingredientName) && x.table === "RecipeIngredient"));
+
+  // Each example as [quantity, unit, target, notes].
+  const shown = (x: Proposal | undefined) => (x ? [x.proposed.quantity, x.proposed.unit, target(x), x.proposed.notes] : null);
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const chickenBreast = `Chicken Breast (#${snap.ingredients.find((i) => i.name === "Chicken Breast")!.id})`;
+  const examples: [string, string, string, unknown[]][] = [
+    ["green onions - chopped", "Potato Soup", "green onions - chopped", [4, "each", "green onions (new)", "chopped"]],
+    ["smoked bacon - chopped", "Potato Soup", "smoked bacon - chopped", [0.5, "pound", "smoked bacon (new)", "chopped"]],
+    ["lg. russet potatoes", "Potato Soup", "lg. russet potatoes - scrubbed clean and cubed", [2, "each", "russet potatoes (new)", "large, scrubbed clean and cubed"]],
+    ["garlic cloves - peeled", "Potato Soup", "garlic cloves - peeled", [2, "clove", `garlic (#${garlicId})`, "peeled, crushed"]],
+    // "onions": the spelling the earlier "large onions chopped" line creates.
+    ["small onion - peeled", "Potato Soup", "small onion - peeled", [1, "each", "onions (new)", "small, peeled, chopped"]],
+    ["kale or Swiss chard", "Potato Soup", "kale or Swiss chard - chopped or torn", [2, "cup", "kale (new)", "or Swiss chard, chopped or torn"]],
+    ["rosemary - crushed", "Potato Soup", "rosemary - crushed", [0.5, "teaspoon", "rosemary (new)", "crushed"]],
+    ["lemon peel - shredded", "Potato Soup", "lemon peel - shredded", [0.5, "teaspoon", "lemon peel (new)", "shredded"]],
+    ["-5 chicken breasts, each", "Chicken Parmesan", "-5 chicken breasts cut in pieces or 12-ish chicken tenders", [5, "each", chickenBreast, "4 to 5, cut in pieces or 12-ish chicken tenders"]],
+    ["-5 chicken breasts, pound", "Chicken Parmesan Bake", "-5 chicken breasts cut in pieces or 12-ish chicken tenders", [2, "pound", chickenBreast, "cut in pieces or 12-ish chicken tenders"]],
+    ["cheese across name and note", "Mac and Cheese", "cheese (such as cheddar", [1, "pound", "cheese (new)", "such as cheddar, jack, and/or fontina, grated"]],
+    ["cheese (such as cheddar", "Enchiladas", "cheese (such as cheddar", [1, "each", "cheese (new)", "such as cheddar"]],
+    ["tomatoes with a nested-paren note", "Tikka Gravy", "(500 grams) tomatoes", [1.35, "pound", "tomatoes (new)", "500 grams, pureed/chopped or 10 oz. (1 cup) tomato puree/passata or 14 oz can peeled tomatoes, read notes"]],
+    ["chicken boneless", "Chicken Tikka Masala Recipe", "(700 grams) chicken boneless", [1.5, "pound", "boneless chicken (new)", "700 grams, Preferably thighs, or breasts"]],
+    ["chicken boneless, skinless", "Baked Parmesan Chicken", "(700 grams) chicken boneless", [8, "each", "boneless skinless chicken breasts (new)", "700 grams"]],
+    ["rotisserie or left-over chicken", "Chicken Pot Pie", "shredded cooked rotisserie or left-over chicken*", [2.5, "cup", "cooked chicken (new)", "shredded, rotisserie or left-over"]],
+    ["(or so) cup cooked ham", "Ham Casserole", "(or so) cup cooked ham", [1, "cup", "cooked ham (new)", "or so, diced"]],
+    ["large or 40 small tomatoes", "Tomato Sauce", "large or 40 small tomatoes", [20, "each", "tomatoes (new)", "large or 40 small"]],
+  ];
+  for (const [label, recipe, ingredient, want] of examples) {
+    const got = shown(line(recipe, ingredient));
+    check(`${label}: ${JSON.stringify(want)}`, same(got, want) || (console.log(`      got ${JSON.stringify(got)}`), false));
+  }
+  check("garlic cloves asks about the unit", !!line("Potato Soup", "garlic cloves - peeled")?.ambiguous);
+  check("-5 chicken breasts, pound asks", /end of a range/.test(line("Chicken Parmesan Bake", "-5 chicken breasts cut in pieces or 12-ish chicken tenders")?.question ?? ""));
+  check("cooked ham asks about each -> cup", !!line("Ham Casserole", "(or so) cup cooked ham")?.ambiguous);
+  check("plain dash lines need no question", ["green onions - chopped", "rosemary - crushed", "kale or Swiss chard - chopped or torn"].every((n) => !line("Potato Soup", n)?.ambiguous));
+
+  console.log("\nCooked X:");
+  const cookedNames = ["cooked rice", "Cooked white rice", "cooked chicken breasts"];
+  check("no wrong_link for cooked X", !report.proposals.some((x) => x.category === "wrong_link" && cookedNames.includes(x.current.ingredientName)));
+  check("no line repointed off cooked X", !report.proposals.some((x) => x.table === "RecipeIngredient" && cookedNames.includes(x.current.ingredientName)));
+  const cookedQuestions = report.proposals.filter((x) => x.category === "cooked_separate");
+  check("one question per cooked name", same(cookedQuestions.map((x) => x.current.ingredientName).sort(), [...cookedNames].sort()));
+  check('asks "Keep \'cooked rice\' separate from \'rice\'?"', cookedQuestions.some((x) => x.question === 'Keep "cooked rice" separate from "rice"?' && x.ambiguous));
+  check("cooked questions keep the link", cookedQuestions.every((x) => "id" in x.proposed.target && x.proposed.target.id === x.current.ingredientId));
+
+  console.log("\nSanity check on proposed names:");
+  for (const [name, want] of [
+    ["green onions -", ["leading or trailing punctuation"]],
+    ["-5 chicken breasts", ["leading or trailing punctuation"]],
+    ["40 small tomatoes", ["starts with a digit"]],
+    ["cheese (such as cheddar", ["unbalanced parens"]],
+    ["kale or Swiss chard", ['has " or "']],
+    ["lg. russet potatoes - scrubbed clean and", ['has " - "', "more than 5 words"]],
+    ["can crushed tomatoes", ["starts with a unit word"]],
+    ["large red", ["only descriptor or color words"]],
+    ["garlic*", ["leading or trailing punctuation", 'has "$" or "*"']],
+    ["boneless skinless chicken breasts", []],
+    ["salt and freshly ground black pepper", []],
+  ] as [string, string[]][]) {
+    check(`${JSON.stringify(name)} -> ${JSON.stringify(want)}`, same(badNameReasons(name, makeUnitLookup(snap.units) as UnitLookup).filter((r) => want.includes(r) || !want.length), want));
+  }
+  const zucchini = line("Zucchini Bake", "(1/4-inch-thick) slices small zucchini");
+  check("a bad proposed name is a question", !!zucchini?.ambiguous && zucchini.question.includes("Proposed name looks wrong:"));
+  check("failures are counted", report.sanityFailures.some((f) => f.proposal === zucchini));
+
   const summary = summaryMd(report, { mode: "self-test", isolation: "n/a", generated: "self-test" });
+  check("summary reports sanity failures", summary.includes(`${report.sanityFailures.length} proposals (`));
   check("summary states dry run", summary.includes("Dry run: nothing was written"));
   const csvs = proposalsCsv(report.proposals) + ingredientsCsv(report.ingredients) + listsCsv(report.lists);
   check("no em dashes in output", !/\u2014/.test(summary + csvs));
@@ -1262,8 +1632,21 @@ async function main() {
     process.exitCode = selfTest(out);
     return;
   }
+  const csvIndex = args.indexOf("--from-csv");
+  if (csvIndex >= 0) {
+    const csv = resolve(args[csvIndex + 1] ?? "");
+    const report = analyze(snapshotFromCsv(csv), new Date());
+    for (const line of countsLine(report)) console.log(line);
+    console.log("\nSanity-check failures:");
+    for (const f of sanityByName(report)) console.log(`  "${f.name}" (${f.reasons.join(", ")}): ${f.rows} row(s)`);
+    if (out) {
+      const meta = { mode: `offline, rebuilt from ${csv}`, isolation: "n/a (no database)", generated: new Date().toISOString() };
+      for (const path of writeReport(report, resolve(out), meta)) console.log(path);
+    }
+    return;
+  }
   if (!out) {
-    console.error("Usage: npx tsx scripts/cleanup-ingredients-preview.ts --out <dir> | --self-test");
+    console.error("Usage: npx tsx scripts/cleanup-ingredients-preview.ts --out <dir> | --self-test | --from-csv <csv>");
     process.exitCode = 2;
     return;
   }
