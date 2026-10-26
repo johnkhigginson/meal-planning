@@ -1,8 +1,8 @@
 // A one-off data fix: four recipe lines and the name of Ingredient #881.
 //
-// 1. "Creamy Chicken and Wild Rice Soup": the "Cooked white rice" line whose
+// 1. "Creamy Chicken and Wild Rice Soup": the "white rice" line whose
 //    note says "chicken breast" points at #73 Chicken Breast.
-// 2. "White Chicken Enchiladas": the "Cooked white rice" line whose note says
+// 2. "White Chicken Enchiladas": the "white rice" line whose note says
 //    "chicken" points at "shredded chicken" if that row exists, else #73.
 // 3. "Lemon Herb Chicken": the "range start lost" line becomes 6, "6 to 8".
 // 4. "Chicken Lentil Crock-Pot Soup": celery "sticks" become "stalks".
@@ -191,14 +191,14 @@ const LINE_TARGETS: LineTarget[] = [
   {
     n: 1,
     title: "Creamy Chicken and Wild Rice Soup",
-    rule: 'ingredient "Cooked white rice", notes contain "chicken breast"',
-    match: (l) => key(l.ingredientName) === "cooked white rice" && has(l.notes, "chicken breast"),
+    rule: 'ingredient "white rice", notes contain "chicken breast"',
+    match: (l) => key(l.ingredientName) === "white rice" && has(l.notes, "chicken breast"),
   },
   {
     n: 2,
     title: "White Chicken Enchiladas",
-    rule: 'ingredient "Cooked white rice", notes contain "chicken"',
-    match: (l) => key(l.ingredientName) === "cooked white rice" && has(l.notes, "chicken"),
+    rule: 'ingredient "white rice", notes contain "chicken"',
+    match: (l) => key(l.ingredientName) === "white rice" && has(l.notes, "chicken"),
   },
   {
     n: 3,
