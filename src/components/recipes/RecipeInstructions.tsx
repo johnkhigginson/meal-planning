@@ -1,10 +1,12 @@
+import { stripFootnoteMarkers } from "@/lib/parse-steps";
 import { parseInstructionSections } from "@/lib/recipe-sections";
 
 // Instructions are stored as one text blob, with `--- Section ---` heading lines
 // when the source recipe grouped its steps ("Pot Pie Filling", "Bake Pot Pie").
 // Render those headings as headings instead of showing the raw markers.
+// Recipes imported before footnote markers were stripped lose them here.
 export function RecipeInstructions({ text }: { text: string }) {
-  const sections = parseInstructionSections(text);
+  const sections = parseInstructionSections(stripFootnoteMarkers(text));
 
   if (sections.length === 1 && sections[0].name === null) {
     return <div className="whitespace-pre-wrap">{sections[0].body}</div>;

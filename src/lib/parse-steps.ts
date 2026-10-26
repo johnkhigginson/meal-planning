@@ -60,6 +60,24 @@ function stripMarker(text: string): string {
   return clean(text.replace(MARKER, ""));
 }
 
+// A footnote marker on a word ("green onions*", "garlic**"), before a space,
+// punctuation or the end of the text. "5 * 3" and "5*3" have no word right
+// before the asterisk, so they stay.
+const FOOTNOTE = /(?<=[\p{L}\p{N})\]])\*{1,2}(?=[\s.,;:!?)\]]|$)/gu;
+// An asterisk that opens a word ("*very* hot") means the line uses emphasis,
+// not footnotes, so it is left alone.
+const OPENING_ASTERISK = /(?:^|\s)\*{1,2}[\p{L}\p{N}]/u;
+
+// Recipe sites mark words that have a note further down the page ("Top with
+// sliced green onions*"). The note isn't imported, so the marker means
+// nothing here. Works line by line on a whole instructions blob.
+export function stripFootnoteMarkers(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => (OPENING_ASTERISK.test(line) ? line : line.replace(FOOTNOTE, "")))
+    .join("\n");
+}
+
 function looksLikeHtml(text: string): boolean {
   return /<\/?(?:p|li|ol|ul|br|div|h[1-6]|span|strong|em|b|i)\b[^>]*>/i.test(text);
 }
@@ -130,7 +148,7 @@ function textToSteps(text: string): string[] {
 
 // Splits one block of instructions into step texts with numbering removed.
 export function parseSteps(instructions: string | null | undefined): string[] {
-  const text = (instructions || "").trim();
+  const text = stripFootnoteMarkers(instructions || "").trim();
   if (!text) return [];
   return looksLikeHtml(text) ? htmlToSteps(text) : textToSteps(text);
 }

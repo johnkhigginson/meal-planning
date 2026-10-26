@@ -13,6 +13,10 @@ import {
   formatIngredientText,
   readQuantity,
 } from "../src/lib/ingredient-format";
+import { parseCookSteps, stripFootnoteMarkers } from "../src/lib/parse-steps";
+import { cleanScrapedRecipe, extractStructuredRecipe } from "../src/lib/recipe-scrape";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 let failures = 0;
 function eq(label: string, actual: unknown, expected: unknown) {
@@ -137,6 +141,30 @@ eq("medium stays with onions", formatIngredientText("2 medium onions"), "2 mediu
 eq("large stays with eggs", formatIngredientText("3 large eggs"), "3 large eggs");
 eq("saved Heaping in name", formatIngredientLine(0.25, "ea", "Heaping teaspoon ground cinnamon"), "1/4 tsp ground cinnamon (heaping)");
 eq("saved size word before stored unit", formatIngredient(0.25, "tsp", "heaping tsp ground cinnamon"), { amount: "1/4 tsp", name: "ground cinnamon (heaping)" });
+
+console.log("Footnote markers in steps:");
+eq("word*", stripFootnoteMarkers("Top the pasta with sliced green onions* and serve."), "Top the pasta with sliced green onions and serve.");
+eq("word** before a period", stripFootnoteMarkers("Add the garlic**."), "Add the garlic.");
+eq("end of text", stripFootnoteMarkers("Serve with lime wedges*"), "Serve with lime wedges");
+eq("each line of a blob", stripFootnoteMarkers("1. Add onions*\n2. Stir"), "1. Add onions\n2. Stir");
+eq("spaced multiplication stays", stripFootnoteMarkers("Cut into 5 * 3 inch pieces"), "Cut into 5 * 3 inch pieces");
+eq("tight multiplication stays", stripFootnoteMarkers("Use a 9*13 pan"), "Use a 9*13 pan");
+eq("emphasis line stays", stripFootnoteMarkers("Do *not* stir"), "Do *not* stir");
+eq("bullet stays", stripFootnoteMarkers("* Preheat the oven"), "* Preheat the oven");
+eq("cook steps lose markers", parseCookSteps("1. Top with green onions* and serve.").map((s) => s.text), ["Top with green onions and serve."]);
+
+// The real Budget Bytes JSON-LD, run through the same path the scrape API
+// takes: read the Recipe off the page, then clean it.
+const fixture = readFileSync(join(__dirname, "fixtures/budgetbytes-cajun-chicken-pasta.json"), "utf8");
+const page = `<html><head><script type="application/ld+json">${fixture}</script></head><body></body></html>`;
+const scraped = extractStructuredRecipe(page);
+const recipe = scraped ? cleanScrapedRecipe(scraped) : null;
+
+console.log("Budget Bytes fixture, steps:");
+const steps = parseCookSteps(recipe?.instructions).map((s) => s.text);
+eq("six steps", steps.length, 6);
+eq("no step has a stray asterisk", steps.filter((s) => s.includes("*")), []);
+eq("last step", steps[5], "Add the cream cheese to the skillet in chunks, then stir until it has melted into the sauce. Top the pasta with sliced green onions and serve.");
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

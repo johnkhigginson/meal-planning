@@ -1,4 +1,6 @@
 import * as cheerio from "cheerio";
+import { cleanIngredientText } from "@/lib/ingredient-format";
+import { stripFootnoteMarkers } from "@/lib/parse-steps";
 import {
   cleanSectionName,
   formatSectionHeading,
@@ -463,6 +465,16 @@ export function extractFallback(html: string): ScrapedRecipe | null {
 // settles for the heuristic read.
 export function extractStructuredRecipe(html: string): ScrapedRecipe | null {
   return extractJsonLdRecipe(html) || extractMicrodataRecipe(html);
+}
+
+// Drops per-line prices and footnote markers before the user sees the recipe:
+// "1/2 lb. penne pasta (uncooked) ($0.75)", "Top with sliced green onions*".
+// The fetcher runs every scraped recipe through this.
+export function cleanScrapedRecipe(recipe: ScrapedRecipe): ScrapedRecipe {
+  const ingredients = recipe.ingredients
+    .map((line) => ({ ...line, text: cleanIngredientText(line.text) }))
+    .filter((line) => line.text);
+  return { ...recipe, ingredients, instructions: stripFootnoteMarkers(recipe.instructions) };
 }
 
 // The page-level entry point: structured data first, then a best-effort read of
