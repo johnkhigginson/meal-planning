@@ -239,7 +239,11 @@ eq("very large onion", imported("1 very large yellow onion sliced fairly thin"),
 eq("large potatoes", imported("3 large potatoes cut in small pieces"), [3, null, "potatoes", "large, cut in small pieces"]);
 eq("large onions chopped", imported("2 large onions chopped (diced)"), [2, null, "onions", "large, chopped, diced"]);
 eq("garlic minced", imported("3 cloves garlic minced"), [3, "clove", "garlic", "minced"]);
-eq("prep word before the noun stays", imported("1 cup shredded cheddar cheese"), [1, "cup", "shredded cheddar cheese", ""]);
+// Changed on purpose: cook's prep before the noun is a note now, the same
+// as after it, so "-1 1/2 c. shredded cheddar cheese" and this line agree.
+eq("cook's prep before the noun is a note", imported("1 cup shredded cheddar cheese"), [1, "cup", "cheddar cheese", "shredded"]);
+eq("diced tomatoes stay", imported("1 can diced tomatoes"), [1, "can", "diced tomatoes", ""]);
+eq("shredded coconut stays", imported("1 cup shredded coconut"), [1, "cup", "shredded coconut", ""]);
 eq("crushed red pepper stays", imported("1/2 tsp crushed red pepper"), [0.5, "teaspoon", "crushed red pepper", ""]);
 eq("large eggs stay", imported("3 large eggs"), [3, null, "large eggs", ""]);
 
@@ -309,6 +313,81 @@ eq("in water", imported("2 cans (4.5 ounces each) white chunk chicken breast in 
 eq("with juice", imported("1 (14.5-ounce) can diced tomatoes with juice"), [1, "can", "diced tomatoes", "14.5-ounce, with juice"]);
 eq("cut in cubes stays a prep note", imported("3 lb butternut squash cut in 3/4 inch cubes"), [3, "pound", "butternut squash", "cut in 3/4 inch cubes"]);
 eq("cream of chicken soup stays whole", imported("1 can cream of chicken soup"), [1, "can", "cream of chicken soup", ""]);
+
+console.log("Import: choices with \"or\", head nouns:");
+eq("water or chicken broth", imported("4 cups water or chicken broth"), [4, "cup", "water", "or chicken broth"]);
+eq("button or cremini mushrooms", imported("1.5 lb button or cremini mushrooms, quartered"), [1.5, "pound", "button mushrooms", "or cremini mushrooms, quartered"]);
+eq("kosher or coarse salt", imported("1.5 tsp kosher or coarse salt"), [1.5, "teaspoon", "kosher salt", "or coarse salt"]);
+eq("bittersweet or semisweet chocolate", imported("4 oz bittersweet or semisweet chocolate, chopped"), [4, "ounce", "bittersweet chocolate", "or semisweet chocolate, chopped"]);
+eq("olive or vegetable oil", imported("2 tbsp olive or vegetable oil"), [2, "tablespoon", "olive oil", "or vegetable oil"]);
+eq("apple or white grape juice", imported("1/2 cup apple or white grape juice"), [0.5, "cup", "apple juice", "or white grape juice"]);
+eq("water or orange juice stays water", imported("1 cup water or orange juice"), [1, "cup", "water", "or orange juice"]);
+eq("jar or can chili sauce", imported("1 14 oz. jar or can chili sauce, the chunkier, the better"), [1, "each", "chili sauce", "14 oz jar or can, the chunkier, the better"]);
+eq("sleeve Ritz or Town House crackers", imported("1 sleeve Ritz or Town House crackers, crumbled"), [1, "each", "Ritz crackers", "1 sleeve, or Town House crackers, crumbled"]);
+eq("chopped Vidalia or other sweet onion", imported("1 cup chopped Vidalia or other sweet onion, about 1small"), [1, "cup", "Vidalia onion", "chopped, or other sweet onion, about 1 small"]);
+eq("chopped pecans or walnuts", imported("1/2 cup chopped pecans or walnuts"), [0.5, "cup", "pecans", "chopped, or walnuts"]);
+eq("chopped chorizo or sausage", imported("1/2 cup chopped chorizo or sausage"), [0.5, "cup", "chorizo", "chopped, or sausage"]);
+eq("grated pecorino or parmesan cheese", imported("1/4 cup grated pecorino or parmesan cheese"), [0.25, "cup", "pecorino cheese", "grated, or parmesan cheese"]);
+eq("good quality sourdough or country bread", imported("4 slices good quality sourdough or country bread"), [4, "slice", "sourdough bread", "good quality, or country bread"]);
+eq("shredded mozzarella or swiss cheese", imported("1 cup shredded mozzarella or swiss cheese"), [1, "cup", "mozzarella cheese", "shredded, or swiss cheese"]);
+eq("shredded mozzarella or pizza blend cheese", imported("1 cup shredded mozzarella or pizza blend cheese"), [1, "cup", "mozzarella cheese", "shredded, or pizza blend cheese"]);
+eq("shredded Monterey Jack or Cheddar Jack cheese", imported("1.5 cups shredded Monterey Jack or Cheddar Jack cheese"), [1.5, "cup", "Monterey Jack cheese", "shredded, or Cheddar Jack cheese"]);
+eq("finely ground rolled oats or fine bread crumbs", imported("1/2 cup finely ground rolled oats or fine bread crumbs"), [0.5, "cup", "rolled oats", "finely ground, or fine bread crumbs"]);
+eq("zest from one lemon or orange", imported("1 zest from one lemon or orange, for topping"), [1, null, "lemon zest", "from one lemon, or orange, for topping"]);
+eq("Tortillas or taco shells, for serving", imported("1 Tortillas or taco shells, for serving"), [1, null, "Tortillas", "or taco shells, for serving"]);
+eq("grated sharp cheddar or 1/2 cup grated Parmesan", imported("1/4 cup grated sharp cheddar or 1/2 cup grated Parmesan cheese"), [0.25, "cup", "sharp cheddar", "grated, or 1/2 cup grated Parmesan cheese"]);
+
+console.log("Import: a dash and a second amount (saved apart by older imports):");
+eq("1 -1/2 lbs. ground beef", fragmentLine("1 -1/2 lbs. ground beef"), [1.5, "pound", "ground beef", "", 1]);
+eq("2 -1/2 cups Monterey Jack Cheese, Grated", fragmentLine("2 -1/2 cups Monterey Jack Cheese, Grated"), [2.5, "cup", "Monterey Jack Cheese", "grated", 1]);
+eq("1 - 1/2 C whipped cream", fragmentLine("1 - 1/2 C whipped cream"), [1.5, "cup", "whipped cream", "", 1]);
+eq("1 -1/4 cups (2-1/2 sticks) butter", fragmentLine("1 -1/4 cups (2-1/2 sticks) butter, softened"), [1.25, "cup", "butter", "2 1/2 sticks, softened", 1]);
+eq("1 -1/2 cups chopped onion", fragmentLine("1 -1/2 cups chopped onion"), [1.5, "cup", "onion", "chopped", 1]);
+eq("2 -1/4 cups packed brown sugar", fragmentLine("2 -1/4 cups packed brown sugar"), [2.25, "cup", "brown sugar", "packed", 1]);
+eq("mixed number doubt reads as a question", parseIngredientText("1 -1/2 lbs. ground beef", lookup)?.doubts, ['Read "1 -1/2" as 1 1/2 lb?']);
+eq("0.25 - 1/2 cup is a range", fragmentLine("0.25 - 1/2 cup shredded Monterey jack cheese"), [0.5, "cup", "Monterey jack cheese", "1/4 to 1/2 cup, shredded", 0]);
+eq("2 \u2013 8 ounce pkg", fragmentLine("2 \u2013 8 ounce pkg cream cheese at room temperature"), [2, "package", "cream cheese", "8 oz, at room temperature", 0]);
+eq("2 - 8 ounce pkgs.", fragmentLine("2 - 8 ounce pkgs. cream cheese, softened"), [2, "package", "cream cheese", "8 oz, softened", 0]);
+eq("1 -10-oz. pkg.", fragmentLine("1 -10-oz. pkg. REESE'S Peanut Butter Chips"), [1, "package", "REESE'S Peanut Butter Chips", "10 oz", 0]);
+eq("0.5 -10-oz. pkg. asks", fragmentLine("0.5 -10-oz. pkg. REESE'S Peanut Butter Chips"), [0.5, "package", "REESE'S Peanut Butter Chips", "10 oz", 1]);
+eq("1 - 14 ounce can", fragmentLine("1 - 14 ounce can sweetened condensed milk"), [1, "can", "sweetened condensed milk", "14 oz", 0]);
+eq("1 -16 oz is one container", fragmentLine("1 -16 oz sour cream"), [16, "ounce", "sour cream", "", 1]);
+eq("1 cup -1 1/2 c.", fragmentLine("1 cup -1 1/2 c. shredded cheddar cheese"), [1.5, "cup", "cheddar cheese", "1 to 1 1/2 cups, shredded", 0]);
+eq("2 cup -2 cups, shredded", fragmentLine("2 cup -2 cups shredded mozzarella cheese, shredded"), [2, "cup", "mozzarella cheese", "shredded", 0]);
+eq("2.5 cup -3 cups", fragmentLine("2.5 cup -3 cups quick oats"), [3, "cup", "quick oats", "2 1/2 to 3 cups", 0]);
+eq("4 -6 slices bacon cooked and crumbled", fragmentLine("4 -6 slices bacon cooked and crumbled"), [6, "slice", "bacon", "4 to 6 slices, cooked and crumbled", 0]);
+eq("4 -6 cooked and cubed chicken breast", fragmentLine("4 -6 cooked and cubed chicken breast"), [6, null, "cooked chicken breast", "4 to 6, cubed", 0]);
+eq("4 -5 stalks of celery", fragmentLine("4 -5 stalks of celery, sliced"), [5, "each", "celery", "4 to 5 stalks, sliced", 0]);
+eq("0.5 - 1 stick of butter", fragmentLine("0.5 - 1 stick of butter, 1/4-1/2 cup"), [1, "each", "butter", "1/2 to 1 stick, 1/4-1/2 cup", 0]);
+eq("list with etc. keeps the name's word", imported("4 -5 cups milk, or combination of cream, milk, etc."), [5, "cup", "milk", "4 to 5 cups, or combination of cream, milk, etc."]);
+
+console.log("Import: T. is a tablespoon, t. a teaspoon:");
+eq("-4 T. milk", imported("2 -4 T. milk, for frosting"), [4, "tablespoon", "milk", "2 to 4 tbsp, for frosting"]);
+eq("-2 T. margarine", imported("1 -2 T. margarine or butter, melted"), [2, "tablespoon", "margarine", "1 to 2 tbsp, or butter, melted"]);
+eq("-6 T. cocoa", imported("5 -6 T. cocoa"), [6, "tablespoon", "cocoa", "5 to 6 tbsp"]);
+eq("-5 T. whipping cream", imported("4 -5 T. whipping cream, for icing"), [5, "tablespoon", "whipping cream", "4 to 5 tbsp, for icing"]);
+eq("-4 T. Salad Supreme", imported("2 -4 T. Salad Supreme"), [4, "tablespoon", "Salad Supreme", "2 to 4 tbsp"]);
+eq("-3 t. grated orange peel", imported("2 -3 t. grated orange peel"), [3, "teaspoon", "orange peel", "2 to 3 tsp, grated"]);
+eq("2 T butter, no range", imported("2 T butter"), [2, "tablespoon", "butter", ""]);
+eq("1 t salt", imported("1 t salt"), [1, "teaspoon", "salt", ""]);
+eq("3 C flour", imported("3 C flour"), [3, "cup", "flour", ""]);
+eq("T. on display", formatIngredientText("2 T. butter"), "2 tbsp butter");
+
+console.log("Import: containers after a weight or volume:");
+eq("6 ounce package feta cheese", imported("6 ounce package feta cheese, crumbled"), [6, "ounce", "feta cheese", "package, crumbled"]);
+eq("12 ounce can of salsa", imported("12 ounce can of salsa"), [12, "ounce", "salsa", "can"]);
+eq("12 ounce box jumbo shells pasta", imported("12 ounce box jumbo shells pasta"), [12, "ounce", "jumbo shells pasta", "box"]);
+eq("36 ounce (28 oz) can crushed tomatoes", imported("36 ounce (28 oz) can crushed tomatoes"), [36, "ounce", "crushed tomatoes", "28 oz can"]);
+eq("3 cup (1/4-inch-thick) slices small zucchini", imported("3 cup (1/4-inch-thick) slices small zucchini"), [3, "cup", "zucchini", "1/4-inch-thick slices, small"]);
+
+console.log("Import: other shapes from the second run:");
+eq("whole Eggs Beaten", imported("3 whole Eggs Beaten"), [3, null, "Eggs", "whole, beaten"]);
+eq("Soy Sauce Or More To Taste", imported("2 tbsp Soy Sauce Or More To Taste"), [2, "tablespoon", "Soy Sauce", "or more to taste"]);
+eq("peeled and cut in cubes before the noun", imported("3 lb (about 5 cups) peeled and cut in 3/4 inch cubes butternut squash"), [3, "pound", "butternut squash", "about 5 cups, peeled and cut in 3/4 inch cubes"]);
+eq("cooked and shredded chicken", imported("2 cups cooked and shredded chicken"), [2, "cup", "cooked chicken", "shredded"]);
+eq("cooked and cut up chicken breast", imported("2 cups cooked and cut up chicken breast"), [2, "cup", "cooked chicken breast", "cut up"]);
+eq("cooked diced chicken", imported("2 cups cooked diced chicken"), [2, "cup", "cooked chicken", "diced"]);
+eq("cooked and crumbled bacon", imported("1/2 cup cooked and crumbled bacon"), [0.5, "cup", "cooked bacon", "crumbled"]);
 
 console.log("Matching a name to the Ingredient table:");
 const rows = [
