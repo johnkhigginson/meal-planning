@@ -108,13 +108,20 @@ instead, so both need to point at the same database.
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Support address shown on /contact, /privacy and /terms; omit to hide it |
 | `NEXT_PUBLIC_GA_ID` | no | Google Analytics 4 measurement ID; omit to disable analytics |
 | `GEMINI_API_KEY` | no | Enables photo recipe parsing, receipt scanning, ingredient extraction |
-| `AI_LIMIT_PER_MIN` | no | Per-user AI calls per minute (default 10) |
-| `AI_LIMIT_PER_DAY` | no | Per-user AI calls per day (default 200) |
+| `AI_LIMIT_PER_MIN` | no | Per-user AI calls per minute, per feature (default 10) |
+| `AI_DAILY_LIMIT_PER_USER` | no | AI calls per user per UTC day (default 50; 0 turns AI off; admins are exempt) |
+| `AI_DAILY_LIMIT_GLOBAL` | no | AI calls across all users per UTC day (default 1000; 0 turns AI off) |
 | `POSTMARK_API_KEY` | no | Enables invite, collaboration, and blog follower email |
 | `KROGER_CLIENT_ID` | no | Kroger API client ID for product and price lookups |
 | `KROGER_CLIENT_SECRET` | no | Kroger API client secret |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | no | Cloudflare Turnstile site key |
 | `TURNSTILE_SECRET_KEY` | no | Cloudflare Turnstile secret key |
+
+The daily AI caps count in memory and reset at midnight UTC. They also reset
+whenever the app restarts, since the app runs as one process with no shared
+store. When a cap is hit, AI endpoints return HTTP 429 with a message the UI
+shows as is. The caps are a guard against runaway use, so keep a budget alert
+in Google Cloud as well.
 
 Optional features degrade rather than crash when their keys are absent, except
 the Kroger client, which throws if only one of its two values is set. Leaving

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { AiBudget, secondsUntilUtcMidnight } from "@/lib/ai-budget";
 
 // Single source of truth for the Gemini model. Every AI call site imports this,
 // so switching models is a one-line change.
@@ -11,26 +12,43 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 // October 2026), with 3.1-flash-lite as its named replacement.
 export const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
-// Per-user limits. The burst window stops a runaway client loop or a single user
-// hammering an endpoint; the daily cap is the real cost ceiling. Both are
-// tunable per environment without a code change.
+// Per-user burst limit. It stops a runaway client loop or a single user
+// hammering one endpoint. The daily caps (per user and global) are the real
+// cost ceiling and live in the shared AI budget below.
 const PER_MIN = Number(process.env.AI_LIMIT_PER_MIN ?? 10);
-const PER_DAY = Number(process.env.AI_LIMIT_PER_DAY ?? 200);
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-type AiGuard = { ok: true; userId: number } | { ok: false; response: NextResponse };
+// One budget for the whole process. Limits are read from the environment on
+// every check, so AI_DAILY_LIMIT_PER_USER and AI_DAILY_LIMIT_GLOBAL apply
+// without a code change. See src/lib/ai-budget.ts for the day boundary (UTC)
+// and the restart caveat.
+const budget = new AiBudget();
+
+function budgetResponse(message: string, reason: string): NextResponse {
+  return NextResponse.json(
+    { error: message, code: reason === "disabled" ? "ai_disabled" : "ai_daily_limit" },
+    { status: 429, headers: { "Retry-After": String(secondsUntilUtcMidnight(new Date())) } }
+  );
+}
+
+// Count one model call against the daily caps. Routes that make several model
+// calls per request (the batch extractor) call this before each one; it
+// returns a 429 response when a cap is hit, or null to proceed.
+export function consumeAiCall(userId: number, isAdmin: boolean): NextResponse | null {
+  const result = budget.consume(userId, { exemptFromUserCap: isAdmin });
+  return result.ok ? null : budgetResponse(result.message, result.reason);
+}
+
+type AiGuard = { ok: true; userId: number; isAdmin: boolean } | { ok: false; response: NextResponse };
 
 // Gate for every AI-backed endpoint: the caller must be signed in, must have AI
-// enabled on their account (admin-controlled), and must be within both the burst
-// and daily request budgets.
-//
-// NOTE: the counters live in the in-memory rate limiter, so they reset when the
-// process restarts (i.e. on deploy). That makes the daily cap a strong guard
-// against runaway usage rather than a hard billing guarantee — set a spend cap in
-// Google Cloud too if you want an absolute ceiling.
+// enabled on their account (admin-controlled), must be within the burst limit,
+// and must be within the daily caps. A guarded request counts as one AI call
+// unless the caller passes { countLater: true } and calls consumeAiCall itself
+// before each model call. Admins skip the per-user daily cap but not the
+// global one.
 export async function guardAi(
   scope: string,
-  opts?: { perMin?: number; perDay?: number }
+  opts?: { perMin?: number; countLater?: boolean }
 ): Promise<AiGuard> {
   const user = await getCurrentUser();
   if (!user) {
@@ -51,14 +69,14 @@ export async function guardAi(
     };
   }
 
-  // Burst limit is per-feature so one endpoint can't starve another...
+  // Burst limit is per-feature so one endpoint can't starve another.
   const burst = enforceRateLimit(`${scope}:min`, user.userId, opts?.perMin ?? PER_MIN, 60_000);
   if (burst) return { ok: false, response: burst };
 
-  // ...while the daily budget is shared across every AI feature, so the cap is
-  // "this person's total AI usage today", not per-endpoint.
-  const daily = enforceRateLimit("ai:day", user.userId, opts?.perDay ?? PER_DAY, DAY_MS);
-  if (daily) return { ok: false, response: daily };
+  if (!opts?.countLater) {
+    const daily = consumeAiCall(user.userId, user.isAdmin);
+    if (daily) return { ok: false, response: daily };
+  }
 
-  return { ok: true, userId: user.userId };
+  return { ok: true, userId: user.userId, isAdmin: user.isAdmin };
 }

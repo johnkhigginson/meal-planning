@@ -168,6 +168,11 @@ export default function MigratePage() {
           trackEvent(mode === "ai" ? "ai_extraction" : "heuristic_extraction", { total: processedTotal });
           break;
         }
+        // Our own daily AI cap was reached partway through the batch.
+        if (d.aiLimitMessage) {
+          setAiError(d.aiLimitMessage);
+          break;
+        }
         // Quota hit (AI mode) — billing/daily-cap issue, not transient.
         if (d.quotaExceeded) {
           setAiError(

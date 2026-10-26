@@ -132,7 +132,10 @@ export default function RecipesPage() {
                   setImportResult(`Imported ${data.imported} recipe${data.imported !== 1 ? "s" : ""}`);
                   fetchRecipes();
                 } else {
-                  setImportResult("Import failed");
+                  // Show the server's reason (the daily AI limit, a file that's
+                  // too large) instead of a bare failure.
+                  const data = await res.json().catch(() => null);
+                  setImportResult(data?.error || "Import failed");
                 }
                 setImportingDoc(false);
                 e.target.value = "";

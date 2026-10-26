@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { htmlToText, extractRecipeSections } from "@/lib/blogger";
 import { extractRecipeFromText, isAiConfigured, isQuotaError, isDailyQuotaError } from "@/lib/recipe-ai";
 import { parseIngredientLines } from "@/lib/ingredient-parse";
-import { guardAi } from "@/lib/ai";
+import { consumeAiCall, guardAi } from "@/lib/ai";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -37,10 +37,14 @@ export async function POST(request: NextRequest) {
   // This route is the heaviest AI consumer (a batch of model calls per request,
   // looped by the client), so it gets the same account toggle and budget as the
   // rest. The burst allowance is higher because the client drives it in a loop.
-  // "heuristic" mode makes no model calls, so it's exempt.
+  // Each model call counts against the global daily cap on its own (below), so
+  // a batch can't slip past it. "heuristic" mode makes no model calls, so it's
+  // exempt.
+  let aiUser: { userId: number; isAdmin: boolean } | null = null;
   if (mode === "ai") {
-    const guard = await guardAi("ai-extract", { perMin: 40 });
+    const guard = await guardAi("ai-extract", { perMin: 40, countLater: true });
     if (!guard.ok) return guard.response;
+    aiUser = guard;
   }
 
   // Resolve the target household (the owner's), matching the importer.
@@ -118,6 +122,7 @@ export async function POST(request: NextRequest) {
 
   let quotaExceeded = false;
   let dailyQuota = false;
+  let aiLimitMessage: string | null = null;
 
   for (const recipe of batch) {
     try {
@@ -134,6 +139,14 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      const limited = aiUser ? consumeAiCall(aiUser.userId, aiUser.isAdmin) : null;
+      if (limited) {
+        // Nothing done yet: hand back the 429 as is. Otherwise keep the
+        // progress so far and report the cap alongside it.
+        if (processed === 0) return limited;
+        aiLimitMessage = ((await limited.json()) as { error: string }).error;
+        break;
+      }
       const ai = await extractRecipeFromText(text);
       await sleep(700); // pace requests to stay under per-minute rate limits
 
@@ -188,6 +201,7 @@ export async function POST(request: NextRequest) {
     done: remaining === 0,
     quotaExceeded,
     dailyQuota,
+    aiLimitMessage,
     errors: errors.slice(0, 10),
   });
 }
