@@ -23,6 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package, ChevronDown } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -259,11 +260,48 @@ export default function PantryPage() {
     setEditingId(null);
   }
 
-  async function deleteItem(id: number) {
-    const res = await fetch(`/api/inventory/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setItems((prev) => prev.filter((i) => i.id !== id));
+  // Puts a removed item back. The add endpoint is an upsert keyed on the
+  // ingredient, so a second Undo tap or a re-added item can't make a duplicate.
+  async function restoreItem(item: PantryItem) {
+    const res = await fetch("/api/inventory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ingredientId: item.ingredientId,
+        quantity: item.quantity,
+        unitId: item.unitId,
+        ...(item.expirationDate ? { expirationDate: item.expirationDate } : {}),
+      }),
+    });
+    if (!res.ok) {
+      toast.error(`Couldn't restore ${item.ingredient.name}. Please add it again.`);
+      return;
     }
+    const restored: PantryItem = await res.json();
+    setItems((prev) =>
+      [...prev.filter((i) => i.ingredientId !== restored.ingredientId), restored].sort((a, b) =>
+        a.ingredient.name.localeCompare(b.ingredient.name)
+      )
+    );
+  }
+
+  // Removes at once, then offers a few seconds to take it back. The server
+  // delete happens right away and Undo recreates the row with the same fields,
+  // so leaving the page during the toast can never lose or resurrect an item.
+  async function deleteItem(item: PantryItem) {
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    const res = await fetch(`/api/inventory/${item.id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 404) {
+      setItems((prev) =>
+        [...prev, item].sort((a, b) => a.ingredient.name.localeCompare(b.ingredient.name))
+      );
+      toast.error(`Couldn't remove ${item.ingredient.name}. Please try again.`);
+      return;
+    }
+    toast(`Removed ${item.ingredient.name}.`, {
+      duration: 6000,
+      action: { label: "Undo", onClick: () => void restoreItem(item) },
+    });
   }
 
   // ─── Receipt handling ──────────────────────────────────────
@@ -737,7 +775,7 @@ export default function PantryPage() {
                 size="icon"
                 variant="ghost"
                 className="size-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => deleteItem(item.id)}
+                onClick={() => deleteItem(item)}
                 aria-label={`Remove ${item.ingredient.name}`}
               >
                 <Trash2 className="h-4 w-4" />
