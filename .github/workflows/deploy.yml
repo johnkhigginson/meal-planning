@@ -27,8 +27,15 @@ jobs:
           EXCLUDE: "node_modules/, .git/, .env, .env.*, .next/, .next-build/, .next-old/"
 
       # The build goes to .next-build while the live site keeps serving .next.
-      # If the build fails, the script stops and .next is untouched. On success
-      # the folders are swapped and the service restarts.
+      # If any step fails, the script exits non-zero, the job fails, and .next
+      # is untouched. On success the folders are swapped and the service
+      # restarts.
+      #
+      # appleboy/ssh-action@v1 has no script_stop input, so the script must
+      # fail fast on its own. The action hands the script to the remote user's
+      # login shell, which may not be bash, so the body runs in an explicit
+      # bash with -euo pipefail. The quoted 'SCRIPT' delimiter stops the outer
+      # shell from expanding anything; bash does all expansion.
       #
       # Renaming .next-build to .next is safe on Next 16.2. The build bakes
       # distDir ".next-build" into its route modules, but on each request
@@ -44,10 +51,18 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
           script: |
+            bash -euo pipefail <<'SCRIPT'
+            set -euo pipefail
+
+            # nvm is optional. An `if` keeps a missing nvm from tripping set -e,
+            # and nvm.sh reads unset variables, so set -u is paused while it loads.
             export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              set +u
+              . "$NVM_DIR/nvm.sh"
+              set -u
+            fi
 
             cd /var/www/mylemonkitchen.com
 
@@ -63,3 +78,4 @@ jobs:
             mv .next-build .next
             sudo systemctl restart meal-planning
             rm -rf .next-old
+            SCRIPT
