@@ -8,7 +8,7 @@ import { RecipeCard } from "@/components/recipes/RecipeCard";
 import { RecipeFilters } from "@/components/recipes/RecipeFilters";
 import { Plus, Upload, Loader2, UtensilsCrossed } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
-import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Tag {
   id: number;
@@ -103,6 +103,10 @@ export default function RecipesPage() {
     );
   }
 
+  // An empty result with a search or filter on means "no match", not "no
+  // recipes".
+  const filtering = Boolean(search) || sourceType !== "ALL" || selectedTagIds.length > 0 || favoritesOnly;
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -185,18 +189,26 @@ export default function RecipesPage() {
 
       {loading ? (
         <PageLoader />
+      ) : recipes.length === 0 && filtering ? (
+        <EmptyState
+          icon={UtensilsCrossed}
+          title="No recipes match"
+          description="Try a different search or clear a filter."
+        />
       ) : recipes.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-3xl border bg-card px-6 py-14 text-center">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
-            <UtensilsCrossed className="h-6 w-6" />
-          </div>
-          <p className="font-heading text-xl">No recipes found</p>
-          <p className="text-sm text-muted-foreground">Try adjusting your filters or add a new recipe.</p>
-          <Link href="/recipes/new" className={cn(buttonVariants(), "mt-1")}>
+        <EmptyState
+          icon={UtensilsCrossed}
+          title="No recipes yet"
+          description="This is your recipe box: everything you cook, ready to plan meals and build grocery lists from."
+        >
+          <Link href="/recipes/new" className={buttonVariants({ size: "lg" })}>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Add recipe
+            Add your first recipe
           </Link>
-        </div>
+          <Link href="/recipes/library" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            Browse library
+          </Link>
+        </EmptyState>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">

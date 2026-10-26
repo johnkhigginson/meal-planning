@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Plus, Trash2, Star, Loader2, ArrowRight, Store as StoreIcon } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Store {
   id: number;
@@ -22,6 +23,7 @@ export default function StoresPage() {
   const [newName, setNewName] = useState("");
   const [libraryStores, setLibraryStores] = useState<{ id: number; name: string }[]>([]);
   const [addingLibId, setAddingLibId] = useState<number | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([
@@ -97,6 +99,7 @@ export default function StoresPage() {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
+          ref={nameRef}
           placeholder="Store name"
           aria-label="Store name"
           value={newName}
@@ -148,13 +151,17 @@ export default function StoresPage() {
         ))}
 
         {stores.length === 0 && (
-          <div className="col-span-full flex flex-col items-center gap-3 rounded-3xl border-[1.5px] border-dashed border-input px-6 py-12 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
-              <StoreIcon className="h-6 w-6" />
-            </div>
-            <p className="font-heading text-xl">No stores added yet</p>
-            <p className="text-muted-foreground">Add a store to start tracking prices.</p>
-          </div>
+          <EmptyState
+            icon={StoreIcon}
+            title="No stores yet"
+            description="Add the stores you shop at to track their prices, so your grocery list can show where each item costs least."
+            className="col-span-full"
+          >
+            <Button size="lg" onClick={() => nameRef.current?.focus()}>
+              <Plus className="h-4 w-4" />
+              Add your first store
+            </Button>
+          </EmptyState>
         )}
       </div>
 

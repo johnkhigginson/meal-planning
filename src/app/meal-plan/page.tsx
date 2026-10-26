@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
 import { SLOT_LABELS, addMealToPlan, formatDate, getMonday, parseDate } from "@/lib/meal-plan";
-import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2, Move } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, ShoppingCart, Loader2, Move, CalendarDays } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 const ALL_MEAL_SLOTS = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"] as const;
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -110,6 +111,11 @@ export default function MealPlanPage() {
     d.setDate(d.getDate() + i);
     return d;
   });
+
+  // The empty-week button starts with today's dinner, or the first day shown
+  // when this isn't the current week, using a meal slot that's switched on.
+  const firstPlanDay = weekDates.find(isToday) ?? weekDates[0];
+  const firstPlanSlot: string = enabledSlots.includes("DINNER") ? "DINNER" : (enabledSlots[0] ?? "DINNER");
 
   const activeSlots = ALL_MEAL_SLOTS.filter((s) => enabledSlots.includes(s));
 
@@ -320,6 +326,22 @@ export default function MealPlanPage() {
         </div>
       ) : (
         <>
+          {/* Empty week: say what the page is for and offer the first step.
+              The grid stays below so any slot can still be picked. */}
+          {plan && plan.entries.length === 0 && (
+            <EmptyState
+              icon={CalendarDays}
+              title="Nothing planned this week"
+              description="Pick what to cook each day. Meals with a recipe go straight into your grocery list."
+              className="py-8"
+            >
+              <Button size="lg" onClick={() => openPicker(formatDate(firstPlanDay), firstPlanSlot)}>
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                Plan {SLOT_LABELS[firstPlanSlot].toLowerCase()} for {firstPlanDay.toLocaleDateString("en-US", { weekday: "long" })}
+              </Button>
+            </EmptyState>
+          )}
+
           {/* Desktop grid, from 1024px. Below that the side rail leaves too
               little width for seven columns, so tablets get the day cards. */}
           <div className="hidden overflow-x-auto rounded-3xl border bg-card p-5 lg:block">

@@ -473,6 +473,13 @@ function GroceryListContent() {
           <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
             <ShoppingCart className="h-6 w-6" />
           </div>
+          {/* First visit: say what the page is for. */}
+          {lists?.length === 0 && (
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Your grocery list adds up what you need for the meals you plan and shows what is
+              already in your pantry. You can also keep a list by hand.
+            </p>
+          )}
           {currentPlan ? (
             <>
               <p className="font-heading text-xl">
