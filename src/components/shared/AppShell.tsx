@@ -1,21 +1,32 @@
 "use client";
 
+import { useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Navbar } from "./Navbar";
-import { MobileNav } from "./MobileNav";
 import { PageLoader } from "./PageLoader";
-import { ImpersonationBanner } from "./ImpersonationBanner";
-import { EmailVerificationBanner } from "./EmailVerificationBanner";
+import { isAuthPage } from "@/lib/nav";
 
-const authPages = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
+// The app chrome loads in its own chunks, so pages that never show it (sign-in,
+// sign-up, the landing page, the blog) don't download it. These are rendered
+// only after the session loads on the client, so nothing is lost from the
+// server HTML.
+const loadNavbar = () => import("./Navbar").then((m) => m.Navbar);
+const loadMobileNav = () => import("./MobileNav").then((m) => m.MobileNav);
+const Navbar = dynamic(loadNavbar);
+const MobileNav = dynamic(loadMobileNav);
+const ImpersonationBanner = dynamic(() => import("./ImpersonationBanner").then((m) => m.ImpersonationBanner));
+const EmailVerificationBanner = dynamic(() =>
+  import("./EmailVerificationBanner").then((m) => m.EmailVerificationBanner)
+);
+
 const publicPages = ["/privacy", "/terms", "/contact"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
 
-  const isAuthPage = authPages.includes(pathname);
+  const onAuthPage = isAuthPage(pathname);
   const isLandingPage = pathname === "/";
   // The public blog is fully standalone: no app chrome for anyone (including
   // logged-in users), and it must render immediately without the session
@@ -26,12 +37,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPublicPage = publicPages.includes(pathname);
   const isStandalone = isBlog || isPublicPage;
 
+  // On app pages, fetch the nav chunks while the session is still loading
+  // instead of after it.
+  const wantsNav = !onAuthPage && !isStandalone;
+  useEffect(() => {
+    if (wantsNav) {
+      loadNavbar();
+      loadMobileNav();
+    }
+  }, [wantsNav]);
+
   // Don't show loading spinner on public pages
-  if (status === "loading" && !isAuthPage && !isLandingPage && !isStandalone) {
+  if (status === "loading" && !onAuthPage && !isLandingPage && !isStandalone) {
     return <PageLoader />;
   }
 
-  const showNav = session && !isAuthPage && !isStandalone && !(isLandingPage && !session);
+  const showNav = session && wantsNav && !(isLandingPage && !session);
 
   if (!showNav) {
     return (

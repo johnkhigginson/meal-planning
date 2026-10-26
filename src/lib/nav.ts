@@ -18,3 +18,11 @@ export function parseHiddenNav(value: string | null | undefined): Set<string> {
       .filter(Boolean)
   );
 }
+
+// Sign-in, sign-up and password pages. They render without the app chrome and
+// skip the service worker, and analytics loads late on them.
+export const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
+
+export function isAuthPage(pathname: string): boolean {
+  return AUTH_PAGES.includes(pathname);
+}
