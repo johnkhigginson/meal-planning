@@ -13,11 +13,13 @@
 //   npx tsx scripts/cleanup-ingredients-preview.ts --out <dir>
 //   npx tsx scripts/cleanup-ingredients-preview.ts --self-test [--out <dir>]   (no database)
 //   npx tsx scripts/cleanup-ingredients-preview.ts --from-csv <proposed-changes.csv> [--out <dir>]   (no database)
+//
+// scripts/cleanup-ingredients-apply.ts imports the analysis from here. The
+// CLI below only runs when this file is the one run.
 
-import "dotenv/config";
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   cleanIngredientName,
   cleanIngredientText,
@@ -30,23 +32,35 @@ import {
   tidyIngredientNote,
 } from "../src/lib/ingredient-format";
 
+// Packages resolve from this file's folder, then from the app it is run
+// from (the current directory), so a copy outside the app still finds them.
+export function appRequire(name: string): unknown {
+  try {
+    return createRequire(import.meta.url)(name);
+  } catch {
+    return createRequire(join(process.cwd(), "package.json"))(name);
+  }
+}
+// The app's .env, as `import "dotenv/config"` loads it.
+appRequire("dotenv/config");
+
 // ─── Rows as loaded ─────────────────────────────────────────────
 
-interface UnitRow { id: number; name: string; abbreviation: string; unitType: string }
-interface IngredientRow { id: number; name: string }
-interface RecipeRow { id: number; householdId: number; name: string }
-interface LibraryRecipeRow { id: number; name: string }
+export interface UnitRow { id: number; name: string; abbreviation: string; unitType: string }
+export interface IngredientRow { id: number; name: string }
+export interface RecipeRow { id: number; householdId: number; name: string }
+export interface LibraryRecipeRow { id: number; name: string }
 // RecipeIngredient and LibraryRecipeIngredient; recipeId is libraryRecipeId
 // for the library table.
-interface LineRow { id: number; recipeId: number; ingredientId: number; quantity: number; unitId: number; notes: string | null }
-interface GroceryListRow { id: number; householdId: number; mealPlanId: number | null; name: string }
-interface GroceryItemRow { id: number; groceryListId: number; ingredientId: number; quantity: number; unitId: number }
-interface InventoryRow { id: number; householdId: number; ingredientId: number; quantity: number; unitId: number }
-interface StorePriceRow { id: number; storeId: number; ingredientId: number; quantity: number; unitId: number }
-interface MealPlanRow { id: number; householdId: number; weekStartDate: Date }
-interface MealPlanEntryRow { mealPlanId: number; recipeId: number | null }
+export interface LineRow { id: number; recipeId: number; ingredientId: number; quantity: number; unitId: number; notes: string | null }
+export interface GroceryListRow { id: number; householdId: number; mealPlanId: number | null; name: string }
+export interface GroceryItemRow { id: number; groceryListId: number; ingredientId: number; quantity: number; unitId: number }
+export interface InventoryRow { id: number; householdId: number; ingredientId: number; quantity: number; unitId: number }
+export interface StorePriceRow { id: number; storeId: number; ingredientId: number; quantity: number; unitId: number }
+export interface MealPlanRow { id: number; householdId: number; weekStartDate: Date }
+export interface MealPlanEntryRow { mealPlanId: number; recipeId: number | null }
 
-interface Snapshot {
+export interface Snapshot {
   units: UnitRow[];
   ingredients: IngredientRow[];
   recipes: RecipeRow[];
@@ -96,7 +110,7 @@ interface MssqlModule {
 
 // Every query the script runs. Ids only for households; no emails or names
 // of people.
-const QUERIES = {
+export const QUERIES = {
   snapshotState: "SELECT snapshot_isolation_state AS snapshot FROM sys.databases WHERE name = DB_NAME()",
   units: "SELECT id, name, abbreviation, unitType FROM [Unit]",
   ingredients: "SELECT id, name FROM [Ingredient]",
@@ -115,17 +129,42 @@ const QUERIES = {
 
 interface LoadResult { snapshot: Snapshot; isolation: string }
 
-async function loadSnapshot(): Promise<LoadResult> {
-  const mssql = createRequire(import.meta.url)("mssql") as MssqlModule;
-  // Same settings as src/lib/prisma.ts, plus read-only intent.
-  const pool = new mssql.ConnectionPool({
+// Same settings as src/lib/prisma.ts. The preview always asks for read-only
+// intent; the apply script asks for it on a dry run.
+export function connectionConfig(readOnlyIntent: boolean): object {
+  return {
     server: process.env.DB_HOST!,
     port: parseInt(process.env.DB_PORT || "1433", 10),
     database: process.env.DB_NAME!,
     user: process.env.DB_USER!,
     password: process.env.DB_PASSWORD!,
-    options: { encrypt: true, trustServerCertificate: true, readOnlyIntent: true },
-  });
+    options: { encrypt: true, trustServerCertificate: true, ...(readOnlyIntent ? { readOnlyIntent: true } : {}) },
+  };
+}
+
+// Every table the analysis reads, through the caller's read function, in
+// the order the preview has always read them.
+export async function readSnapshot(read: <T>(sql: string) => Promise<T[]>): Promise<Snapshot> {
+  return {
+    units: await read(QUERIES.units),
+    ingredients: await read(QUERIES.ingredients),
+    recipes: await read(QUERIES.recipes),
+    recipeLines: await read(QUERIES.recipeLines),
+    libraryRecipes: await read(QUERIES.libraryRecipes),
+    libraryLines: await read(QUERIES.libraryLines),
+    groceryLists: await read(QUERIES.groceryLists),
+    groceryItems: await read(QUERIES.groceryItems),
+    inventory: await read(QUERIES.inventory),
+    storePrices: await read(QUERIES.storePrices),
+    mealPlans: await read(QUERIES.mealPlans),
+    mealPlanEntries: await read(QUERIES.mealPlanEntries),
+  };
+}
+
+async function loadSnapshot(): Promise<LoadResult> {
+  const mssql = appRequire("mssql") as MssqlModule;
+  // Same settings as src/lib/prisma.ts, plus read-only intent.
+  const pool = new mssql.ConnectionPool(connectionConfig(true));
   await pool.connect();
   let tx: SqlTransaction | null = null;
   try {
@@ -142,20 +181,7 @@ async function loadSnapshot(): Promise<LoadResult> {
     await tx.begin(snapshotOn ? mssql.ISOLATION_LEVEL.SNAPSHOT : mssql.ISOLATION_LEVEL.READ_COMMITTED);
     const t = tx;
 
-    const snapshot: Snapshot = {
-      units: await read(t, QUERIES.units),
-      ingredients: await read(t, QUERIES.ingredients),
-      recipes: await read(t, QUERIES.recipes),
-      recipeLines: await read(t, QUERIES.recipeLines),
-      libraryRecipes: await read(t, QUERIES.libraryRecipes),
-      libraryLines: await read(t, QUERIES.libraryLines),
-      groceryLists: await read(t, QUERIES.groceryLists),
-      groceryItems: await read(t, QUERIES.groceryItems),
-      inventory: await read(t, QUERIES.inventory),
-      storePrices: await read(t, QUERIES.storePrices),
-      mealPlans: await read(t, QUERIES.mealPlans),
-      mealPlanEntries: await read(t, QUERIES.mealPlanEntries),
-    };
+    const snapshot = await readSnapshot((sql) => read(t, sql));
     return { snapshot, isolation };
   } finally {
     // Always rolled back, even after a clean read. Nothing was written, and
@@ -213,7 +239,7 @@ const AFTER_NOUN_DESCRIPTORS = new Set([
 const STATE_LEAD = /^(uncooked)\s+(.+)$/i;
 // "cooked rice" is its own ingredient, not "rice" with a stray word. Lines
 // keep their link; the report asks once per name.
-const COOKED_LEAD = /^cooked\s+(.+)$/i;
+export const COOKED_LEAD = /^cooked\s+(.+)$/i;
 const OF_CHOICE = /^\s*of\s+(?:your\s+)?choice$/i;
 // "Your Favorite Pie Crust Recipe": a line that points to another recipe.
 // It stays as written; the report asks.
@@ -227,7 +253,7 @@ const CONTAINER_LEAD = /^(?:package|packages|pkg|pkgs|can|cans|jar|jars|box|boxe
 // "cooked and cubed chicken breast" -> "cooked chicken breast", "cubed".
 // Null when the prep follows the noun ("cooked chicken cut into pieces");
 // that one is a line fix, not a naming question.
-function cookedTidy(name: string): { name: string; note: string } | null {
+export function cookedTidy(name: string): { name: string; note: string } | null {
   const clean = cleanIngredientName(name);
   if (!COOKED_LEAD.test(clean)) return null;
   const split = splitNameAndNote(clean);
@@ -291,7 +317,7 @@ const outsideParens = (text: string) => {
   return t;
 };
 
-type UnitLookup = (word: string) => UnitRow | null;
+export type UnitLookup = (word: string) => UnitRow | null;
 
 // A unit as the first word of a name: "teaspoon(s) baking powder", "pkg
 // cheese". One-letter words ("t", "c") are left alone unless written "c(s)".
@@ -458,13 +484,15 @@ function typoOf(a: string, b: string): boolean {
 
 // The name without stray punctuation or spacing around it: "garlic," ->
 // "garlic". A closing paren stays.
-const tidyName = (name: string) => name.replace(/\s+/g, " ").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "");
+export const tidyName = (name: string) => name.replace(/\s+/g, " ").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "");
 
 // A name with stray punctuation, read the way a line is: "“globs” liquid
 // lecithin" -> "liquid lecithin", note "globs"; "Heaping  teaspoon baking
 // soda" -> "baking soda", teaspoon, note "heaping". A leading "of" ('" of
-// oil') means the amount was lost, so it asks. Null when the parser can't
-// read it as one plain name.
+// oil') means the amount was lost, so it asks. A leading "+" adds to the
+// saved amount, so its unit is a note: "+ tsp yeast in cup lukewarm water"
+// -> "yeast", note "+ tsp, in cup lukewarm water". Null when the parser
+// can't read it as one plain name.
 interface DirtyRead { name: string; notes: string[]; unit: UnitRow | null; lost: boolean }
 function readDirtyName(name: string, lookup: UnitLookup): DirtyRead | null {
   let text = name.replace(/\s+/g, " ").trim();
@@ -474,14 +502,26 @@ function readDirtyName(name: string, lookup: UnitLookup): DirtyRead | null {
     notes.push(quoted[1].trim().toLowerCase());
     text = text.slice(quoted[0].length);
   }
+  const plus = text.startsWith("+");
   text = tidyName(text);
   const of = text.match(/^of\s+(?=\S)/i);
   if (of) text = text.slice(of[0].length);
   const parsed = text ? parseIngredientText(`1 ${text}`, lookup) : null;
   if (!parsed || parsed.quantity !== 1 || parsed.doubts.length || !parsed.name) return null;
+  let unit = parsed.unit && parsed.unit.name.toLowerCase() !== "each" ? parsed.unit : null;
+  if (plus && unit) {
+    notes.push(`+ ${text.split(/\s+/)[0]}`);
+    unit = null;
+  }
+  // "yeast in cup lukewarm water": a phrase whose amount was lost.
+  let read = parsed.name;
+  const phrase = read.match(/^(.+?)\s+(in\s+(\S+)\s+.+)$/i);
+  if (phrase && lookup(phrase[3].toLowerCase())) {
+    read = phrase[1];
+    notes.push(phrase[2]);
+  }
   if (parsed.notes) notes.push(parsed.notes);
-  const unit = parsed.unit && parsed.unit.name.toLowerCase() !== "each" ? parsed.unit : null;
-  return { name: parsed.name, notes, unit, lost: !!of };
+  return { name: read, notes, unit, lost: !!of };
 }
 
 // The filter the first count used, as LIKE patterns: '(%', '%(s)%', '%*%',
@@ -492,7 +532,7 @@ function matchesLikeFilter(name: string): boolean {
 
 // ─── Proposals ──────────────────────────────────────────────────
 
-type Category =
+export type Category =
   | "wrong_link"
   | "cooked_separate"
   | "lost_noun"
@@ -502,17 +542,17 @@ type Category =
   | "rename_ingredient"
   | "deletable_after_repoint"
   | "recipe_reference";
-type Confidence = "high" | "medium" | "low";
+export type Confidence = "high" | "medium" | "low";
 
-const CATEGORIES: Category[] = [
+export const CATEGORIES: Category[] = [
   "wrong_link", "cooked_separate", "lost_noun", "prep_in_name", "garbled_name_note", "junk_ingredient_repoint", "rename_ingredient",
   "deletable_after_repoint", "recipe_reference",
 ];
 
 // An existing Ingredient id, or a name to create. "delete" for category F.
-type Target = { id: number; name: string } | { create: string } | { delete: true };
+export type Target = { id: number; name: string } | { create: string } | { delete: true };
 
-interface Proposal {
+export interface Proposal {
   category: Category;
   confidence: Confidence;
   table: string;
@@ -532,7 +572,7 @@ function targetLabel(target: Target): string {
   return String(target.id);
 }
 
-function targetText(target: Target): string {
+export function targetText(target: Target): string {
   if ("delete" in target) return "(delete row)";
   if ("create" in target) return `${target.create} (new)`;
   return `${target.name} (#${target.id})`;
@@ -578,7 +618,7 @@ interface ListReport {
 
 interface SanityFailure { name: string; reasons: string[]; proposal: Proposal }
 
-interface Report {
+export interface Report {
   proposals: Proposal[];
   // Proposals whose proposed name failed badNameReasons.
   sanityFailures: SanityFailure[];
@@ -587,6 +627,10 @@ interface Report {
   unreferencedClean: number;
   likeFilterCount: number;
   detectorCount: number;
+  // Where a name points after the analysis, the way every proposal was
+  // matched: an existing (or renamed) row, or a name to create. For the
+  // apply script.
+  targetFor: (name: string) => Target;
 }
 
 const REF_TABLES = ["RecipeIngredient", "LibraryRecipeIngredient", "GroceryListItem", "InventoryItem", "StorePrice"] as const;
@@ -1484,6 +1528,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
     unreferencedClean,
     likeFilterCount: snap.ingredients.filter((i) => matchesLikeFilter(i.name)).length,
     detectorCount: ingredientReports.filter((r) => r.kind !== "prep_in_name").length,
+    targetFor,
   };
 }
 
@@ -1491,12 +1536,12 @@ export function analyze(snap: Snapshot, today: Date): Report {
 
 // RFC 4180: a field with a comma, quote or line break is quoted, and quotes
 // inside it are doubled.
-function csvField(value: unknown): string {
+export function csvField(value: unknown): string {
   const text = value === null || value === undefined ? "" : String(value);
   return /[",\r\n]|^\s|\s$/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function toCsv(header: string[], rows: unknown[][]): string {
+export function toCsv(header: string[], rows: unknown[][]): string {
   return [header, ...rows].map((row) => row.map(csvField).join(",")).join("\r\n") + "\r\n";
 }
 
@@ -1548,7 +1593,7 @@ function listsCsv(rows: ListReport[]): string {
   );
 }
 
-function describe(x: Proposal, side: "current" | "proposed"): string {
+export function describe(x: Proposal, side: "current" | "proposed"): string {
   if (side === "proposed" && "delete" in x.proposed.target) return "(delete row)";
   const s = x[side];
   const amount = s.quantity === null ? "" : `${s.quantity} ${s.unit} | `;
@@ -1738,7 +1783,7 @@ function readCsvObjects(path: string): Record<string, string>[] {
   return rows.map((r) => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ""])));
 }
 
-function snapshotFromCsv(path: string): Snapshot {
+export function snapshotFromCsv(path: string): Snapshot {
   const rows = readCsvObjects(path);
   const units: UnitRow[] = SEED_UNITS.map(([name, abbreviation, unitType], i) => ({ id: i + 1, name, abbreviation, unitType }));
   const unitId = (name: string) => {
@@ -1808,7 +1853,7 @@ function snapshotFromCsv(path: string): Snapshot {
 //
 // Real production lines, in memory. No database.
 
-function fixture(): Snapshot {
+export function fixture(): Snapshot {
   const unitNames: [string, string, string][] = [
     ["teaspoon", "tsp", "VOLUME"], ["tablespoon", "tbsp", "VOLUME"], ["cup", "cup", "VOLUME"],
     ["ounce", "oz", "WEIGHT"], ["pound", "lb", "WEIGHT"], ["gram", "g", "WEIGHT"],
@@ -2240,6 +2285,7 @@ function selfTest(out: string | undefined): number {
     [805, '" of oil', 1, "each", null],
     [875, "Heaping  teaspoon baking soda", 1, "each", null],
     [878, "medium yellow onion,", 1, "each", "diced"],
+    [453, "+ tsp yeast in cup lukewarm water with 1 Tbs sugar", 1.5, "tablespoon", null],
   ];
   for (const [id, name, quantity, unit, notes] of dirtyRows) {
     renameSnap.ingredients.push({ id, name });
@@ -2259,6 +2305,7 @@ function selfTest(out: string | undefined): number {
     [805, "oil", "", true],
     [875, "baking soda", "heaping", false],
     [878, "yellow onion", "medium", false],
+    [453, "yeast", "+ tsp, in cup lukewarm water, with 1 Tbs sugar", false],
   ] as [number, string, string, boolean][]) {
     const x = renameOf(id);
     const got = x ? [targetText(x.proposed.target), x.proposed.notes, x.ambiguous] : null;
@@ -2270,6 +2317,14 @@ function selfTest(out: string | undefined): number {
   check('globs line gets note "globs"', same(shownLine(lineOf(454)), [2, "tablespoon", "liquid lecithin (#454)", "globs", false]));
   check("heaping line: each -> teaspoon, note heaping, asks", same(shownLine(lineOf(875)), [1, "teaspoon", "baking soda (#875)", "heaping", true]) && lineOf(875)!.question === "Amount would change from 1 each to 1 teaspoon. OK?");
   check('onion line gets note "medium, diced"', same(shownLine(lineOf(878)), [1, "each", "yellow onion (#878)", "medium, diced", false]));
+  check("yeast line keeps 1.5 tablespoon, the rest in the note, no question", same(shownLine(lineOf(453)), [1.5, "tablespoon", "yeast (#453)", "+ tsp, in cup lukewarm water, with 1 Tbs sugar", false]));
+  // With a "yeast" row already there, the yeast line links to it.
+  const yeastSnap = fixture();
+  yeastSnap.ingredients.push({ id: 452, name: "yeast" }, { id: 453, name: "+ tsp yeast in cup lukewarm water with 1 Tbs sugar" });
+  yeastSnap.recipeLines.push({ id: 9453, recipeId: riceRecipe, ingredientId: 453, quantity: 1.5, unitId: yeastSnap.units.find((u) => u.name === "tablespoon")!.id, notes: null });
+  const yeast = analyze(yeastSnap, new Date("2026-10-26T12:00:00Z"));
+  const yeastLine = yeast.proposals.find((x) => x.table === "RecipeIngredient" && x.rowId === 9453);
+  check("yeast line links to the existing yeast row", same(shownLine(yeastLine), [1.5, "tablespoon", "yeast (#452)", "+ tsp, in cup lukewarm water, with 1 Tbs sugar", false]) && yeast.proposals.some((x) => x.category === "deletable_after_repoint" && x.rowId === 453));
   check("renamed dirty rows are not deleted", !renamed.proposals.some((x) => x.category === "deletable_after_repoint" && dirtyRows.some(([id]) => id === x.rowId)));
   // With a "yellow onion" row already there, the dirty row is junk: its
   // line repoints with the note and the row goes.
@@ -2354,8 +2409,11 @@ async function main() {
   for (const path of paths) console.log(path);
 }
 
-main().catch((err: unknown) => {
-  // The message only; the config holding the password is never printed.
-  console.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
-  process.exitCode = 1;
-});
+// Only when run, not when the apply script imports this file.
+if (/^cleanup-ingredients-preview(?:\.ts)?$/.test(basename(process.argv[1] ?? ""))) {
+  main().catch((err: unknown) => {
+    // The message only; the config holding the password is never printed.
+    console.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
+  });
+}
