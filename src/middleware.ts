@@ -15,6 +15,23 @@ const publicPaths = [
   "/contact",
 ];
 
+// Top-level sections of the signed-in app. A signed-out request for anything
+// else (a mistyped or made-up URL) gets the 404 page rather than a redirect to
+// /login, so crawlers see a real 404. A section missing from this list fails
+// closed: signed-out visitors get a 404 instead of the login redirect.
+const appSections = [
+  "admin",
+  "api",
+  "books",
+  "grocery-list",
+  "meal-plan",
+  "pantry",
+  "recipes",
+  "settings",
+  "stores",
+  "what-can-i-make",
+];
+
 const authMiddleware = auth((req) => {
   const { pathname } = req.nextUrl;
 
@@ -39,6 +56,12 @@ const authMiddleware = auth((req) => {
 
   // Redirect to login if not authenticated
   if (!req.auth) {
+    const section = pathname.split("/")[1];
+    // Paths with a file extension may be files in public/, so they keep the
+    // login redirect.
+    if (!appSections.includes(section) && !section.includes(".")) {
+      return NextResponse.rewrite(new URL("/404", req.nextUrl.origin));
+    }
     const loginUrl = new URL("/login", req.nextUrl.origin);
     return NextResponse.redirect(loginUrl);
   }

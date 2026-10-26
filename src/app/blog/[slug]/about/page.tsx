@@ -14,7 +14,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
   const data = await getPublishedBookAuthors(slug);
-  if (!data) return { title: "Not found" };
+  if (!data) notFound();
   return {
     title: `About — ${data.book.name}`,
     alternates: { canonical: `${getSiteUrl()}/blog/${slug}/about` },

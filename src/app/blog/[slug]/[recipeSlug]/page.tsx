@@ -27,7 +27,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { slug, recipeSlug } = await params;
   const data = await getPublishedRecipe(slug, recipeSlug);
-  if (!data) return { title: "Not found" };
+  if (!data) notFound();
 
   const { recipe } = data;
   const url = `${getSiteUrl()}/blog/${slug}/${recipe.slug ?? recipe.id}`;

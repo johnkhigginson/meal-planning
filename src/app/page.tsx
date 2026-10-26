@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { Dashboard } from "@/components/shared/Dashboard";
 import { LandingPage } from "@/components/shared/LandingPage";
+import { PageLoader } from "@/components/shared/PageLoader";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -26,5 +28,12 @@ export default async function HomePage() {
     return <LandingPage />;
   }
 
-  return <Dashboard userId={user.userId} householdId={user.householdId} name={user.name} />;
+  // The dashboard's queries stream in behind a spinner. This page has its own
+  // boundary because a root loading.tsx would also wrap the public routes and
+  // turn their notFound() into a 200.
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Dashboard userId={user.userId} householdId={user.householdId} name={user.name} />
+    </Suspense>
+  );
 }

@@ -17,7 +17,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
   const book = await getPublishedBookBySlug(slug);
-  if (!book) return { title: "Not found" };
+  if (!book) notFound();
 
   // Fall back to the site default image (app/opengraph-image.tsx).
   const cover =
