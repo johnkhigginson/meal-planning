@@ -1,7 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeImportedIngredients } from "@/lib/recipe-sections";
 import { guessIngredientCategory } from "@/lib/ingredient-category";
-import { cleanIngredientName, cleanIngredientNote, cleanIngredientText } from "@/lib/ingredient-format";
+import {
+  cleanIngredientName,
+  cleanIngredientNote,
+  cleanIngredientText,
+  formatRange,
+  readIngredientLine,
+} from "@/lib/ingredient-format";
 
 // Parses free-text ingredient lines ("2 cups flour", "1/2 tsp salt (fine)")
 // into structured rows, matching/creating Ingredient records and resolving
@@ -18,44 +24,6 @@ export interface ParsedIngredient {
   // Ingredient group the line came from ("Cheddar Bay Biscuits"), when the
   // source recipe split its list into sections.
   section: string | null;
-}
-
-const FRACTIONS: Record<string, number> = {
-  "½": 0.5, "⅓": 0.333, "⅔": 0.667, "¼": 0.25, "¾": 0.75,
-  "⅛": 0.125, "⅜": 0.375, "⅝": 0.625, "⅞": 0.875,
-  "⅕": 0.2, "⅖": 0.4, "⅗": 0.6, "⅘": 0.8, "⅙": 0.167, "⅚": 0.833,
-};
-
-function parseQuantity(str: string): { quantity: number; rest: string } {
-  let s = str.trim();
-  let qty = 0;
-
-  for (const [frac, val] of Object.entries(FRACTIONS)) {
-    if (s.includes(frac)) {
-      s = s.replace(frac, "");
-      qty += val;
-    }
-  }
-
-  const match = s.match(/^(\d+)\s+(\d+)\/(\d+)/);
-  if (match) {
-    qty += parseInt(match[1]) + parseInt(match[2]) / parseInt(match[3]);
-    s = s.slice(match[0].length);
-  } else {
-    const fracMatch = s.match(/^(\d+)\/(\d+)/);
-    if (fracMatch) {
-      qty += parseInt(fracMatch[1]) / parseInt(fracMatch[2]);
-      s = s.slice(fracMatch[0].length);
-    } else {
-      const numMatch = s.match(/^(\d+\.?\d*)/);
-      if (numMatch) {
-        qty += parseFloat(numMatch[1]);
-        s = s.slice(numMatch[0].length);
-      }
-    }
-  }
-
-  return { quantity: qty || 1, rest: s.trim() };
 }
 
 const UNIT_ALIASES: Record<string, string> = {
@@ -91,39 +59,15 @@ const UNIT_ALIASES: Record<string, string> = {
   "stalk": "each", "stalks": "each",
 };
 
-function parseUnit(
-  str: string,
-  unitMap: Map<string, { id: number; name: string }>
-): { unitId: number; unitName: string; rest: string } {
-  const s = str.trim();
-  const words = s.split(/\s+/);
+type UnitRow = { id: number; name: string; abbreviation: string };
 
-  for (const len of [2, 1]) {
-    if (words.length < len) continue;
-    // "cup(s)" and "clove(s)" are written by some recipe sites.
-    const candidate = words
-      .slice(0, len)
-      .join(" ")
-      .toLowerCase()
-      .replace(/\.$/, "")
-      .replace(/\((e?s)\)$/, "");
-
-    const dbUnit = unitMap.get(candidate);
-    if (dbUnit) {
-      return { unitId: dbUnit.id, unitName: dbUnit.name, rest: words.slice(len).join(" ") };
-    }
-
-    const alias = UNIT_ALIASES[candidate];
-    if (alias) {
-      const aliasUnit = unitMap.get(alias);
-      if (aliasUnit) {
-        return { unitId: aliasUnit.id, unitName: aliasUnit.name, rest: words.slice(len).join(" ") };
-      }
-    }
-  }
-
-  const eachUnit = unitMap.get("each");
-  return { unitId: eachUnit?.id ?? 1, unitName: "each", rest: s };
+// A unit word or abbreviation ("cups", "tsp", "cloves") to its row in the
+// units table, or null when it isn't one.
+function unitLookup(unitMap: Map<string, UnitRow>): (word: string) => UnitRow | null {
+  return (word) => {
+    const alias = UNIT_ALIASES[word];
+    return unitMap.get(word) ?? (alias ? unitMap.get(alias) : undefined) ?? null;
+  };
 }
 
 function extractNotes(name: string): { cleanName: string; notes: string } {
@@ -150,11 +94,14 @@ export async function parseIngredientLines(
 ): Promise<ParsedIngredient[]> {
   const lines = normalizeImportedIngredients(rawList);
   const units = await prisma.unit.findMany();
-  const unitMap = new Map<string, { id: number; name: string }>();
+  const unitMap = new Map<string, UnitRow>();
   for (const unit of units) {
-    unitMap.set(unit.name.toLowerCase(), { id: unit.id, name: unit.name });
-    unitMap.set(unit.abbreviation.toLowerCase(), { id: unit.id, name: unit.name });
+    const row = { id: unit.id, name: unit.name, abbreviation: unit.abbreviation };
+    unitMap.set(unit.name.toLowerCase(), row);
+    unitMap.set(unit.abbreviation.toLowerCase(), row);
   }
+  const lookup = unitLookup(unitMap);
+  const eachUnit = unitMap.get("each");
 
   const results: ParsedIngredient[] = [];
 
@@ -166,14 +113,19 @@ export async function parseIngredientLines(
     // "($0.20)" and "garlic*" from sites that price or footnote each line.
     text = cleanIngredientText(text);
 
-    const { quantity, rest: afterQty } = parseQuantity(text);
-    const { unitId, unitName, rest: afterUnit } = parseUnit(afterQty, unitMap);
+    // A line with no number ("Salt and freshly ground black pepper") is
+    // saved with quantity 0: no amount, not a count of 1. A range ("1/2 to 1
+    // tsp") is saved at its upper end so a grocery list covers the most the
+    // recipe could use, and the full range is kept in the notes.
+    const parsed = readIngredientLine(text, lookup);
+    const unit = parsed.unit ?? { id: eachUnit?.id ?? 1, name: "each", abbreviation: "ea" };
+    const range =
+      parsed.quantityMax > parsed.quantity ? formatRange(parsed.quantity, parsed.quantityMax, unit.abbreviation) : "";
 
-    let ingredientText = afterUnit.replace(/^(of|the)\s+/i, "").trim();
-    const { cleanName, notes: rawNotes } = extractNotes(ingredientText);
+    const { cleanName, notes: rawNotes } = extractNotes(parsed.name);
     // "garlic, (minced)" leaves "garlic," before the note.
-    ingredientText = cleanIngredientName(cleanName);
-    const notes = cleanIngredientNote(rawNotes, ingredientText);
+    const ingredientText = cleanIngredientName(cleanName);
+    const notes = cleanIngredientNote([range, ...parsed.notes, rawNotes].filter(Boolean).join(", "), ingredientText);
 
     if (!ingredientText) continue;
 
@@ -194,9 +146,9 @@ export async function parseIngredientLines(
     results.push({
       ingredientId: ingredient.id,
       ingredientName: ingredient.name,
-      quantity,
-      unitId,
-      unitName,
+      quantity: parsed.quantityMax,
+      unitId: unit.id,
+      unitName: unit.name,
       notes,
       optional,
       section: line.section,

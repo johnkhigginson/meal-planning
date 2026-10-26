@@ -507,8 +507,11 @@ function GroceryListContent() {
   // page follows, or when that week's plan has changed since.
   const otherWeek = list.mealPlanId !== null && !!currentPlan && list.mealPlanId !== currentPlan.id;
   const outOfDate = otherWeek || list.planChanged;
-  const needToBuy = list.items.filter((i) => i.needed > 0);
-  const alreadyHave = list.items.filter((i) => i.needed <= 0);
+  // An item with no amount ("salt, to taste") still needs buying unless the
+  // pantry has some.
+  const toBuy = (i: GroceryListItem) => i.needed > 0 || (i.quantity <= 0 && i.inInventory <= 0);
+  const needToBuy = list.items.filter(toBuy);
+  const alreadyHave = list.items.filter((i) => !toBuy(i));
   const sections = view === "recipe" ? groupByRecipe(list, needToBuy) : groupByAisle(needToBuy);
 
   return (

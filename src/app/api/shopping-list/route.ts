@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
     include: {
       items: {
         include: { ingredient: true, unit: true },
-        where: { needed: { gt: 0 } },
+        // Items with no amount ("salt, to taste") count when the pantry has none.
+        where: { OR: [{ needed: { gt: 0 } }, { quantity: 0, inInventory: 0 }] },
       },
     },
   });
@@ -84,10 +85,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // With no amount to price by, it costs one package at this store.
+      const price = item.needed > 0 ? unitPrice * item.needed : sp.price;
       return {
         storeId: sp.storeId,
         storeName: sp.storeName,
-        price: Math.round(unitPrice * item.needed * 100) / 100,
+        price: Math.round(price * 100) / 100,
         unitPrice: Math.round(unitPrice * 100) / 100,
       };
     }).sort((a, b) => a.price - b.price);

@@ -12,7 +12,8 @@ export const createIngredientSchema = z.object({
 
 export const recipeIngredientSchema = z.object({
   ingredientId: z.number().int().positive(),
-  quantity: z.number().positive(),
+  // 0 is a line with no amount, like "salt, to taste".
+  quantity: z.number().min(0),
   unitId: z.number().int().positive(),
   notes: z.string().max(200).optional(),
   optional: z.boolean().default(false),

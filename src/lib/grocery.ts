@@ -110,10 +110,16 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
   // Convert and sum quantities per ingredient
   const items: AggregatedItem[] = [];
 
+  // A recipe range ("1/2 to 1 tsp") was saved at its upper end, so these
+  // totals cover the most each recipe could use. A line with no amount ("salt,
+  // to taste") is saved as 0 and adds nothing, so it never becomes a made-up
+  // count; on its own it stays on the list with no amount.
   for (const [, agg] of aggregated) {
-    // Use the first unit encountered as the target unit
-    const targetUnitId = agg.quantities[0].unitId;
-    const targetUnitAbbr = agg.quantities[0].unitAbbr;
+    // Use the first unit with an amount as the target unit, so "salt, to
+    // taste" (each) doesn't block "1 tsp salt" from converting.
+    const target = agg.quantities.find((q) => q.quantity > 0) ?? agg.quantities[0];
+    const targetUnitId = target.unitId;
+    const targetUnitAbbr = target.unitAbbr;
 
     let totalQty = 0;
     for (const q of agg.quantities) {
@@ -392,13 +398,15 @@ export async function saveGroceryList(
   );
   const rows = items.map((item) => {
     const before = previous.get(`${item.ingredientId}:${item.unitId}`);
+    // An item with no amount ("salt, to taste") is covered only by having some.
+    const covered = item.totalQuantity > 0 ? item.needed <= 0 : item.inInventory > 0;
     return {
       ingredientId: item.ingredientId,
       quantity: item.totalQuantity,
       unitId: item.unitId,
       inInventory: item.inInventory,
       needed: item.needed,
-      checked: item.needed <= 0 || (!!before?.checked && item.needed <= before.needed),
+      checked: covered || (!!before?.checked && item.needed <= before.needed),
     };
   });
 

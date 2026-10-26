@@ -557,8 +557,9 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
   // Turn every named row into one the API accepts. A name typed without picking
   // a suggestion is matched or created by name (the endpoint upserts), and a
-  // blank quantity or unit gets the same defaults the import parser uses: 1, and
-  // the ingredient's default unit or "each". Rows with no name are dropped.
+  // blank quantity or unit gets the same defaults the import parser uses: no
+  // amount (0), and the ingredient's default unit or "each". Rows with no name
+  // are dropped.
   async function resolveIngredientRows(): Promise<RecipeIngredientRow[]> {
     const named = form.ingredients.filter(
       (ing) => ing.ingredientId > 0 || ing.ingredientName.trim()
@@ -629,7 +630,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       return {
         ...ing,
         ingredientId: match?.id ?? ing.ingredientId,
-        quantity: ing.quantity > 0 ? ing.quantity : 1,
+        quantity: ing.quantity > 0 ? ing.quantity : 0,
         unitId,
       };
     });
