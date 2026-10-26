@@ -761,6 +761,12 @@ function takeLeadingDescriptors(name: string): { name: string; notes: string[] }
     notes.push(prepped[1].toLowerCase());
     rest = prepped[2];
   }
+  // "soft taco size flour tortillas": flour tortillas, soft taco size.
+  const tacoSize = rest.match(/^((?:soft\s+)?taco[\s-]sized?)\s+(.+)$/i);
+  if (tacoSize) {
+    notes.push(tacoSize[1].toLowerCase());
+    rest = tacoSize[2];
+  }
   const sized = rest.match(LEADING_SIZE);
   // "large or 40 small tomatoes" is a choice; splitAlternative reads it.
   if (sized && !/^eggs?\b/i.test(sized[2]) && !/^or\b/i.test(sized[2]) && !onlyDescriptors(sized[2])) {
@@ -903,10 +909,18 @@ export function splitNameAndNote(text: string, isNoun?: (name: string) => boolea
     head = leadingPhrase[2];
     tailNotes.unshift(leadingPhrase[1]);
   }
-  // "zest from one lemon or orange": lemon zest.
-  const zest = head.match(/^zest\s+(?:from|of)\s+((?:one|1|a|an|the)\s+([a-z]+))(?:\s+or\s+([a-z]+))?$/i);
+  // "zest from one lemon or orange", "Grated zest from one lemon": lemon zest.
+  const zest = head.match(/^(?:((?:finely\s+)?grated)\s+)?zest\s+(?:from|of)\s+((?:one|1|a|an|the)\s+([a-z]+))(?:\s+or\s+([a-z]+))?$/i);
   if (zest) {
-    return { name: `${zest[2]} zest`, notes: [`from ${zest[1]}`, zest[3] ? `or ${zest[3]}` : "", ...tailNotes].filter(Boolean) };
+    const notes = [zest[1]?.toLowerCase() ?? "", `from ${zest[2]}`, zest[4] ? `or ${zest[4]}` : "", ...tailNotes];
+    return { name: `${zest[3].toLowerCase()} zest`, notes: notes.filter(Boolean) };
+  }
+  // "cooked rice of choice": the choice is a note. After "or" it stays with
+  // the choice ("pecans or nut of choice").
+  const choice = head.match(/^(.+?)\s+(of\s+(?:your\s+)?choice)$/i);
+  if (choice && !/\sor\s/i.test(choice[1])) {
+    head = choice[1];
+    tailNotes.unshift(choice[2].toLowerCase());
   }
 
   const prep = splitPrepPhrase(head);

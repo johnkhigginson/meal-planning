@@ -334,6 +334,12 @@ eq("shredded mozzarella or pizza blend cheese", imported("1 cup shredded mozzare
 eq("shredded Monterey Jack or Cheddar Jack cheese", imported("1.5 cups shredded Monterey Jack or Cheddar Jack cheese"), [1.5, "cup", "Monterey Jack cheese", "shredded, or Cheddar Jack cheese"]);
 eq("finely ground rolled oats or fine bread crumbs", imported("1/2 cup finely ground rolled oats or fine bread crumbs"), [0.5, "cup", "rolled oats", "finely ground, or fine bread crumbs"]);
 eq("zest from one lemon or orange", imported("1 zest from one lemon or orange, for topping"), [1, null, "lemon zest", "from one lemon, or orange, for topping"]);
+eq("Grated zest from one lemon", imported("1 Grated zest from one lemon"), [1, null, "lemon zest", "grated, from one lemon"]);
+eq("grated lemon zest", imported("1 grated lemon zest, 2 lemons"), [1, null, "lemon zest", "grated, 2 lemons"]);
+eq("cooked rice of choice", imported("2 cups cooked rice of choice"), [2, "cup", "cooked rice", "of choice"]);
+eq("rice of your choice", imported("1 cup rice of your choice"), [1, "cup", "rice", "of your choice"]);
+eq("soft taco size flour tortillas", imported("10 soft taco size flour tortillas"), [10, null, "flour tortillas", "soft taco size"]);
+eq("pecans or nut of choice", imported("1 cup pecans or nut of choice"), [1, "cup", "pecans", "or nut of choice"]);
 eq("Tortillas or taco shells, for serving", imported("1 Tortillas or taco shells, for serving"), [1, null, "Tortillas", "or taco shells, for serving"]);
 eq("grated sharp cheddar or 1/2 cup grated Parmesan", imported("1/4 cup grated sharp cheddar or 1/2 cup grated Parmesan cheese"), [0.25, "cup", "sharp cheddar", "grated, or 1/2 cup grated Parmesan cheese"]);
 

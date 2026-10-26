@@ -211,6 +211,10 @@ const STATE_LEAD = /^(uncooked)\s+(.+)$/i;
 // "cooked rice" is its own ingredient, not "rice" with a stray word. Lines
 // keep their link; the report asks once per name.
 const COOKED_LEAD = /^cooked\s+(.+)$/i;
+const OF_CHOICE = /^\s*of\s+(?:your\s+)?choice$/i;
+// "Your Favorite Pie Crust Recipe": a line that points to another recipe.
+// It stays as written; the report asks.
+const RECIPE_REFERENCE = /\brecipes?\b|^\s*(?:your|my)\s+favou?rite\b/i;
 // Containers at the front of a name ("package feta cheese"). After a weight
 // or volume they describe the amount and are not the unit.
 const CONTAINER_LEAD = /^(?:package|packages|pkg|pkgs|can|cans|jar|jars|box|boxes|bag|bags|bottle|bottles|carton|cartons|tub|tubs)\.?(?:\s+of)?\s/i;
@@ -223,7 +227,9 @@ function cookedTidy(name: string): { name: string; note: string } | null {
   if (!COOKED_LEAD.test(clean)) return null;
   const split = splitNameAndNote(clean);
   if (!COOKED_LEAD.test(split.name)) return null;
-  if (split.name !== clean && clean.toLowerCase().startsWith(split.name.toLowerCase())) return null;
+  // "cooked rice of choice" is cooked rice with a note, not a line fix.
+  const after = clean.slice(split.name.length);
+  if (split.name !== clean && clean.toLowerCase().startsWith(split.name.toLowerCase()) && !OF_CHOICE.test(after)) return null;
   return { name: split.name, note: split.notes.join(", ") };
 }
 // "large or 40 small tomatoes": a second amount inside the name.
@@ -352,7 +358,96 @@ function badNameReasons(name: string, lookup: UnitLookup): string[] {
   const list = t.split(/[\s,]+/).map(bare).filter((w) => w && w !== "and" && w !== "or");
   if (list.length && list.every((w) => NAME_ONLY_DESCRIPTORS.has(w))) reasons.push("only descriptor or color words");
   if (/[$*]/.test(t)) reasons.push('has "$" or "*"');
+  if (/^(?:zest|juice|peel|rind)$/i.test(t)) reasons.push("names a part without its fruit");
   return reasons;
+}
+
+// ─── Spelling new names ─────────────────────────────────────────
+
+// Proper and brand words a new name keeps capitalized. Every other word is
+// lower case: "Soy Sauce" -> "soy sauce", "Parmesan cheese" stays.
+const PROPER_PHRASES = ["Monterey Jack", "Salad Supreme", "Old Bay", "Town House", "Granny Smith", "Yukon Gold", "Cool Whip"];
+const PROPER_WORDS = new Map(
+  [
+    "Parmesan", "Swiss", "Monterey", "Greek", "Italian", "French", "Mexican", "Cajun", "Thai", "Vidalia", "Ritz",
+    "Prego", "REESE'S", "Nestle", "Parmigiano-Reggiano", "Neufchatel", "Dijon", "Worcestershire", "Tabasco",
+    "Romano", "Asiago", "Gruyere", "Gorgonzola", "Kalamata", "Roma", "Velveeta", "Bisquick", "Crisco", "Hershey's",
+    "Oreo", "Nutella", "Kraft", "Rotel", "Ro-Tel",
+  ].map((w) => [w.toLowerCase(), w])
+);
+
+function newIngredientName(name: string): string {
+  let out = name
+    .replace(/’/g, "'")
+    .split(/\s+/)
+    .map((w) => PROPER_WORDS.get(w.toLowerCase()) ?? w.toLowerCase())
+    .join(" ");
+  for (const phrase of PROPER_PHRASES) out = out.replace(new RegExp(`\\b${phrase}\\b`, "gi"), phrase);
+  return out;
+}
+
+// Herbs named with their leaves: "fresh flat-leaf parsley leaves" is parsley.
+const HERBS = new Set(["parsley", "cilantro", "thyme", "basil", "mint", "oregano", "rosemary", "sage", "dill", "tarragon", "chives"]);
+
+// Shorter names a new name could mean, most words first, with the words
+// that move to the note: "fresh parsley leaves" -> "parsley leaves"
+// ("fresh"), then "parsley" ("fresh", "leaves").
+function peeledNames(name: string): { name: string; notes: string[] }[] {
+  const words = name.trim().split(/\s+/);
+  const notes: string[] = [];
+  const out: { name: string; notes: string[] }[] = [];
+  const keep = () => out.push({ name: words.join(" "), notes: [...notes] });
+  if (words.length > 1 && words[0].toLowerCase() === "fresh") {
+    notes.push(words.shift()!.toLowerCase());
+    keep();
+  }
+  if (words.length === 2 && words[0].toLowerCase() === "flat-leaf" && HERBS.has(words[1].toLowerCase())) {
+    notes.push(words.shift()!.toLowerCase());
+    keep();
+  }
+  if (words.length === 2 && /^(?:leaf|leaves)$/i.test(words[1]) && HERBS.has(words[0].toLowerCase())) {
+    notes.push("leaves");
+    words.pop();
+    keep();
+  }
+  return out;
+}
+
+// Restricted Damerau-Levenshtein distance: edits, with a swap of two
+// neighbors as one.
+function editDistance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// Real words one letter apart, which a typo match must not join.
+const NOT_TYPOS = new Set([
+  ...TRAILING_DESCRIPTORS, ...PREP_WORDS, "dried", "fried", "spiced", "smoked", "baked", "roasted", "salted",
+  "sweet", "sweetened", "butter", "batter", "breast", "breasts",
+]);
+
+// "mozarella" and "mozzarella", "Monterrey" and "Monterey": the same words
+// but one, and that one a typo apart. Names of 6 or more letters, and never
+// two words that differ by a whole word.
+function typoOf(a: string, b: string): boolean {
+  const x = a.trim().toLowerCase();
+  const y = b.trim().toLowerCase();
+  if (x === y || x.length < 6 || y.length < 6) return false;
+  const xw = x.split(/\s+/);
+  const yw = y.split(/\s+/);
+  if (xw.length !== yw.length) return false;
+  const diff = xw.map((w, i) => [w, yw[i]]).filter(([p, q]) => p !== q);
+  if (diff.length !== 1) return false;
+  const [p, q] = diff[0];
+  if (Math.min(p.length, q.length) < 5 || NOT_TYPOS.has(p) || NOT_TYPOS.has(q)) return false;
+  return editDistance(p, q) === 1;
 }
 
 // The filter the first count used, as LIKE patterns: '(%', '%(s)%', '%*%',
@@ -370,11 +465,13 @@ type Category =
   | "prep_in_name"
   | "garbled_name_note"
   | "junk_ingredient_repoint"
-  | "deletable_after_repoint";
+  | "deletable_after_repoint"
+  | "recipe_reference";
 type Confidence = "high" | "medium" | "low";
 
 const CATEGORIES: Category[] = [
   "wrong_link", "cooked_separate", "lost_noun", "prep_in_name", "garbled_name_note", "junk_ingredient_repoint", "deletable_after_repoint",
+  "recipe_reference",
 ];
 
 // An existing Ingredient id, or a name to create. "delete" for category F.
@@ -493,14 +590,32 @@ export function analyze(snap: Snapshot, today: Date): Report {
   const findExisting = (name: string) => pickIngredientMatch(name, byKey.get(ingredientKey(name)) ?? []);
   // "water" is an ingredient on its own, so "water or chicken broth" stays water.
   const isNoun = (name: string) => byKey.has(ingredientKey(name));
+  // New names that mean another name, filled once every line is read (see
+  // "Spelling" below): "fresh garlic" -> garlic, note "fresh".
+  const spelling = new Map<string, { target: Target; notes: string[]; typo: boolean }>();
+  const respelled = (target: Target) => {
+    let t = target;
+    const notes: string[] = [];
+    const questions: string[] = [];
+    const seen = new Set<string>();
+    while ("create" in t && spelling.has(ingredientKey(t.create)) && !seen.has(ingredientKey(t.create))) {
+      const key = ingredientKey(t.create);
+      seen.add(key);
+      const next = spelling.get(key)!;
+      notes.push(...next.notes);
+      if (next.typo) questions.push(`Treat "${t.create}" as "${"create" in next.target ? next.target.create : "id" in next.target ? next.target.name : ""}"?`);
+      t = next.target;
+    }
+    return { target: t, notes, questions };
+  };
   // One spelling per new name, so "onion" and "onions" create one row.
   const createNames = new Map<string, string>();
   const targetFor = (name: string): Target => {
     const row = findExisting(name);
     if (row) return { id: row.id, name: row.name };
     const key = ingredientKey(name);
-    if (!createNames.has(key)) createNames.set(key, name);
-    return { create: createNames.get(key)! };
+    if (!createNames.has(key)) createNames.set(key, newIngredientName(name));
+    return respelled({ create: createNames.get(key)! }).target;
   };
 
   const proposals: Proposal[] = [];
@@ -830,9 +945,83 @@ export function analyze(snap: Snapshot, today: Date): Report {
     };
   };
 
+  // A line that points to another recipe stays as written, and asks.
+  const recipeReference = (line: Line): Proposal => {
+    const current = currentOf(line);
+    return {
+      category: "recipe_reference",
+      confidence: "low",
+      table: line.table,
+      rowId: line.row.id,
+      recipeId: line.row.recipeId,
+      recipeName: line.recipeName,
+      current,
+      proposed: { ...current, target: { id: current.ingredientId, name: current.ingredientName } },
+      reason: `"${current.ingredientName}" names a recipe, not an ingredient.`,
+      ambiguous: true,
+      question: "This line points to another recipe. Keep it as written?",
+    };
+  };
   for (const line of lines) {
-    const proposal = flagged(line.row.ingredientId) ? reparse(line) : (wrongLink(line) ?? reparse(line));
+    const ing = ingById.get(line.row.ingredientId);
+    const proposal = ing && RECIPE_REFERENCE.test(ing.name)
+      ? recipeReference(line)
+      : flagged(line.row.ingredientId) ? reparse(line) : (wrongLink(line) ?? reparse(line));
     if (proposal) proposals.push(proposal);
+  }
+
+  // ── Spelling: new names that mean a row or another new name ──
+  // Case and plural already share a key. "fresh garlic" is garlic with a
+  // note, "fresh parsley leaves" is parsley. "mozarella" is a typo of
+  // "mozzarella", which asks. The most used new name of a pair is kept.
+  const newUses = new Map<string, { name: string; n: number }>();
+  for (const x of proposals) {
+    const t = x.proposed.target;
+    if (!("create" in t) || t.create === "?") continue;
+    const key = ingredientKey(t.create);
+    newUses.set(key, { name: t.create, n: (newUses.get(key)?.n ?? 0) + 1 });
+  }
+  const named = (name: string, self: string): Target | null => {
+    const row = findExisting(name);
+    if (row) return { id: row.id, name: row.name };
+    const key = ingredientKey(name);
+    return key !== self && newUses.has(key) ? { create: newUses.get(key)!.name } : null;
+  };
+  const cleanRows = [...byKey.values()].flat();
+  // On a tie, the spelling whose words the clean rows already use.
+  const vocabulary = new Set(cleanRows.flatMap((r) => wordsOf(r.name)));
+  const familiar = (name: string) => wordsOf(name).filter((w) => vocabulary.has(w)).length;
+  const kept: string[] = [];
+  const byUse = [...newUses].sort((a, b) => b[1].n - a[1].n || familiar(b[1].name) - familiar(a[1].name));
+  for (const [key, { name }] of byUse) {
+    const peeled = peeledNames(name).reverse().find((p) => named(p.name, key));
+    if (peeled) {
+      spelling.set(key, { target: named(peeled.name, key)!, notes: peeled.notes, typo: false });
+      continue;
+    }
+    const row = cleanRows.find((r) => typoOf(name, r.name));
+    const twin = row ? undefined : kept.find((k) => typoOf(name, k));
+    const near: Target | null = row ? { id: row.id, name: row.name } : twin ? { create: twin } : null;
+    if (near) spelling.set(key, { target: near, notes: [], typo: true });
+    else kept.push(name);
+  }
+  for (const x of proposals) {
+    const t = x.proposed.target;
+    if (!("create" in t)) continue;
+    const moved = respelled(t);
+    if (moved.target === t) continue;
+    x.proposed.target = moved.target;
+    const have = new Set(wordsOf(x.proposed.notes));
+    const notes = [...moved.notes.filter((n) => !have.has(n)), x.proposed.notes].filter(Boolean).join(", ");
+    x.proposed.notes = tidyIngredientNote(notes);
+    let question = x.question;
+    if ("id" in moved.target) question = question.replace(/No "[^"]+" row exists\. Create it for this line\?\s*/, "").trim();
+    if (moved.questions.length) {
+      question = [question, ...moved.questions].filter(Boolean).join(" ");
+      x.confidence = lower(x.confidence, "medium");
+    }
+    x.question = question;
+    x.ambiguous = question !== "";
   }
 
   // ── A2. Cooked X: its own ingredient, one question per tidy name ──
@@ -886,7 +1075,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
     sanityChecked.add(x);
     const t = x.proposed.target;
     const name = "create" in t ? t.create : "id" in t ? t.name : "";
-    if (!name || name === "?") return;
+    if (!name || name === "?" || x.category === "recipe_reference") return;
     const reasons = badNameReasons(name, lookup);
     if (!reasons.length) return;
     x.ambiguous = true;
@@ -920,7 +1109,9 @@ export function analyze(snap: Snapshot, today: Date): Report {
       }
     }
     const ranked = [...counts.values()].sort((a, b) => b.n - a.n);
-    const target = ranked[0]?.target ?? null;
+    // A row its lines keep (a recipe reference) has nothing to follow.
+    const top = ranked[0]?.target ?? null;
+    const target = top && "id" in top && top.id === ing.id ? null : top;
     const ambiguous = ranked.length !== 1 || mine.some((x) => x.ambiguous);
     if (target) {
       rowTarget.set(ing.id, {
@@ -1472,7 +1663,7 @@ function fixture(): Snapshot {
     return ingredients.length;
   };
   // Clean rows, to be left alone or used as targets.
-  for (const name of ["garlic", "large eggs", "butter", "baking powder", "Chicken Breast", "rice", "white rice", "eggs", "water", "ground beef"]) ingredientId(name);
+  for (const name of ["garlic", "large eggs", "butter", "baking powder", "Chicken Breast", "rice", "white rice", "eggs", "water", "ground beef", "lemon zest", "mozzarella", "cilantro", "thyme"]) ingredientId(name);
 
   const recipes: RecipeRow[] = [];
   const recipeLines: LineRow[] = [];
@@ -1552,6 +1743,28 @@ function fixture(): Snapshot {
   add("Pot Pie", 2, "cup", "cooked shredded chicken breast");
   // A name still too long after the parser, for the sanity check.
   add("Crab Cakes", 1, "teaspoon", "homemade Old Bay seafood seasoning blend mix*");
+  // Misses from the third live run.
+  add("Lemon Bars", 1, "each", "Grated zest from one lemon");
+  add("Lemon Bars", 1, "each", "zest from one lemon or orange", "for topping");
+  add("Lemon Bars", 1, "tablespoon", "grated lemon zest", "2 lemons");
+  add("Pizza", 2, "cup", "shredded mozarella", "the kind shaped like a ball");
+  add("Nachos", 1, "cup", "shredded Monterey Jack cheese");
+  add("Nachos", 1, "cup", "grated Monterey Jack cheese");
+  add("Nachos", 1, "cup", "shredded Monterrey jack cheese", "divided");
+  add("Pasta", 3, "clove", "minced fresh garlic");
+  add("Pasta", 2, "tablespoon", "chopped fresh parsley leaves");
+  add("Pasta", 2, "tablespoon", "chopped fresh flat-leaf parsley");
+  add("Pasta", 1, "tablespoon", "minced parsley");
+  add("Curry", 2, "tablespoon", "finely chopped fresh cilantro leaves");
+  add("Curry", 1, "tablespoon", "chopped fresh cilantro,");
+  add("Curry", 1, "teaspoon", "minced fresh thyme leaves");
+  add("Curry", 1, "tablespoon", "minced fresh ginger");
+  add("Curry", 1, "teaspoon", "grated ginger");
+  add("Curry", 1, "tablespoon", "chopped fresh dill");
+  add("Salad", 1, "each", "chopped Lettuce");
+  add("Salad", 1, "tablespoon", "Soy Sauce - low sodium");
+  add("Apple Pie", 2, "each", "Your Favorite Pie Crust Recipe - you will need 2 crusts", "one for the bottom of the pie and one for the top");
+  add("Sugar Cookies", 1, "teaspoon", "almond extract or vanilla or lemon or mint or your favorite", "for icing");
 
   const groceryLists: GroceryListRow[] = [{ id: 1, householdId: 1, mealPlanId: 1, name: "This week" }];
   const groceryItems: GroceryItemRow[] = [
@@ -1690,12 +1903,12 @@ function selfTest(out: string | undefined): number {
   want("button or cremini", "Stroganoff", "button or cremini mushrooms", [1.5, "pound", "button mushrooms (new)", "or cremini mushrooms, quartered"], false);
   want("jar or can chili sauce", "Chili Dogs", "14 oz. jar or can chili sauce", [1, "each", "chili sauce (new)", "14 oz jar or can, the chunkier, the better"], false);
   want("sleeve Ritz", "Casserole", "sleeve Ritz or Town House crackers", [1, "each", "Ritz crackers (new)", "1 sleeve, or Town House crackers, crumbled"], false);
-  want("Tortillas or taco shells", "Tacos", "Tortillas or taco shells", [1, "each", "Tortillas (new)", "or taco shells, for serving"], false);
-  want("multi-item garnish asks", "Tacos", "Tortilla chips or strips, monterrey jack cheese, sliced avocado", [1, "each", "Tortilla chips (new)", "or strips, monterrey jack cheese, sliced avocado, for serving"], true);
+  want("Tortillas or taco shells", "Tacos", "Tortillas or taco shells", [1, "each", "tortillas (new)", "or taco shells, for serving"], false);
+  want("multi-item garnish asks", "Tacos", "Tortilla chips or strips, monterrey jack cheese, sliced avocado", [1, "each", "tortilla chips (new)", "or strips, monterrey jack cheese, sliced avocado, for serving"], true);
   want("-1/2 lbs. ground beef", "Meatloaf", "-1/2 lbs. ground beef", [1.5, "pound", idOf("ground beef"), ""], true);
   check("-1/2 lbs. asks 1 1/2 lb", (line("Meatloaf", "-1/2 lbs. ground beef")?.question ?? "").includes("as 1 1/2 lb?"));
   want("-4 T. milk", "Cookies", "-4 T. milk", [4, "tablespoon", "milk (new)", "2 to 4 tbsp, for frosting"], true);
-  want("0.5 -10-oz. pkg.", "Cookies", "-10-oz. pkg. REESE'S Peanut Butter Chips", [0.5, "package", "REESE'S Peanut Butter Chips (new)", "10 oz"], true);
+  want("0.5 -10-oz. pkg.", "Cookies", "-10-oz. pkg. REESE'S Peanut Butter Chips", [0.5, "package", "REESE'S peanut butter chips (new)", "10 oz"], true);
   want("6 ounce package feta", "Salad", "package feta cheese", [6, "ounce", "feta cheese (new)", "package, crumbled"], false);
   want("12 ounce can of salsa", "Salad", "can of salsa", [12, "ounce", "salsa (new)", "can"], false);
   want("12 ounce box jumbo shells", "Stuffed Shells", "box jumbo shells pasta", [12, "ounce", "jumbo shells pasta (new)", "box"], false);
@@ -1726,6 +1939,86 @@ function selfTest(out: string | undefined): number {
   check('"cooked rice," joins "cooked rice"', commaRice.filter((x) => /cooked rice/.test(x.current.ingredientName)).length === 1 && commaRice.some((x) => x.question.includes('"cooked rice," (#9001)')));
   check('asks "Keep \'cooked rice\' separate from \'rice\'?"', cookedQuestions.some((x) => x.question === 'Keep "cooked rice" separate from "rice"?' && x.ambiguous));
   check("cooked questions keep the link", cookedQuestions.every((x) => "id" in x.proposed.target && x.proposed.target.id === x.current.ingredientId));
+
+  console.log("\nThird live run:");
+  want("Grated zest from one lemon", "Lemon Bars", "Grated zest from one lemon", [1, "each", idOf("lemon zest"), "grated, from one lemon"], false);
+  want("zest from one lemon or orange", "Lemon Bars", "zest from one lemon or orange", [1, "each", idOf("lemon zest"), "from one lemon, or orange, for topping"], false);
+  want("grated lemon zest", "Lemon Bars", "grated lemon zest", [1, "tablespoon", idOf("lemon zest"), "grated, 2 lemons"], false);
+  check('never proposes the bare name "zest"', !report.proposals.some((x) => /^zest$/i.test(targetText(x.proposed.target).replace(/ \(.*$/, ""))));
+  check('"zest" alone fails the name check', badNameReasons("zest", makeUnitLookup(snap.units) as UnitLookup).includes("names a part without its fruit"));
+  want("mozarella is a typo of mozzarella", "Pizza", "shredded mozarella", [2, "cup", idOf("mozzarella"), "shredded, the kind shaped like a ball"], true);
+  check('mozarella asks "Treat ... as ...?"', (line("Pizza", "shredded mozarella")?.question ?? "").includes('Treat "mozarella" as "mozzarella"?'));
+  want("Monterey Jack cheese is created once", "Nachos", "shredded Monterey Jack cheese", [1, "cup", "Monterey Jack cheese (new)", "shredded"], false);
+  want("Monterrey is a typo of Monterey", "Nachos", "shredded Monterrey jack cheese", [1, "cup", "Monterey Jack cheese (new)", "shredded, divided"], true);
+  check('Monterrey asks "Treat ... as ...?"', (line("Nachos", "shredded Monterrey jack cheese")?.question ?? "").includes('Treat "monterrey jack cheese" as "Monterey Jack cheese"?'));
+  want("fresh garlic -> garlic", "Pasta", "minced fresh garlic", [3, "clove", idOf("garlic"), "fresh, minced"], false);
+  want("fresh parsley leaves -> parsley", "Pasta", "chopped fresh parsley leaves", [2, "tablespoon", "parsley (new)", "fresh, leaves, chopped"], false);
+  want("fresh flat-leaf parsley -> parsley", "Pasta", "chopped fresh flat-leaf parsley", [2, "tablespoon", "parsley (new)", "fresh, flat-leaf, chopped"], false);
+  want("minced parsley -> parsley", "Pasta", "minced parsley", [1, "tablespoon", "parsley (new)", "minced"], false);
+  want("fresh cilantro leaves -> cilantro", "Curry", "finely chopped fresh cilantro leaves", [2, "tablespoon", idOf("cilantro"), "fresh, leaves, finely chopped"], false);
+  want("fresh cilantro -> cilantro", "Curry", "chopped fresh cilantro,", [1, "tablespoon", idOf("cilantro"), "fresh, chopped"], false);
+  want("fresh thyme leaves -> thyme", "Curry", "minced fresh thyme leaves", [1, "teaspoon", idOf("thyme"), "fresh, leaves, minced"], false);
+  want("fresh ginger -> new ginger", "Curry", "minced fresh ginger", [1, "tablespoon", "ginger (new)", "fresh, minced"], false);
+  want("fresh dill stays with no dill row", "Curry", "chopped fresh dill", [1, "tablespoon", "fresh dill (new)", "chopped"], false);
+  const peeled = (name: string) => peeledNames(name).map((p) => `${p.name} | ${p.notes.join(", ")}`);
+  check("fresh parsley leaves peels to parsley", same(peeled("fresh parsley leaves"), ["parsley leaves | fresh", "parsley | fresh, leaves"]));
+  check("fresh flat-leaf parsley peels to parsley", same(peeled("fresh flat-leaf parsley"), ["flat-leaf parsley | fresh", "parsley | fresh, flat-leaf"]));
+  check("bay leaves does not peel", same(peeled("bay leaves"), []));
+  for (const [a, b, wanted] of [
+    ["mozarella", "mozzarella", true],
+    ["Monterrey jack cheese", "Monterey Jack cheese", true],
+    ["pecans", "pecan pie", false],
+    ["rice", "ice", false],
+    ["garlic", "fresh garlic", false],
+    ["butter", "batter", false],
+    ["dried onions", "fried onions", false],
+    ["canned pears", "canned peas", false],
+    ["red pepper", "green pepper", false],
+  ] as [string, string, boolean][]) {
+    check(`typo ${JSON.stringify(a)} ~ ${JSON.stringify(b)}: ${wanted}`, typoOf(a, b) === wanted);
+  }
+  check("red pepper and red peppers share a key", ingredientKey("red pepper") === ingredientKey("red peppers"));
+  check("bell pepper and bell peppers share a key", ingredientKey("Bell Pepper") === ingredientKey("bell peppers"));
+  for (const [name, wanted] of [
+    ["REESE'S Peanut Butter Chips", "REESE'S peanut butter chips"],
+    ["Nestle Semi-Sweet chocolate chips", "Nestle semi-sweet chocolate chips"],
+    ["Prego sauce", "Prego sauce"],
+    ["Ritz crackers", "Ritz crackers"],
+    ["Vidalia onion", "Vidalia onion"],
+    ["Parmigiano-Reggiano cheese", "Parmigiano-Reggiano cheese"],
+    ["Monterey Jack cheese", "Monterey Jack cheese"],
+    ["monterey jack cheese", "Monterey Jack cheese"],
+    ["Parmesan", "Parmesan"],
+    ["Swiss cheese", "Swiss cheese"],
+    ["Greek yogurt", "Greek yogurt"],
+    ["Italian sausage", "Italian sausage"],
+    ["Salad Supreme", "Salad Supreme"],
+    ["Lettuce", "lettuce"],
+    ["Mustard", "mustard"],
+    ["Soy Sauce", "soy sauce"],
+    ["Tortillas", "tortillas"],
+    ["whole Eggs", "whole eggs"],
+    ["Cheddar cheese", "cheddar cheese"],
+    ["sharp Cheddar", "sharp cheddar"],
+    ["pepper jack cheese", "pepper jack cheese"],
+  ]) {
+    check(`new name ${JSON.stringify(name)} -> ${JSON.stringify(wanted)}`, newIngredientName(name) === wanted);
+  }
+  want("chopped Lettuce -> lettuce", "Salad", "chopped Lettuce", [1, "each", "lettuce (new)", "chopped"], false);
+  want("Soy Sauce -> soy sauce", "Salad", "Soy Sauce - low sodium", [1, "tablespoon", "soy sauce (new)", "low sodium"], false);
+  const crust = line("Apple Pie", "Your Favorite Pie Crust Recipe - you will need 2 crusts");
+  want("recipe reference stays as written", "Apple Pie", "Your Favorite Pie Crust Recipe - you will need 2 crusts", [2, "each", idOf("Your Favorite Pie Crust Recipe - you will need 2 crusts"), "one for the bottom of the pie and one for the top"], true);
+  check("recipe reference asks", crust?.category === "recipe_reference" && crust.question === "This line points to another recipe. Keep it as written?");
+  check("recipe reference row is not deleted", !report.proposals.some((x) => x.category === "deletable_after_repoint" && x.current.ingredientName.startsWith("Your Favorite")));
+  check("a flavor choice with \"your favorite\" is not a recipe", line("Sugar Cookies", "almond extract or vanilla or lemon or mint or your favorite")?.category !== "recipe_reference");
+
+  // "cooked rice of choice" joins "cooked rice", on its own snapshot.
+  const choiceSnap = fixture();
+  choiceSnap.ingredients.push({ id: 9002, name: "cooked rice of choice" });
+  choiceSnap.recipeLines.push({ id: 9002, recipeId: riceRecipe, ingredientId: 9002, quantity: 2, unitId: choiceSnap.units.find((u) => u.name === "cup")!.id, notes: null });
+  const choiceRice = analyze(choiceSnap, new Date("2026-10-26T12:00:00Z")).proposals.filter((x) => x.category === "cooked_separate");
+  const riceQuestion = choiceRice.find((x) => x.current.ingredientName === "cooked rice");
+  check('"cooked rice of choice" joins "cooked rice" with note "of choice"', choiceRice.filter((x) => /cooked rice/.test(x.current.ingredientName)).length === 1 && (riceQuestion?.question ?? "").startsWith('Keep "cooked rice" separate from "rice"?') && (riceQuestion?.question ?? "").includes('"cooked rice of choice" (#9002) -> note "of choice"'));
 
   console.log("\nSanity check on proposed names:");
   for (const [name, want] of [
