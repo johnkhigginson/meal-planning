@@ -136,9 +136,9 @@ export default function TermsPage() {
 
         <LegalSection title="Governing law">
           <p>
-            These terms are governed by the laws of the State of [STATE], United States, without
+            These terms are governed by the laws of the State of Idaho, United States, without
             regard to its conflict of law rules. Any dispute will be handled in the state or federal
-            courts located in [COUNTY], [STATE], unless the law where you live requires otherwise.
+            courts located in Bonneville County, Idaho, unless the law where you live requires otherwise.
           </p>
         </LegalSection>
 
