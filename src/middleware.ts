@@ -58,9 +58,12 @@ const authMiddleware = auth((req) => {
   if (!req.auth) {
     const section = pathname.split("/")[1];
     // Paths with a file extension may be files in public/, so they keep the
-    // login redirect.
+    // login redirect. Unknown paths pass through so the app router renders
+    // not-found.tsx with a 404 status. Do not rewrite to "/404" here: behind
+    // the proxy nextUrl.origin is the public host, so Next would proxy the
+    // rewrite back out through Caddy and loop.
     if (!appSections.includes(section) && !section.includes(".")) {
-      return NextResponse.rewrite(new URL("/404", req.nextUrl.origin));
+      return NextResponse.next();
     }
     const loginUrl = new URL("/login", req.nextUrl.origin);
     return NextResponse.redirect(loginUrl);
