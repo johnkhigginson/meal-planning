@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeImportedIngredients } from "@/lib/recipe-sections";
 import { guessIngredientCategory } from "@/lib/ingredient-category";
-import { cleanIngredientName } from "@/lib/ingredient-format";
+import { cleanIngredientName, cleanIngredientNote, cleanIngredientText } from "@/lib/ingredient-format";
 
 // Parses free-text ingredient lines ("2 cups flour", "1/2 tsp salt (fine)")
 // into structured rows, matching/creating Ingredient records and resolving
@@ -163,14 +163,17 @@ export async function parseIngredientLines(
     if (!text) continue;
     const optional = /\boptional\b/i.test(text);
     text = text.replace(/\(?\boptional\b\)?/i, "").trim();
+    // "($0.20)" and "garlic*" from sites that price or footnote each line.
+    text = cleanIngredientText(text);
 
     const { quantity, rest: afterQty } = parseQuantity(text);
     const { unitId, unitName, rest: afterUnit } = parseUnit(afterQty, unitMap);
 
     let ingredientText = afterUnit.replace(/^(of|the)\s+/i, "").trim();
-    const { cleanName, notes } = extractNotes(ingredientText);
+    const { cleanName, notes: rawNotes } = extractNotes(ingredientText);
     // "garlic, (minced)" leaves "garlic," before the note.
     ingredientText = cleanIngredientName(cleanName);
+    const notes = cleanIngredientNote(rawNotes, ingredientText);
 
     if (!ingredientText) continue;
 

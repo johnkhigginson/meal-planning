@@ -52,9 +52,29 @@ function unitWord(unit: string): string | null {
   return SINGULAR.get(key) ?? null;
 }
 
-// Trimmed decimals: 2, 1.5, 0.33. Nothing for a missing or zero amount.
+// Fractions cooks measure with. 0.33 and 0.333 both snap to 1/3.
+const DENOMINATORS = [2, 3, 4, 8];
+const FRACTION_TOLERANCE = 0.01;
+
+// Kitchen fractions as plain text: 2, 1/2, 1 1/2, 2/3. Anything that isn't
+// near a half, third, quarter or eighth shows as up to 2 decimals (0.2,
+// 1.15). Nothing for a missing or zero amount. Scaled amounts and grocery
+// totals come through here too.
 export function formatQuantity(quantity: number): string {
   if (!Number.isFinite(quantity) || quantity <= 0) return "";
+  let whole = Math.floor(quantity);
+  const part = quantity - whole;
+  if (part > 1 - FRACTION_TOLERANCE) whole += 1;
+  if (part < FRACTION_TOLERANCE || part > 1 - FRACTION_TOLERANCE) {
+    if (whole > 0) return String(whole);
+  } else {
+    for (const den of DENOMINATORS) {
+      const num = Math.round(part * den);
+      if (num > 0 && num < den && Math.abs(part - num / den) <= FRACTION_TOLERANCE) {
+        return whole > 0 ? `${whole} ${num}/${den}` : `${num}/${den}`;
+      }
+    }
+  }
   return String(Math.round(quantity * 100) / 100);
 }
 
@@ -67,10 +87,62 @@ export function formatUnit(unit: string, quantity: number): string {
   return quantity > 1 ? UNIT_WORDS[word] : word;
 }
 
-// "garlic, " -> "garlic". Trailing commas and stray spaces come in with
+// Prices some recipe sites print beside each line: "($0.20)", "($1.17*)",
+// "( $2.50 )", or a bare "$0.43". Other parentheticals ("(15 oz can)") stay.
+const COST_IN_PARENS = /\(\s*\$\s*\d+(?:[.,]\d+)?\s*\**\s*\)/g;
+const BARE_COST = /\$\s*\d+(?:[.,]\d+)?\**/g;
+
+// Costs and "*" footnote markers out, then the spaces, commas and empty
+// parens they leave behind. Used on imported lines and again on display, so
+// recipes saved before this cleanup read cleanly too.
+export function cleanIngredientText(text: string): string {
+  return text
+    .replace(COST_IN_PARENS, " ")
+    .replace(BARE_COST, " ")
+    .replace(/\*+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\(\s+/g, "(")
+    .replace(/\s+([,;)])/g, "$1")
+    .replace(/([,;])(?:\s*[,;])+/g, "$1")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,;]+|[\s,;]+$/g, "");
+}
+
+function words(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+// True when every word of the note is already in the name: "uncooked" beside
+// "uncooked penne pasta".
+function repeatsName(note: string, name: string): boolean {
+  const noteWords = words(note);
+  if (noteWords.length === 0) return false;
+  const nameWords = new Set(words(name));
+  return noteWords.every((w) => nameWords.has(w));
+}
+
+// "garlic, " -> "garlic", "uncooked penne pasta (uncooked)" -> "uncooked
+// penne pasta". Trailing commas, prices and repeated notes come in with
 // imported lines.
 export function cleanIngredientName(name: string): string {
-  return name.replace(/\s+/g, " ").replace(/[\s,;]+$/, "").trim();
+  const cleaned = cleanIngredientText(name);
+  const paren = cleaned.match(/^(.*\S)\s*\(([^()]*)\)$/);
+  return paren && repeatsName(paren[2], paren[1]) ? paren[1] : cleaned;
+}
+
+// A note as it should show beside its ingredient: costs and markers out, and
+// any comma-separated part that only repeats the name dropped. Empty when
+// nothing is left.
+export function cleanIngredientNote(note: string | null | undefined, name: string): string {
+  if (!note) return "";
+  const cleaned = cleanIngredientText(note).replace(/^\(([^()]*)\)$/, "$1");
+  return cleanIngredientText(
+    cleaned
+      .split(",")
+      .filter((part) => !repeatsName(part, name))
+      .join(",")
+  );
 }
 
 // Drops the unit from the front of a name that repeats it, as in

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, Minus, Plus } from "lucide-react";
 import { groupBySection } from "@/lib/recipe-sections";
-import { formatIngredient } from "@/lib/ingredient-format";
+import { cleanIngredientNote, formatIngredient } from "@/lib/ingredient-format";
 import { cn } from "@/lib/utils";
 import { AddMissingToGroceryButton } from "./AddMissingToGroceryButton";
 
@@ -106,6 +106,7 @@ export function ScalableIngredients({
               {group.items.map((ri, i) => {
                 const enough = hasEnough(ri.stock, ri.quantity * factor);
                 const shown = formatIngredient(ri.quantity * factor, ri.unit, ri.name);
+                const note = cleanIngredientNote(ri.notes, shown.name);
                 return (
                   <li
                     key={i}
@@ -125,7 +126,7 @@ export function ScalableIngredients({
                     <span className="min-w-0">
                       <span className="font-extrabold">{shown.amount}</span>{" "}
                       <span>{shown.name}</span>
-                      {ri.notes && <span className="text-sm text-muted-foreground"> ({ri.notes})</span>}
+                      {note && <span className="text-sm text-muted-foreground"> ({note})</span>}
                       {ri.optional && (
                         <Badge variant="secondary" className="ml-2 text-xs print:hidden">
                           optional

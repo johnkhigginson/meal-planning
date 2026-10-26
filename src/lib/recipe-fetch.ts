@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { safeFetch, UnsafeUrlError } from "@/lib/ssrf";
 import { getSiteUrl } from "@/lib/site";
+import { cleanIngredientText } from "@/lib/ingredient-format";
 import {
   extractFallback,
   extractStructuredRecipe,
@@ -378,7 +379,11 @@ export async function scrapeRecipeUrl(rawUrl: string): Promise<ScrapedRecipe> {
 
   try {
     const recipe = await findRecipe(pageUrl, new Deadline());
-    return { ...recipe, imageUrl: absoluteImage(recipe.imageUrl, pageUrl) };
+    // Drop per-line prices and footnote markers before the user sees the list.
+    const ingredients = recipe.ingredients
+      .map((line) => ({ ...line, text: cleanIngredientText(line.text) }))
+      .filter((line) => line.text);
+    return { ...recipe, ingredients, imageUrl: absoluteImage(recipe.imageUrl, pageUrl) };
   } catch (err) {
     if (err instanceof UnsafeUrlError) {
       throw new RecipeScrapeError("INVALID_URL", "That address can't be imported. Use a public recipe website link.");
