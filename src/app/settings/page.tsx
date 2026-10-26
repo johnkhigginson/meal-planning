@@ -17,6 +17,7 @@ import { Loader2, Save, UserPlus, X, Users, LayoutDashboard, Upload, KeyRound, T
 import { useSession, signOut } from "next-auth/react";
 import SettingsSkeleton from "./loading";
 import { OPTIONAL_NAV_ITEMS, parseHiddenNav } from "@/lib/nav";
+import { FooterLinks } from "@/components/shared/FooterLinks";
 
 const ALL_MEAL_SLOTS = [
   { value: "BREAKFAST", label: "Breakfast" },
@@ -556,6 +557,8 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <FooterLinks className="justify-center border-t pt-6 text-sm text-muted-foreground" />
     </div>
   );
 }

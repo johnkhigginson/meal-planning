@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/", "/blog"],
+      allow: ["/", "/blog", "/help", "/privacy", "/terms", "/contact"],
       // Private/app areas (auth-gated anyway) — keep them out of search results.
       disallow: [
         "/admin",

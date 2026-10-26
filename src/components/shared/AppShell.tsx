@@ -9,6 +9,7 @@ import { ImpersonationBanner } from "./ImpersonationBanner";
 import { EmailVerificationBanner } from "./EmailVerificationBanner";
 
 const authPages = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
+const publicPages = ["/privacy", "/terms", "/contact"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -21,18 +22,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // loading gate (which otherwise swaps the page for a spinner — breaking
   // back-navigation between the recipe list and a recipe).
   const isBlog = pathname === "/blog" || pathname.startsWith("/blog/");
+  // Legal and contact pages bring their own public chrome, like the blog.
+  const isPublicPage = publicPages.includes(pathname);
+  const isStandalone = isBlog || isPublicPage;
 
   // Don't show loading spinner on public pages
-  if (status === "loading" && !isAuthPage && !isLandingPage && !isBlog) {
+  if (status === "loading" && !isAuthPage && !isLandingPage && !isStandalone) {
     return <PageLoader />;
   }
 
-  const showNav = session && !isAuthPage && !isBlog && !(isLandingPage && !session);
+  const showNav = session && !isAuthPage && !isStandalone && !(isLandingPage && !session);
 
   if (!showNav) {
     return (
       <div className="flex-1">
-        {!isBlog && <ImpersonationBanner />}
+        {!isStandalone && <ImpersonationBanner />}
         {children}
       </div>
     );

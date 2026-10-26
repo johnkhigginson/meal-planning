@@ -1,4 +1,5 @@
 import { LemonLogo } from "@/components/shared/LemonLogo";
+import { FooterLinks } from "@/components/shared/FooterLinks";
 import Link from "next/link";
 
 export default function AuthLayout({
@@ -20,6 +21,11 @@ export default function AuthLayout({
       <main className="flex flex-1 flex-col items-center px-4 pt-6 pb-20 sm:pt-12">
         {children}
       </main>
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-6xl justify-center px-4 py-8 text-sm text-muted-foreground sm:px-6">
+          <FooterLinks className="justify-center" />
+        </div>
+      </footer>
     </div>
   );
 }

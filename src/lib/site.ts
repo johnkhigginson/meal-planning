@@ -14,3 +14,9 @@ export function absoluteUrl(path: string | null | undefined): string | undefined
   if (/^https?:\/\//i.test(path)) return path;
   return `${getSiteUrl()}${path.startsWith("/") ? "" : "/"}${path}`;
 }
+
+export const SUPPORT_EMAIL = "support@example.com"; // TODO(John): choose the real support address
+
+// Shown as "Last updated" on the privacy, terms and contact pages. Bump it
+// whenever the legal text changes.
+export const LEGAL_LAST_UPDATED = "October 25, 2026";

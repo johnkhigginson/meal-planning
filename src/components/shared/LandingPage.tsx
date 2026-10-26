@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { LemonLogo } from "./LemonLogo";
+import { FooterLinks } from "./FooterLinks";
 import { LemonSlice } from "@/components/landing/LemonSlice";
 import { cn } from "@/lib/utils";
 
@@ -185,10 +186,7 @@ export function LandingPage() {
             <LemonLogo className="h-5 w-5" />
             My Lemon Kitchen
           </span>
-          <nav aria-label="Footer" className="flex gap-6">
-            <Link href="/blog">Recipe blogs</Link>
-            <Link href="/login">Sign in</Link>
-          </nav>
+          <FooterLinks />
         </div>
       </footer>
     </div>

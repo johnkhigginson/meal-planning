@@ -2,7 +2,18 @@ import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 // Routes that don't require authentication
-const publicPaths = ["/", "/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
+const publicPaths = [
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/help",
+  "/privacy",
+  "/terms",
+  "/contact",
+];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;

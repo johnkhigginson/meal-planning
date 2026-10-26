@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PublicShell } from "@/components/shared/PublicShell";
 import {
   CheckCircle2,
   Circle,
@@ -20,7 +20,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Help & getting started" };
+export const metadata = {
+  title: "Help & getting started",
+  description: "How to add recipes, build cookbooks and publish your recipe blog.",
+  alternates: { canonical: "/help" },
+};
 
 interface Step {
   title: string;
@@ -32,7 +36,29 @@ interface Step {
 
 export default async function HelpPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+
+  // Public for signed-out visitors: the guide without the personal checklist,
+  // wrapped in the public chrome since AppShell shows no nav for them.
+  if (!user) {
+    return (
+      <PublicShell>
+        <div className="space-y-8">
+          <div className="space-y-2">
+            <h1 className="text-4xl leading-tight font-medium">Help &amp; getting started</h1>
+            <p className="text-muted-foreground">
+              A quick tour of how to add recipes, build cookbooks, and publish your blog.{" "}
+              <Link href="/register" className="font-bold text-primary underline-offset-4 hover:underline">
+                Create a free account
+              </Link>{" "}
+              to try it.
+            </p>
+          </div>
+          <Guide />
+        </div>
+      </PublicShell>
+    );
+  }
+
   const householdId = user.householdId;
 
   const [recipeCount, importedCount, bookCount, publishedCount, memberCount] = await Promise.all([
@@ -70,7 +96,7 @@ export default async function HelpPage() {
       done: publishedCount > 0,
       href: "/books",
       cta: "Publish a cookbook",
-      detail: "Open a cookbook and hit Publish to put it online at /blog — no login needed for visitors.",
+      detail: "Open a cookbook and hit Publish to put it online at /blog. Visitors don't need to log in.",
     },
     {
       title: "Invite family",
@@ -138,7 +164,14 @@ export default async function HelpPage() {
         </CardContent>
       </Card>
 
-      {/* Guide */}
+      <Guide />
+    </div>
+  );
+}
+
+function Guide() {
+  return (
+    <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
@@ -146,14 +179,14 @@ export default async function HelpPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-          <p>On the <Link href="/recipes/new" className="text-primary underline">New Recipe</Link> page you can add a recipe four ways — pick a Source at the top:</p>
+          <p>On the <Link href="/recipes/new" className="text-primary underline">New Recipe</Link> page you can add a recipe four ways. Pick a Source at the top:</p>
           <ul className="space-y-2">
-            <li className="flex gap-2"><UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Personal</strong> — type the name, ingredients, and steps yourself.</span></li>
-            <li className="flex gap-2"><Globe className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Website</strong> — paste a recipe URL and click <em>Import</em> to auto-fill the name, photo, ingredients, and steps.</span></li>
-            <li className="flex gap-2"><Camera className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Cookbook / photo</strong> — snap or upload a photo of a recipe and it&apos;s read automatically.</span></li>
-            <li className="flex gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Document import</strong> — from the Recipes page, upload a document with one or more recipes.</span></li>
+            <li className="flex gap-2"><UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Personal</strong>: type the name, ingredients, and steps yourself.</span></li>
+            <li className="flex gap-2"><Globe className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Website</strong>: paste a recipe URL and click <em>Import</em> to auto-fill the name, photo, ingredients, and steps.</span></li>
+            <li className="flex gap-2"><Camera className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Cookbook / photo</strong>: snap or upload a photo of a recipe and it&apos;s read automatically.</span></li>
+            <li className="flex gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><strong className="text-foreground">Document import</strong>: from the Recipes page, upload a document with one or more recipes.</span></li>
           </ul>
-          <p>Add a <strong className="text-foreground">photo</strong> by pasting an image link in the Photo field — it shows on the recipe and your blog. You can also set the recipe&apos;s <strong className="text-foreground">author</strong> (any household member).</p>
+          <p>Add a <strong className="text-foreground">photo</strong> by pasting an image link in the Photo field. It shows on the recipe and your blog. You can also set the recipe&apos;s <strong className="text-foreground">author</strong> (any household member).</p>
         </CardContent>
       </Card>
 
@@ -181,6 +214,6 @@ export default async function HelpPage() {
           <p className="flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Invite family from Settings so everyone can add recipes to your shared collection.</p>
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }

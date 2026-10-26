@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LemonLogo } from "@/components/shared/LemonLogo";
+import { FooterLinks } from "@/components/shared/FooterLinks";
 
 // Standalone chrome for the public blog. Intentionally independent of the
 // authenticated AppShell/Navbar so outside visitors get a clean, login-free
@@ -55,9 +56,12 @@ export function BlogShell({
       <main className={`mx-auto w-full ${width} flex-1 px-4 py-10`}>{children}</main>
 
       <footer className="mt-8 border-t py-8 print:hidden">
-        <div className={`mx-auto ${width} flex items-center gap-2 px-4 text-xs text-muted-foreground`}>
-          <LemonLogo className="h-4 w-4" />
-          Powered by My Lemon Kitchen
+        <div className={`mx-auto ${width} flex flex-wrap items-center justify-between gap-4 px-4 text-xs text-muted-foreground`}>
+          <span className="flex items-center gap-2">
+            <LemonLogo className="h-4 w-4" />
+            Powered by My Lemon Kitchen
+          </span>
+          <FooterLinks className="gap-x-4" />
         </div>
       </footer>
     </div>
