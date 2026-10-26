@@ -8,6 +8,7 @@ import { PageLoader } from "@/components/shared/PageLoader";
 import { Plus, Check, Clock, Users, ArrowLeft, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { decodeEntities } from "@/lib/text-clean";
 
 interface LibraryRecipe {
   id: number;
@@ -91,7 +92,7 @@ export default function BrowseLibraryPage() {
             return (
               <div key={recipe.id} className="flex flex-col gap-3 rounded-2xl border bg-card p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base leading-snug font-bold">{recipe.name}</h3>
+                  <h3 className="text-base leading-snug font-bold">{decodeEntities(recipe.name)}</h3>
                   <Button
                     size="sm"
                     variant={added ? "secondary" : "default"}
@@ -107,7 +108,7 @@ export default function BrowseLibraryPage() {
                   </Button>
                 </div>
                 {recipe.description && (
-                  <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{recipe.description}</p>
+                  <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{decodeEntities(recipe.description)}</p>
                 )}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                   {totalTime > 0 && (

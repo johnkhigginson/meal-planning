@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Clock, Users, Search } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { decodeEntities } from "@/lib/text-clean";
 
 // How many recipes to reveal per "Load more" click on the public blog.
 const PER_PAGE = 12;
@@ -167,7 +168,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                         {/* Fills the card panel: fixed height on mobile, stretches to row height on desktop. */}
                         <Image
                           src={recipe.imageUrl}
-                          alt={recipe.name}
+                          alt={decodeEntities(recipe.name)}
                           fill
                           sizes="(min-width: 640px) 13rem, 100vw"
                           unoptimized={!canOptimizeImage(recipe.imageUrl)}
@@ -176,7 +177,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                       </div>
                     )}
                     <CardContent className="flex-1 p-5">
-                      <h2 className="font-display text-xl leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{recipe.name}</h2>
+                      <h2 className="font-display text-xl leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{decodeEntities(recipe.name)}</h2>
                       {recipe.publishedAt && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {formatDate(recipe.publishedAt)}
@@ -184,7 +185,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                         </p>
                       )}
                       {recipe.description && (
-                        <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{recipe.description}</p>
+                        <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{decodeEntities(recipe.description)}</p>
                       )}
                       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
                         {totalTime > 0 && (

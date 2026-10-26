@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL, guardAi } from "@/lib/ai";
+import { cleanImportedRecipeText } from "@/lib/text-clean";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a photo of a cookbook page or recipe card, extract the recipe information and return it as JSON.
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     const recipe = JSON.parse(jsonStr);
-    return NextResponse.json(recipe);
+    return NextResponse.json(cleanImportedRecipeText(recipe));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to parse photo";
     return NextResponse.json({ error: message }, { status: 500 });

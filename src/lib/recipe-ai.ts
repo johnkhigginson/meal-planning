@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL } from "@/lib/ai";
+import { cleanStepText } from "@/lib/text-clean";
 import { normalizeImportedIngredients, type ImportedIngredient } from "@/lib/recipe-sections";
 
 // AI extraction of structured recipe data from a (messy) blog post. Used by the
@@ -114,7 +115,7 @@ export async function extractRecipeFromText(text: string): Promise<AiRecipe | nu
       prepTimeMinutes: typeof parsed.prepTimeMinutes === "number" ? parsed.prepTimeMinutes : null,
       cookTimeMinutes: typeof parsed.cookTimeMinutes === "number" ? parsed.cookTimeMinutes : null,
       ingredients: normalizeImportedIngredients(parsed.ingredients),
-      instructions: typeof parsed.instructions === "string" ? parsed.instructions : "",
+      instructions: typeof parsed.instructions === "string" ? cleanStepText(parsed.instructions) : "",
     };
   } catch {
     return null;

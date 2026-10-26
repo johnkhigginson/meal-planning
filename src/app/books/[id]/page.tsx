@@ -18,6 +18,7 @@ import { PageLoader } from "@/components/shared/PageLoader";
 import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Plus, Trash2, Share2, Clock, Users, Check, Copy, Loader2, Globe, ExternalLink, UserPlus, UserRound, X, BookOpen, UtensilsCrossed } from "lucide-react";
 import { recipeAuthorName } from "@/lib/recipe-author";
+import { decodeEntities } from "@/lib/text-clean";
 
 interface BookRecipe {
   id: number;
@@ -381,8 +382,8 @@ export default function BookDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/recipes/${recipe.id}`} className="min-w-0 flex-1 rounded-lg focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                      <h3 className="font-heading text-lg leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{recipe.name}</h3>
-                      {recipe.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{recipe.description}</p>}
+                      <h3 className="font-heading text-lg leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{decodeEntities(recipe.name)}</h3>
+                      {recipe.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{decodeEntities(recipe.description)}</p>}
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
                         {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{totalTime}m</span>}
                         <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{recipe.servings}</span>
@@ -412,7 +413,7 @@ export default function BookDetailPage() {
               const alreadyIn = existingIds.has(recipe.id) || addedIds.has(recipe.id);
               return (
                 <div key={recipe.id} className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 transition-colors duration-200 ease-out hover:bg-muted">
-                  <span className="text-sm font-semibold">{recipe.name}</span>
+                  <span className="text-sm font-semibold">{decodeEntities(recipe.name)}</span>
                   <Button size="sm" variant={alreadyIn ? "secondary" : "default"} disabled={alreadyIn} onClick={() => addRecipe(recipe.id)}>
                     {alreadyIn ? <><Check className="h-3.5 w-3.5" /> Added</> : <><Plus className="h-3.5 w-3.5" /> Add</>}
                   </Button>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getPublishedRecipe } from "@/lib/blog";
 import { safeFetch } from "@/lib/ssrf";
 import { OG_COLORS, OG_SIZE, OgBrand, OgLemonMark } from "@/lib/og";
+import { decodeEntities } from "@/lib/text-clean";
 
 export const alt = "Recipe from My Lemon Kitchen";
 export const size = OG_SIZE;
@@ -58,7 +59,8 @@ export default async function Image({
 
   const { book, recipe } = data;
   const photo = await loadPhoto(recipe.imageUrl);
-  const title = recipe.name.length > 90 ? `${recipe.name.slice(0, 87).trimEnd()}...` : recipe.name;
+  const fullName = decodeEntities(recipe.name);
+  const title = fullName.length > 90 ? `${fullName.slice(0, 87).trimEnd()}...` : fullName;
   const titleSize = title.length > 50 ? 56 : title.length > 28 ? 68 : 80;
 
   return new ImageResponse(

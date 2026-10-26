@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { groupBySection } from "@/lib/recipe-sections";
 import { cleanIngredientNote, formatIngredient } from "@/lib/ingredient-format";
 import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
+import { decodeEntities } from "@/lib/text-clean";
 
 interface SharedRecipe {
   name: string;
@@ -123,9 +124,9 @@ export default function SharePage() {
           <header className="space-y-3">
             <div className="flex items-start gap-3">
               <UtensilsCrossed className="mt-2.5 h-6 w-6 shrink-0 text-primary" />
-              <h1 className="text-4xl leading-tight font-medium text-balance">{data.recipe.name}</h1>
+              <h1 className="text-4xl leading-tight font-medium text-balance">{decodeEntities(data.recipe.name)}</h1>
             </div>
-            {data.recipe.description && <p className="text-lg leading-relaxed text-muted-foreground">{data.recipe.description}</p>}
+            {data.recipe.description && <p className="text-lg leading-relaxed text-muted-foreground">{decodeEntities(data.recipe.description)}</p>}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
               {(data.recipe.prepTimeMinutes || 0) + (data.recipe.cookTimeMinutes || 0) > 0 && (
                 <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{(data.recipe.prepTimeMinutes || 0) + (data.recipe.cookTimeMinutes || 0)}m</span>
@@ -184,7 +185,7 @@ export default function SharePage() {
               return (
                 <div key={i} className="rounded-2xl border bg-card p-4">
                   <h2 className="text-base leading-snug font-bold">{r.name}</h2>
-                  {r.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{r.description}</p>}
+                  {r.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{decodeEntities(r.description)}</p>}
                   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{totalTime}m</span>}
                     <span className="flex items-center gap-1"><Users className="h-3 w-3" />{r.servings}</span>

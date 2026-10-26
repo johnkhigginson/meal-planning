@@ -3,6 +3,7 @@ import Image from "next/image";
 import { canOptimizeImage } from "@/lib/image";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Users, Heart, UserRound, UtensilsCrossed } from "lucide-react";
+import { decodeEntities } from "@/lib/text-clean";
 
 interface RecipeCardProps {
   recipe: {
@@ -53,7 +54,7 @@ export function RecipeCard({ recipe, showAuthor = false }: RecipeCardProps) {
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="space-y-0.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-2 text-base leading-snug font-bold">{recipe.name}</h3>
+            <h3 className="line-clamp-2 text-base leading-snug font-bold">{decodeEntities(recipe.name)}</h3>
             {recipe.isFavorite && (
               <Heart
                 role="img"
@@ -72,7 +73,7 @@ export function RecipeCard({ recipe, showAuthor = false }: RecipeCardProps) {
 
         {recipe.description && (
           <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-            {recipe.description}
+            {decodeEntities(recipe.description)}
           </p>
         )}
 

@@ -14,6 +14,7 @@ import { getPublishedRecipe, formatBlogDate } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { buildRecipeBreadcrumbJsonLd, buildRecipeJsonLd, jsonLdString, recipeMetadata } from "@/lib/seo";
+import { decodeEntities } from "@/lib/text-clean";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
       <article>
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-display text-4xl leading-tight font-semibold tracking-tight">{recipe.name}</h1>
+          <h1 className="font-display text-4xl leading-tight font-semibold tracking-tight">{decodeEntities(recipe.name)}</h1>
           <PrintButton />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -85,7 +86,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
         {recipe.imageUrl && (
           <Image
             src={recipe.imageUrl}
-            alt={recipe.name}
+            alt={decodeEntities(recipe.name)}
             width={1600}
             height={1200}
             sizes="(min-width: 48rem) 48rem, 100vw"

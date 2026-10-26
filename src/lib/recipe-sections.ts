@@ -8,6 +8,8 @@
 // `--- Name ---` and also read back a markdown-style `## Name`, which is what a
 // person is most likely to type into the instructions box by hand.
 
+import { decodeEntities } from "@/lib/text-clean";
+
 export const SECTION_NAME_MAX = 100;
 
 const DASH_HEADING = /^\s*-{3,}\s*(.+?)\s*-{3,}\s*$/;
@@ -149,7 +151,10 @@ export function normalizeImportedIngredients(input: unknown): ImportedIngredient
   const out: ImportedIngredient[] = [];
   let carried: string | null = null;
 
-  for (const item of input) {
+  for (const raw of input) {
+    // Pages and AI replies carry entities ("1 cup half &amp; half"). Decode
+    // here so every importer's lines and sections are plain text.
+    const item = typeof raw === "string" ? decodeEntities(raw) : raw;
     if (typeof item === "string") {
       const heading = headingFromLooseLine(item);
       if (heading) {
@@ -163,7 +168,7 @@ export function normalizeImportedIngredients(input: unknown): ImportedIngredient
 
     if (item && typeof item === "object") {
       const row = item as { text?: unknown; name?: unknown; section?: unknown; group?: unknown };
-      const text = typeof row.text === "string" ? row.text : typeof row.name === "string" ? row.name : "";
+      const text = decodeEntities(typeof row.text === "string" ? row.text : typeof row.name === "string" ? row.name : "");
       if (!text.trim()) continue;
       // The scraper wraps every line as an object, so a heading can arrive
       // here too ("For the crust:" in a flat JSON-LD list).
@@ -173,7 +178,9 @@ export function normalizeImportedIngredients(input: unknown): ImportedIngredient
         continue;
       }
       const section =
-        cleanSectionName(typeof row.section === "string" ? row.section : typeof row.group === "string" ? row.group : null);
+        cleanSectionName(
+          decodeEntities(typeof row.section === "string" ? row.section : typeof row.group === "string" ? row.group : null) || null
+        );
       out.push({ text: text.trim(), section: section ?? carried });
     }
   }

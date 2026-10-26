@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
 import { GEMINI_MODEL, guardAi } from "@/lib/ai";
+import { cleanImportedRecipeText } from "@/lib/text-clean";
 import { parseIngredientLines, type ParsedIngredient } from "@/lib/ingredient-parse";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a document that contains one or more recipes, extract each recipe as structured data.
@@ -125,7 +126,8 @@ export async function POST(request: NextRequest) {
 
       // Auto-parse ingredients for each recipe
       const results = [];
-      for (const recipe of parsed.recipes || []) {
+      for (const raw of parsed.recipes || []) {
+        const recipe = cleanImportedRecipeText(raw);
         let ingredients: RecipeIngredientData[] = [];
         if (recipe.ingredients?.length) {
           try {
@@ -174,7 +176,8 @@ export async function POST(request: NextRequest) {
   }
 
   const results = [];
-  for (const recipe of parsed.recipes || []) {
+  for (const raw of parsed.recipes || []) {
+    const recipe = cleanImportedRecipeText(raw);
     let ingredients: RecipeIngredientData[] = [];
     if (recipe.ingredients?.length) {
       try {

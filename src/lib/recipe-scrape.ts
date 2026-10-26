@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { cleanIngredientText } from "@/lib/ingredient-format";
 import { stripFootnoteMarkers } from "@/lib/parse-steps";
+import { cleanStepText, decodeEntities } from "@/lib/text-clean";
 import {
   cleanSectionName,
   formatSectionHeading,
@@ -11,34 +12,6 @@ import {
 // Reads a recipe off a web page: schema.org JSON-LD when the site publishes it
 // (nearly all recipe sites do), falling back to common HTML patterns. Kept out
 // of the route handler so it can be exercised against saved pages.
-
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  rsquo: "\u2019", lsquo: "\u2018", rdquo: "\u201d", ldquo: "\u201c",
-  ndash: "\u2013", mdash: "\u2014", hellip: "\u2026", deg: "\u00b0",
-  frac12: "\u00bd", frac14: "\u00bc", frac34: "\u00be",
-  frac13: "\u2153", frac23: "\u2154", times: "\u00d7",
-};
-
-// JSON-LD recipe fields routinely carry HTML entities ("half &amp; half",
-// "don&#39;t add salt"). Decode them rather than dropping them, which is what
-// used to turn apostrophes into spaces.
-// A code point past U+10FFFF makes String.fromCodePoint throw, which turned one
-// bad entity into a failed import.
-function fromCodePoint(match: string, code: number): string {
-  return code <= 0x10ffff ? String.fromCodePoint(code) : match;
-}
-
-function decodeEntities(text: string): string {
-  const once = (s: string) =>
-    s
-      .replace(/&#x([0-9a-f]+);/gi, (m, hex) => fromCodePoint(m, parseInt(hex, 16)))
-      .replace(/&#(\d+);/g, (m, dec) => fromCodePoint(m, parseInt(dec, 10)))
-      .replace(/&([a-z][a-z0-9]*);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
-  // Sites often double-encode ("don&amp;#39;t"), so a second pass finishes
-  // the job.
-  return once(once(text));
-}
 
 const stripTags = (text: string) => text.replace(/<[^>]*>/g, "");
 
@@ -472,9 +445,15 @@ export function extractStructuredRecipe(html: string): ScrapedRecipe | null {
 // The fetcher runs every scraped recipe through this.
 export function cleanScrapedRecipe(recipe: ScrapedRecipe): ScrapedRecipe {
   const ingredients = recipe.ingredients
-    .map((line) => ({ ...line, text: cleanIngredientText(line.text) }))
+    .map((line) => ({ ...line, text: cleanIngredientText(decodeEntities(line.text)) }))
     .filter((line) => line.text);
-  return { ...recipe, ingredients, instructions: stripFootnoteMarkers(recipe.instructions) };
+  return {
+    ...recipe,
+    name: decodeEntities(recipe.name),
+    description: decodeEntities(recipe.description),
+    ingredients,
+    instructions: cleanStepText(stripFootnoteMarkers(recipe.instructions)),
+  };
 }
 
 // The page-level entry point: structured data first, then a best-effort read of

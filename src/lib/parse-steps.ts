@@ -4,6 +4,7 @@
 // Pure module: no DOM, so it runs on the server and in the browser alike.
 
 import { parseInstructionSections } from "@/lib/recipe-sections";
+import { cleanStepText, decodeEntities, stripMarkdownMarkers } from "@/lib/text-clean";
 
 export interface CookStep {
   text: string;
@@ -19,34 +20,6 @@ const MARKER =
 
 // Common abbreviations that end in a period but do not end a sentence.
 const ABBREVIATIONS = /\b(?:approx|tsp|tbsp|tbs|oz|lb|lbs|pt|qt|gal|e\.g|i\.e|vs|no|deg|fl|pkg)\.$/i;
-
-const ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  "#39": "'",
-  rsquo: "'",
-  lsquo: "'",
-  rdquo: '"',
-  ldquo: '"',
-  deg: "°",
-  frac12: "½",
-  frac14: "¼",
-  frac34: "¾",
-};
-
-function decodeEntities(text: string): string {
-  return text.replace(/&(#\d+|#x[0-9a-f]+|[a-z0-9]+);/gi, (match, code: string) => {
-    const lower = code.toLowerCase();
-    if (lower in ENTITIES) return ENTITIES[lower];
-    if (lower.startsWith("#x")) return String.fromCodePoint(parseInt(lower.slice(2), 16));
-    if (lower.startsWith("#")) return String.fromCodePoint(parseInt(lower.slice(1), 10));
-    return match;
-  });
-}
 
 function stripTags(html: string): string {
   return decodeEntities(html.replace(/<[^>]*>/g, " "));
@@ -147,10 +120,13 @@ function textToSteps(text: string): string[] {
 }
 
 // Splits one block of instructions into step texts with numbering removed.
+// Entities and stray "**" or "__" are cleaned here too, so recipes stored
+// before the importers cleaned them read properly.
 export function parseSteps(instructions: string | null | undefined): string[] {
-  const text = stripFootnoteMarkers(instructions || "").trim();
+  const text = stripMarkdownMarkers(stripFootnoteMarkers(instructions || "")).trim();
   if (!text) return [];
-  return looksLikeHtml(text) ? htmlToSteps(text) : textToSteps(text);
+  const steps = looksLikeHtml(text) ? htmlToSteps(text) : textToSteps(text);
+  return steps.map(cleanStepText).map(clean).filter(Boolean);
 }
 
 // Section-aware version: `--- Name ---` heading lines become the section of

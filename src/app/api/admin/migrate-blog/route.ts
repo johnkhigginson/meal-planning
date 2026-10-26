@@ -13,6 +13,7 @@ import { uniqueSlug } from "@/lib/slug";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { audit } from "@/lib/audit";
 import { findOrCreateHouseholdTag } from "@/lib/tags";
+import { cleanStepText, decodeEntities } from "@/lib/text-clean";
 
 export const runtime = "nodejs";
 // A full blog can have hundreds of posts; give the import room to run.
@@ -191,13 +192,13 @@ export async function POST(request: NextRequest) {
   });
 
   for (const post of ordered) {
-    const name = (post.title || "Untitled Recipe").slice(0, 300);
+    const name = decodeEntities(post.title || "Untitled Recipe").slice(0, 300);
     const key = postKey(name, post.permalink, post.publishedAt);
     const existingId = existingByKey.get(key);
 
     try {
       const safeHtml = sanitizeBlogHtml(post.contentHtml);
-      const plain = htmlToText(post.contentHtml);
+      const plain = decodeEntities(htmlToText(post.contentHtml));
       const description = buildDescription(post.author, plain);
 
       if (existingId != null) {
@@ -225,7 +226,7 @@ export async function POST(request: NextRequest) {
       const sections = extractRecipeSections(post.contentHtml);
       // `instructions` is non-nullable; fall back to the full post text. The AI
       // pass refines this later.
-      const instructions = sections.instructions || plain || "See original post for details.";
+      const instructions = cleanStepText(sections.instructions) || plain || "See original post for details.";
 
       const recipe = await prisma.recipe.create({
         data: {

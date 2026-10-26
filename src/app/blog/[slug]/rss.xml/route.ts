@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPublishedBookBySlug } from "@/lib/blog";
 import { getSiteUrl } from "@/lib/site";
+import { decodeEntities } from "@/lib/text-clean";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     .map((r) => {
       const link = `${feedUrl}/${r.slug ?? r.id}`;
       const date = (r.publishedAt ?? new Date()).toUTCString();
-      const desc = r.description ?? "";
+      const desc = decodeEntities(r.description);
       return `    <item>
-      <title>${xml(r.name)}</title>
+      <title>${xml(decodeEntities(r.name))}</title>
       <link>${xml(link)}</link>
       <guid isPermaLink="true">${xml(link)}</guid>
       <pubDate>${date}</pubDate>

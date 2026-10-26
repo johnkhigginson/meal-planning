@@ -20,6 +20,7 @@ import { parseCookSteps } from "@/lib/parse-steps";
 import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { convertQuantity } from "@/lib/units";
 import { PROSE_CLASS } from "@/components/blog/BlogShell";
+import { decodeEntities } from "@/lib/text-clean";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -102,21 +103,21 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           )}
           <div className="flex items-start gap-3">
             <h1 className="text-[clamp(2.25rem,5vw,3.75rem)] leading-[1.04] font-medium tracking-[-0.025em] text-balance">
-              {recipe.name}
+              {decodeEntities(recipe.name)}
             </h1>
             {recipe.isFavorite && (
               <Heart className="mt-3 h-6 w-6 shrink-0 fill-red-600 text-red-600" aria-label="Favorite" />
             )}
           </div>
           {recipe.description && (
-            <p className="max-w-[40em] text-lg leading-relaxed text-muted-foreground">{recipe.description}</p>
+            <p className="max-w-[40em] text-lg leading-relaxed text-muted-foreground">{decodeEntities(recipe.description)}</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          <CookMode recipeName={recipe.name} steps={parseCookSteps(recipe.instructions)} />
+          <CookMode recipeName={decodeEntities(recipe.name)} steps={parseCookSteps(recipe.instructions)} />
           <AddToMealPlanButton
             recipeId={recipe.id}
-            recipeName={recipe.name}
+            recipeName={decodeEntities(recipe.name)}
             servings={recipe.servings}
             enabledMealSlots={settings?.enabledMealSlots ?? ""}
           />
@@ -174,7 +175,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
       {recipe.imageUrl && (
         <Image
           src={recipe.imageUrl}
-          alt={recipe.name}
+          alt={decodeEntities(recipe.name)}
           width={1600}
           height={1200}
           sizes="(min-width: 64rem) 64rem, 100vw"
