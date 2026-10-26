@@ -78,7 +78,7 @@ export default function LibraryPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setScrapeError(data.error || "Failed to import");
+        setScrapeError(`${data.error || "Failed to import."} You can fill in the fields below by hand.`);
       } else {
         setRecipeName(data.name || "");
         setRecipeDesc(data.description || "");

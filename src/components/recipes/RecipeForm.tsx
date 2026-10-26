@@ -188,6 +188,11 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [parsingPhoto, setParsingPhoto] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  // A failed URL import, with the server's reason code, shown with ways to
+  // add the recipe anyway.
+  const [urlImportError, setUrlImportError] = useState<{ message: string; code: string } | null>(null);
+  const [pastedIngredients, setPastedIngredients] = useState("");
+  const sourceUrlRef = useRef<HTMLInputElement>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -464,6 +469,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
     if (!form.sourceUrl) return;
     setScraping(true);
     setImportError(null);
+    setUrlImportError(null);
 
     try {
       const res = await fetch("/api/recipes/scrape", {
@@ -473,8 +479,10 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        setImportError(err.error || "Failed to scrape recipe");
+        const err = await res.json().catch(() => null);
+        const code = typeof err?.code === "string" ? err.code : "FETCH_FAILED";
+        setUrlImportError({ message: err?.error || "We couldn't import that page.", code });
+        trackEvent("recipe_url_import_failed", { code });
         return;
       }
 
@@ -482,10 +490,36 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       applyImportedData(data);
       trackEvent("recipe_url_import");
     } catch {
-      setImportError("Failed to connect to URL");
+      setUrlImportError({
+        message: "We couldn't reach the server. Check your connection and try again.",
+        code: "FETCH_FAILED",
+      });
     } finally {
       setScraping(false);
     }
+  }
+
+  // Fallbacks offered when a URL import fails.
+  function addPastedIngredients() {
+    const lines = pastedIngredients
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
+    applyImportedData({ ingredients: lines });
+    setPastedIngredients("");
+  }
+
+  function importScreenshot() {
+    // A screenshot comes from the photo library, not the camera.
+    fileInputRef.current?.removeAttribute("capture");
+    fileInputRef.current?.click();
+  }
+
+  function tryAnotherUrl() {
+    setUrlImportError(null);
+    sourceUrlRef.current?.focus();
+    sourceUrlRef.current?.select();
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -511,6 +545,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
       const data = await res.json();
       applyImportedData(data);
+      setUrlImportError(null);
     } catch {
       setImportError("Failed to parse photo");
     } finally {
@@ -685,6 +720,17 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
           <CardTitle className="text-xl">Source</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Shared by the cookbook photo buttons and the screenshot fallback
+              offered when a URL import fails. */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhotoUpload}
+            className="hidden"
+            id="photo-upload"
+          />
           <Select
             value={form.sourceType}
             onValueChange={(v) => updateForm("sourceType", v ?? "PERSONAL")}
@@ -707,6 +753,7 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                 <Label htmlFor="sourceUrl">Website URL</Label>
                 <div className="flex gap-2">
                   <Input
+                    ref={sourceUrlRef}
                     id="sourceUrl"
                     type="url"
                     value={form.sourceUrl}
@@ -731,6 +778,63 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               <p className="text-xs text-muted-foreground">
                 Paste a recipe URL and click Import to auto-fill the recipe details
               </p>
+
+              {urlImportError && (
+                <div
+                  role="alert"
+                  className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"
+                >
+                  <p className="font-medium text-destructive">{urlImportError.message}</p>
+                  <p className="text-muted-foreground">You can still add this recipe:</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="pastedIngredients">
+                      Paste the ingredients, one per line. Paste the steps into Instructions below.
+                    </Label>
+                    <Textarea
+                      id="pastedIngredients"
+                      value={pastedIngredients}
+                      onChange={(e) => setPastedIngredients(e.target.value)}
+                      rows={4}
+                      placeholder={"2 cups flour\n1 tsp salt"}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addPastedIngredients}
+                      disabled={!pastedIngredients.trim()}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add ingredients
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={importScreenshot}
+                      disabled={parsingPhoto}
+                    >
+                      {parsingPhoto ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="mr-2 h-4 w-4" />
+                      )}
+                      {parsingPhoto ? "Reading photo..." : "Import a screenshot or photo"}
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={tryAnotherUrl}>
+                      <Globe className="mr-2 h-4 w-4" />
+                      Try another URL
+                    </Button>
+                  </div>
+                  {urlImportError.code === "TIMEOUT" && (
+                    <p className="text-xs text-muted-foreground">
+                      Slow sites sometimes answer on a second try, so importing again in a minute may work.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -762,15 +866,6 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
               <div className="space-y-2">
                 <Label>Upload photo of recipe</Label>
                 <div className="flex gap-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    id="photo-upload"
-                  />
                   <Button
                     type="button"
                     variant="outline"

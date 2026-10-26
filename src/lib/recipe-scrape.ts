@@ -61,13 +61,21 @@ export interface ScrapedRecipe {
   imageUrl: string | null;
 }
 
-function parseDuration(iso8601: string): number | null {
-  if (!iso8601) return null;
-  const match = iso8601.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+function parseDuration(iso8601: unknown): number | null {
+  if (!iso8601 || typeof iso8601 !== "string") return null;
+  const match = iso8601.match(/P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return null;
-  const hours = parseInt(match[1] || "0", 10);
-  const minutes = parseInt(match[2] || "0", 10);
-  return hours * 60 + minutes || null;
+  const days = parseInt(match[1] || "0", 10);
+  const hours = parseInt(match[2] || "0", 10);
+  const minutes = parseInt(match[3] || "0", 10);
+  return days * 1440 + hours * 60 + minutes || null;
+}
+
+function parseServings(raw: unknown): number | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value == null) return null;
+  const match = String(value).match(/\d+/);
+  return match ? parseInt(match[0], 10) : null;
 }
 
 // ─── Ingredient groups ──────────────────────────────────────────
@@ -166,32 +174,44 @@ interface RawStep {
   text: string;
 }
 
-// Flattens schema.org instructions (plain strings, HowToStep, HowToSection)
-// into steps that remember which section they belong to.
-function collectSteps(raw: unknown[]): RawStep[] {
+// schema.org types arrive as "Recipe", ["Recipe", "NewsArticle"], or a full IRI
+// like "http://schema.org/Recipe".
+function hasType(node: unknown, type: string): boolean {
+  if (!node || typeof node !== "object") return false;
+  const raw = (node as { "@type"?: unknown })["@type"];
+  const types = Array.isArray(raw) ? raw : [raw];
+  return types.some((t) => typeof t === "string" && t.replace(/^.*[/:]/, "") === type);
+}
+
+// Flattens schema.org instructions (plain strings, HowToStep, HowToSection,
+// sections inside sections) into steps that remember which section they belong
+// to.
+function collectSteps(raw: unknown): RawStep[] {
   const steps: RawStep[] = [];
 
-  const pushStep = (value: unknown, section: string | null) => {
+  const walk = (value: unknown, section: string | null) => {
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, section);
+      return;
+    }
     if (typeof value === "string") {
       const text = cleanText(value);
       if (text) steps.push({ section, text });
       return;
     }
-    const item = value as { text?: string; description?: string } | null;
-    const text = cleanText(item?.text || item?.description || "");
+    if (!value || typeof value !== "object") return;
+
+    const node = value as { name?: string; text?: string; description?: string; itemListElement?: unknown };
+    if (hasType(node, "HowToSection")) {
+      walk(node.itemListElement, cleanSectionName(cleanText(node.name || "")) ?? section);
+      return;
+    }
+    const text = cleanText(node.text || node.description || "");
     if (text) steps.push({ section, text });
+    else if (node.itemListElement) walk(node.itemListElement, section);
   };
 
-  for (const item of raw) {
-    const node = item as { "@type"?: string; name?: string; itemListElement?: unknown[] } | null;
-    if (node?.["@type"] === "HowToSection" && Array.isArray(node.itemListElement)) {
-      const section = cleanSectionName(cleanText(node.name || ""));
-      for (const sub of node.itemListElement) pushStep(sub, section);
-      continue;
-    }
-    pushStep(item, null);
-  }
-
+  walk(raw, null);
   return steps;
 }
 
@@ -208,6 +228,46 @@ function renderInstructions(steps: RawStep[]): string {
     .join("\n\n");
 }
 
+// Finds the Recipe node wherever the site put it: at the top level, in an
+// array, in @graph, or under a page's mainEntity.
+function findRecipeNode(data: unknown, depth = 0): Record<string, unknown> | null {
+  if (!data || typeof data !== "object" || depth > 5) return null;
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const found = findRecipeNode(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  const node = data as Record<string, unknown>;
+  if (hasType(node, "Recipe")) return node;
+  for (const key of ["@graph", "mainEntity"]) {
+    const found = findRecipeNode(node[key], depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Some sites emit JSON-LD with raw newlines or tabs inside strings, which
+// JSON.parse rejects. Retry with those control characters turned into spaces.
+function parseJsonLd(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return JSON.parse(text.replace(/[\u0000-\u001f]+/g, " "));
+  }
+}
+
+function imageFrom(raw: unknown): string | null {
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof first === "string") return first;
+  if (first && typeof first === "object") {
+    const url = (first as { url?: unknown }).url;
+    if (typeof url === "string") return url;
+  }
+  return null;
+}
+
 export function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
   const $ = cheerio.load(html);
   const scripts = $('script[type="application/ld+json"]');
@@ -217,29 +277,8 @@ export function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
       const text = $(scripts[i]).html();
       if (!text) continue;
 
-      let data = JSON.parse(text);
-
-      // Handle @graph arrays
-      if (data["@graph"]) {
-        data = data["@graph"];
-      }
-
-      // Handle arrays
-      if (Array.isArray(data)) {
-        data = data.find(
-          (item: Record<string, unknown>) =>
-            item["@type"] === "Recipe" ||
-            (Array.isArray(item["@type"]) &&
-              (item["@type"] as string[]).includes("Recipe"))
-        );
-      }
-
+      const data = findRecipeNode(parseJsonLd(text));
       if (!data) continue;
-
-      const type = data["@type"];
-      if (type !== "Recipe" && !(Array.isArray(type) && type.includes("Recipe"))) {
-        continue;
-      }
 
       // Extract instructions - handle many formats
       let instructions = "";
@@ -247,50 +286,33 @@ export function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
       if (typeof rawInstructions === "string") {
         // Could be HTML or plain text
         instructions = cleanText(rawInstructions);
-      } else if (Array.isArray(rawInstructions)) {
+      } else if (rawInstructions && typeof rawInstructions === "object") {
         instructions = renderInstructions(collectSteps(rawInstructions));
       }
 
       // Extract ingredients, restoring the group headings from the page HTML.
+      // Older markup uses "ingredients", and a few sites send one string.
       let ingredients: ImportedIngredient[] = [];
-      if (Array.isArray(data.recipeIngredient)) {
-        const flatLines = data.recipeIngredient.map((i: string) =>
-          typeof i === "string" ? cleanText(i) : cleanText(String(i))
-        );
+      const rawIngredients = data.recipeIngredient ?? data.ingredients;
+      const ingredientList = Array.isArray(rawIngredients)
+        ? rawIngredients
+        : typeof rawIngredients === "string"
+          ? [rawIngredients]
+          : [];
+      if (ingredientList.length > 0) {
+        const flatLines = ingredientList.map((i) => cleanText(String(i))).filter(Boolean);
         ingredients = applyIngredientSections(flatLines, extractIngredientLines($));
-      }
-
-      // Extract servings
-      let servings: number | null = null;
-      if (data.recipeYield) {
-        const yieldVal = Array.isArray(data.recipeYield)
-          ? data.recipeYield[0]
-          : data.recipeYield;
-        const match = String(yieldVal).match(/\d+/);
-        if (match) servings = parseInt(match[0], 10);
-      }
-
-      // Extract image
-      let imageUrl: string | null = null;
-      if (data.image) {
-        if (typeof data.image === "string") {
-          imageUrl = data.image;
-        } else if (Array.isArray(data.image)) {
-          imageUrl = typeof data.image[0] === "string" ? data.image[0] : data.image[0]?.url;
-        } else if (data.image.url) {
-          imageUrl = data.image.url;
-        }
       }
 
       return {
         name: cleanText(String(data.name || "")),
         description: cleanText(String(data.description || "")),
         instructions,
-        servings,
+        servings: parseServings(data.recipeYield),
         prepTimeMinutes: parseDuration(data.prepTime),
         cookTimeMinutes: parseDuration(data.cookTime),
         ingredients,
-        imageUrl,
+        imageUrl: imageFrom(data.image),
       };
     } catch {
       continue;
@@ -298,6 +320,76 @@ export function extractJsonLdRecipe(html: string): ScrapedRecipe | null {
   }
 
   return null;
+}
+
+// ─── Microdata ──────────────────────────────────────────────────
+//
+// Older recipe plugins and hand-built sites mark the recipe up with
+// itemscope/itemprop attributes instead of JSON-LD.
+
+export function extractMicrodataRecipe(html: string): ScrapedRecipe | null {
+  const $ = cheerio.load(html);
+  const scope = $("[itemscope][itemtype]")
+    .filter((_, el) => /schema\.org\/Recipe$/i.test($(el).attr("itemtype")?.trim() ?? ""))
+    .first();
+  if (scope.length === 0) return null;
+
+  // Properties of the recipe itself, not of things nested inside it (the
+  // author's name, a review's rating).
+  const props = (name: string) =>
+    scope
+      .find(`[itemprop~="${name}"]`)
+      .filter((_, el) => $(el).parent().closest("[itemscope]")[0] === scope[0]);
+
+  const valueOf = (el: Parameters<typeof $>[0]) => {
+    const node = $(el);
+    return (
+      node.attr("content") ??
+      node.attr("datetime") ??
+      (node.is("img") ? node.attr("src") : undefined) ??
+      (node.is("a, link") ? node.attr("href") : undefined) ??
+      node.text()
+    );
+  };
+  const first = (name: string) => {
+    const el = props(name).first();
+    return el.length ? cleanText(valueOf(el[0]) ?? "") : "";
+  };
+
+  const steps: RawStep[] = [];
+  props("recipeInstructions").each((_, el) => {
+    const node = $(el);
+    const stepText = node.find('[itemprop="text"]');
+    const items = stepText.length ? stepText : node.find("li");
+    if (items.length) {
+      items.each((_, item) => {
+        const text = cleanText($(item).text());
+        if (text) steps.push({ section: null, text });
+      });
+      return;
+    }
+    const text = cleanText(node.text());
+    if (text) steps.push({ section: null, text });
+  });
+
+  const flatLines = [...props("recipeIngredient").toArray(), ...props("ingredients").toArray()]
+    .map((el) => cleanText($(el).text()))
+    .filter(Boolean);
+
+  const name = first("name");
+  if (!name || (flatLines.length === 0 && steps.length === 0)) return null;
+
+  const image = props("image").first();
+  return {
+    name,
+    description: first("description"),
+    instructions: renderInstructions(steps),
+    servings: parseServings(first("recipeYield")),
+    prepTimeMinutes: parseDuration(first("prepTime")),
+    cookTimeMinutes: parseDuration(first("cookTime")),
+    ingredients: applyIngredientSections(flatLines, extractIngredientLines($)),
+    imageUrl: image.length ? valueOf(image[0])?.trim() || null : null,
+  };
 }
 
 export function extractFallback(html: string): ScrapedRecipe | null {
@@ -323,6 +415,9 @@ export function extractFallback(html: string): ScrapedRecipe | null {
   let instructions = "";
   const instructionSelectors = [
     '[itemprop="recipeInstructions"]',
+    ".wprm-recipe-instructions",
+    ".tasty-recipes-instructions",
+    ".mv-create-instructions",
     ".recipe-instructions",
     ".instructions",
     ".recipe-directions",
@@ -363,8 +458,15 @@ export function extractFallback(html: string): ScrapedRecipe | null {
   };
 }
 
+// Structured data only: JSON-LD, then microdata. The fetcher uses this to decide
+// whether an alternate copy of the page (AMP, print) is worth trying before it
+// settles for the heuristic read.
+export function extractStructuredRecipe(html: string): ScrapedRecipe | null {
+  return extractJsonLdRecipe(html) || extractMicrodataRecipe(html);
+}
+
 // The page-level entry point: structured data first, then a best-effort read of
 // the markup.
 export function extractRecipeFromHtml(html: string): ScrapedRecipe | null {
-  return extractJsonLdRecipe(html) || extractFallback(html);
+  return extractStructuredRecipe(html) || extractFallback(html);
 }

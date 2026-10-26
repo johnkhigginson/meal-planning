@@ -10,6 +10,12 @@ import net from "node:net";
 // the validated IP via a custom undici dispatcher; this is a strong, simple
 // mitigation appropriate for this app.
 
+// Thrown when a URL is rejected before any request is made, so callers can tell
+// "that address isn't allowed" apart from a network failure.
+export class UnsafeUrlError extends Error {
+  name = "UnsafeUrlError";
+}
+
 function ipIsPrivate(ip: string): boolean {
   const fam = net.isIP(ip);
   if (fam === 4) {
@@ -37,14 +43,24 @@ function ipIsPrivate(ip: string): boolean {
 async function assertPublicHost(hostname: string): Promise<void> {
   const host = hostname.replace(/^\[|\]$/g, ""); // strip IPv6 brackets
   if (net.isIP(host)) {
-    if (ipIsPrivate(host)) throw new Error("Blocked request to a private address");
+    if (ipIsPrivate(host)) throw new UnsafeUrlError("Blocked request to a private address");
     return;
   }
   const addrs = await dns.lookup(host, { all: true });
-  if (addrs.length === 0) throw new Error("Host did not resolve");
+  if (addrs.length === 0) throw new UnsafeUrlError("Host did not resolve");
   for (const a of addrs) {
-    if (ipIsPrivate(a.address)) throw new Error("Blocked request to a private address");
+    if (ipIsPrivate(a.address)) throw new UnsafeUrlError("Blocked request to a private address");
   }
+}
+
+function raceSignal<T>(promise: Promise<T>, signal: AbortSignal | null | undefined): Promise<T> {
+  if (!signal) return promise;
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }
 
 export async function safeFetch(
@@ -58,16 +74,19 @@ export async function safeFetch(
     try {
       u = new URL(current);
     } catch {
-      throw new Error("Invalid URL");
+      throw new UnsafeUrlError("Invalid URL");
     }
     if (u.protocol !== "http:" && u.protocol !== "https:") {
-      throw new Error("Only http and https URLs are allowed");
+      throw new UnsafeUrlError("Only http and https URLs are allowed");
     }
-    await assertPublicHost(u.hostname);
+    // The DNS lookup isn't abortable, so race it against the caller's signal.
+    // Otherwise a slow resolver runs past the caller's timeout.
+    await raceSignal(assertPublicHost(u.hostname), init.signal);
 
     const res = await fetch(current, { ...init, redirect: "manual" });
     const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
     if (!location) return res;
+    await res.body?.cancel();
     current = new URL(location, current).toString();
   }
   throw new Error("Too many redirects");

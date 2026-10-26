@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
-import { safeFetch } from "@/lib/ssrf";
-import { extractRecipeFromHtml } from "@/lib/recipe-scrape";
+import { RecipeScrapeError, scrapeRecipeUrl, type ScrapeErrorCode } from "@/lib/recipe-fetch";
+
+export const runtime = "nodejs";
+// Worst case is the fetcher's 15s budget plus parsing.
+export const maxDuration = 30;
+
+const STATUS: Record<ScrapeErrorCode, number> = {
+  INVALID_URL: 400,
+  NOT_FOUND: 404,
+  NO_RECIPE: 422,
+  BLOCKED: 502,
+  FETCH_FAILED: 502,
+  TIMEOUT: 504,
+};
 
 export async function POST(request: NextRequest) {
   const limited = enforceRateLimit("scrape", ipKey(request), 20, 60_000);
@@ -9,39 +21,20 @@ export async function POST(request: NextRequest) {
 
   const { url } = await request.json();
   if (!url || typeof url !== "string") {
-    return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    return NextResponse.json({ error: "URL is required", code: "INVALID_URL" }, { status: 400 });
   }
 
   try {
-    const response = await safeFetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Failed to fetch URL: ${response.status}` },
-        { status: 400 }
-      );
-    }
-
-    const html = await response.text();
-    const recipe = extractRecipeFromHtml(html);
-
-    if (!recipe) {
-      return NextResponse.json(
-        { error: "Could not find recipe data on this page" },
-        { status: 404 }
-      );
-    }
-
+    const recipe = await scrapeRecipeUrl(url);
     return NextResponse.json(recipe);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to scrape URL";
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (err instanceof RecipeScrapeError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: STATUS[err.code] });
+    }
+    console.error("Recipe import failed", url, err);
+    return NextResponse.json(
+      { error: "Something went wrong importing that page.", code: "FETCH_FAILED" },
+      { status: 500 }
+    );
   }
 }
