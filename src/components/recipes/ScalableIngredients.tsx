@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, Minus, Plus } from "lucide-react";
 import { groupBySection } from "@/lib/recipe-sections";
+import { formatIngredient } from "@/lib/ingredient-format";
 import { cn } from "@/lib/utils";
 import { AddMissingToGroceryButton } from "./AddMissingToGroceryButton";
 
@@ -23,12 +24,6 @@ export interface ScalableIngredient {
   //   "present"  in the pantry, but the units can't be converted
   //   number     quantity on hand, in this ingredient's unit
   stock?: number | "present" | null;
-}
-
-function formatQty(n: number): string {
-  if (!isFinite(n) || n <= 0) return "";
-  const rounded = Math.round(n * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
 // Same rule as lib/matching.ts, re-run here so it follows the servings scaler.
@@ -110,6 +105,7 @@ export function ScalableIngredients({
             <ul>
               {group.items.map((ri, i) => {
                 const enough = hasEnough(ri.stock, ri.quantity * factor);
+                const shown = formatIngredient(ri.quantity * factor, ri.unit, ri.name);
                 return (
                   <li
                     key={i}
@@ -127,10 +123,8 @@ export function ScalableIngredients({
                       </span>
                     )}
                     <span className="min-w-0">
-                      <span className="font-extrabold">
-                        {formatQty(ri.quantity * factor)} {ri.unit}
-                      </span>{" "}
-                      <span>{ri.name}</span>
+                      <span className="font-extrabold">{shown.amount}</span>{" "}
+                      <span>{shown.name}</span>
                       {ri.notes && <span className="text-sm text-muted-foreground"> ({ri.notes})</span>}
                       {ri.optional && (
                         <Badge variant="secondary" className="ml-2 text-xs print:hidden">

@@ -10,6 +10,7 @@ import { Download, Check, Clock, Users, Loader2, BookOpen, UtensilsCrossed } fro
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { groupBySection } from "@/lib/recipe-sections";
+import { formatIngredient } from "@/lib/ingredient-format";
 import { RecipeInstructions } from "@/components/recipes/RecipeInstructions";
 
 interface SharedRecipe {
@@ -141,12 +142,15 @@ export default function SharePage() {
                     <p className="mb-1.5 text-xs font-extrabold tracking-[0.08em] text-muted-foreground uppercase">{group.name}</p>
                   )}
                   <ul className="divide-y">
-                    {group.items.map((i, idx) => (
-                      <li key={idx} className="py-2 text-[15px]">
-                        <span className="font-bold tabular-nums">{i.quantity} {i.unit.abbreviation}</span> {i.ingredient.name}
-                        {i.notes ? <span className="text-muted-foreground"> ({i.notes})</span> : ""}
-                      </li>
-                    ))}
+                    {group.items.map((i, idx) => {
+                      const shown = formatIngredient(i.quantity, i.unit.abbreviation, i.ingredient.name);
+                      return (
+                        <li key={idx} className="py-2 text-[15px]">
+                          <span className="font-bold tabular-nums">{shown.amount}</span> {shown.name}
+                          {i.notes ? <span className="text-muted-foreground"> ({i.notes})</span> : ""}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}

@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { formatAmount } from "@/lib/ingredient-format";
 
 interface Unit {
   id: number;
@@ -592,7 +593,7 @@ export default function PantryPage() {
                       }}
                       className="rounded-md font-bold text-foreground tabular-nums underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
                     >
-                      {item.quantity} {item.unit.abbreviation}
+                      {formatAmount(item.quantity, item.unit.abbreviation) || `0 ${item.unit.abbreviation}`}
                     </button>
                   )}
                   {item.ingredient.category && (

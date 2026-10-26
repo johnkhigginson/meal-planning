@@ -28,6 +28,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { INGREDIENT_CATEGORIES } from "@/lib/constants";
 import { formatDate, getMonday, weekRangeLabel } from "@/lib/meal-plan";
+import { formatAmount, formatIngredient, formatIngredientLine } from "@/lib/ingredient-format";
 import { cn } from "@/lib/utils";
 
 interface GroceryListItem {
@@ -173,6 +174,7 @@ interface ShoppingItem {
   ingredientName: string;
   needed: number;
   unitAbbr: string;
+  amount: string;
   bestStore: ShoppingStore | null;
   allStores: ShoppingStore[];
 }
@@ -628,7 +630,7 @@ function GroceryListContent() {
                   {storeItems.map((item) => (
                     <div key={item.ingredientId} className="flex items-center justify-between gap-3 text-sm">
                       <span>
-                        <span className="font-bold">{item.needed} {item.unitAbbr}</span> {item.ingredientName}
+                        <span className="font-bold">{item.amount}</span> {item.ingredientName}
                       </span>
                       {item.bestStore ? (
                         <span className="shrink-0 text-sm font-bold text-leaf-ink tabular-nums">
@@ -678,7 +680,9 @@ function GroceryListContent() {
           </CardHeader>
           <CardContent>
             <ul>
-            {section.rows.map(({ item, note }) => (
+            {section.rows.map(({ item, note }) => {
+              const shown = formatIngredient(item.needed, item.unit.abbreviation, item.ingredient.name);
+              return (
               <li
                 key={item.id}
                 className="flex items-center gap-2 border-b border-border/70 last:border-b-0"
@@ -696,13 +700,10 @@ function GroceryListContent() {
                         : "transition-colors duration-200 ease-out"
                     }
                   >
-                    <span className="font-extrabold">
-                      {item.needed} {item.unit.abbreviation}
-                    </span>{" "}
-                    {item.ingredient.name}
+                    <span className="font-extrabold">{shown.amount}</span> {shown.name}
                     {item.inInventory > 0 && (
                       <span className="ml-1.5 text-xs text-muted-foreground">
-                        (have {item.inInventory} {item.unit.abbreviation})
+                        (have {formatAmount(item.inInventory, item.unit.abbreviation)})
                       </span>
                     )}
                     {note && <span className="ml-1.5 text-xs text-muted-foreground">{note}</span>}
@@ -711,7 +712,7 @@ function GroceryListContent() {
                 {view === "aisle" && (
                   <DropdownMenu>
                     <DropdownMenuTrigger
-                      aria-label={`Change aisle for ${item.ingredient.name}`}
+                      aria-label={`Change aisle for ${shown.name}`}
                       title="Change aisle"
                       className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-200 ease-out outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-muted aria-expanded:text-foreground print:hidden"
                     >
@@ -732,7 +733,8 @@ function GroceryListContent() {
                   </DropdownMenu>
                 )}
               </li>
-            ))}
+              );
+            })}
             </ul>
           </CardContent>
         </Card>
@@ -757,8 +759,7 @@ function GroceryListContent() {
                       <Check className="size-3" strokeWidth={3.5} aria-hidden="true" />
                     </span>
                     <span className="line-through decoration-muted-foreground/70">
-                      {item.quantity} {item.unit.abbreviation}{" "}
-                      {item.ingredient.name}
+                      {formatIngredientLine(item.quantity, item.unit.abbreviation, item.ingredient.name)}
                     </span>
                   </li>
                 ))}

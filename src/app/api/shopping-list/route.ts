@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
 import { convertQuantity } from "@/lib/units";
+import { formatIngredient } from "@/lib/ingredient-format";
 import type { UnitConversion } from "@/generated/prisma/client";
 
 interface ShoppingItem {
@@ -10,6 +11,8 @@ interface ShoppingItem {
   needed: number;
   unitId: number;
   unitAbbr: string;
+  // Ready to show: "1.5 cups".
+  amount: string;
   bestStore: { storeId: number; storeName: string; price: number; unitPrice: number } | null;
   allStores: { storeId: number; storeName: string; price: number; unitPrice: number }[];
 }
@@ -89,12 +92,14 @@ export async function POST(request: NextRequest) {
       };
     }).sort((a, b) => a.price - b.price);
 
+    const shown = formatIngredient(item.needed, item.unit.abbreviation, item.ingredient.name);
     return {
       ingredientId: item.ingredientId,
-      ingredientName: item.ingredient.name,
+      ingredientName: shown.name,
       needed: item.needed,
       unitId: item.unitId,
       unitAbbr: item.unit.abbreviation,
+      amount: shown.amount,
       bestStore: allStores[0] || null,
       allStores,
     };

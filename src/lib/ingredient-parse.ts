@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeImportedIngredients } from "@/lib/recipe-sections";
 import { guessIngredientCategory } from "@/lib/ingredient-category";
+import { cleanIngredientName } from "@/lib/ingredient-format";
 
 // Parses free-text ingredient lines ("2 cups flour", "1/2 tsp salt (fine)")
 // into structured rows, matching/creating Ingredient records and resolving
@@ -99,7 +100,13 @@ function parseUnit(
 
   for (const len of [2, 1]) {
     if (words.length < len) continue;
-    const candidate = words.slice(0, len).join(" ").toLowerCase().replace(/\.$/, "");
+    // "cup(s)" and "clove(s)" are written by some recipe sites.
+    const candidate = words
+      .slice(0, len)
+      .join(" ")
+      .toLowerCase()
+      .replace(/\.$/, "")
+      .replace(/\((e?s)\)$/, "");
 
     const dbUnit = unitMap.get(candidate);
     if (dbUnit) {
@@ -162,7 +169,8 @@ export async function parseIngredientLines(
 
     let ingredientText = afterUnit.replace(/^(of|the)\s+/i, "").trim();
     const { cleanName, notes } = extractNotes(ingredientText);
-    ingredientText = cleanName;
+    // "garlic, (minced)" leaves "garlic," before the note.
+    ingredientText = cleanIngredientName(cleanName);
 
     if (!ingredientText) continue;
 

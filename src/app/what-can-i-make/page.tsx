@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { buttonVariants } from "@/components/ui/button";
 import { Clock, Users, Check, Heart, ChevronDown, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatIngredient } from "@/lib/ingredient-format";
 
 interface MatchedIngredient {
   ingredientId: number;
@@ -205,7 +206,9 @@ export default function WhatCanIMakePage() {
                     className="border-t pt-3 pb-5"
                   >
                     <ul className="grid gap-x-6 sm:grid-cols-2">
-                      {match.ingredients.map((ing) => (
+                      {match.ingredients.map((ing) => {
+                        const shown = formatIngredient(ing.requiredQty, ing.requiredUnitAbbr, ing.ingredientName);
+                        return (
                         <li
                           key={ing.ingredientId}
                           className="flex items-baseline gap-3 border-b border-border/70 py-2.5"
@@ -221,9 +224,9 @@ export default function WhatCanIMakePage() {
                           </span>
                           <span className="min-w-0">
                             <span className="font-extrabold">
-                              {ing.requiredQty} {ing.requiredUnitAbbr}
+                              {shown.amount}
                             </span>{" "}
-                            <span>{ing.ingredientName}</span>
+                            <span>{shown.name}</span>
                             {ing.optional && (
                               <Badge variant="secondary" className="ml-2 text-xs">
                                 optional
@@ -231,7 +234,8 @@ export default function WhatCanIMakePage() {
                             )}
                           </span>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                     {match.tags.length > 0 && (
                       <div className="mt-4 flex flex-wrap gap-1.5">

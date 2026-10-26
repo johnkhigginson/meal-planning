@@ -16,6 +16,7 @@ import { sanitizeBlogHtml } from "@/lib/sanitize";
 import { absoluteUrl, getSiteUrl } from "@/lib/site";
 import { recipeAuthorName } from "@/lib/recipe-author";
 import { parseInstructionSections } from "@/lib/recipe-sections";
+import { formatIngredientLine } from "@/lib/ingredient-format";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ function recipeJsonLd(recipe: Awaited<ReturnType<typeof getPublishedRecipe>>) {
   if (!recipe) return null;
   const r = recipe.recipe;
   const ingredients = r.ingredients.map(
-    (ri) => `${ri.quantity} ${ri.unit.abbreviation} ${ri.ingredient.name}`.trim()
+    (ri) => formatIngredientLine(ri.quantity, ri.unit.abbreviation, ri.ingredient.name)
   );
   // Section heading lines ("--- Pot Pie Filling ---") become HowToSections
   // rather than being published as steps of their own.
