@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { parseHiddenNav } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { TonightCard } from "./TonightCard";
+import { GettingStarted } from "./GettingStarted";
 
 interface DashboardProps {
   userId: number;
@@ -53,6 +54,8 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
     currentPlan,
     recentRecipes,
     publishedBooks,
+    mealEntryCount,
+    groceryListCount,
   ] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { hiddenNavItems: true } }),
     prisma.recipe.count({ where: { householdId } }),
@@ -85,6 +88,9 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
       },
       orderBy: { publishedAt: "desc" },
     }),
+    // Getting-started checklist: any meal in any week, any grocery list.
+    prisma.mealPlanEntry.count({ where: { mealPlan: { householdId } } }),
+    prisma.groceryList.count({ where: { householdId } }),
   ]);
 
   const hidden = parseHiddenNav(me?.hiddenNavItems);
@@ -121,6 +127,17 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
     { href: "/stores", label: "Stores", value: storeCount },
   ].filter((s) => s.always || shows(s.href));
 
+  // A step for a section the user hid from their menu is left out, so the
+  // checklist can still be completed.
+  const gettingStarted = [
+    { href: "/recipes/new", label: "Add or import a recipe", description: "Type one in, paste a link or snap a photo", done: recipeCount > 0, always: true },
+    { href: "/pantry", label: "Set up your pantry", description: "Add what you have on hand", done: pantryCount > 0 },
+    { href: "/meal-plan", label: "Make a meal plan", description: "Pick meals for the days ahead", done: mealEntryCount > 0 },
+    { href: "/grocery-list", label: "Generate a grocery list", description: "Build it from your meal plan", done: groceryListCount > 0 },
+  ]
+    .filter((s) => s.always || shows(s.href))
+    .map(({ href, label, description, done }) => ({ href, label, description, done }));
+
   const quickLinks = [
     { href: "/what-can-i-make", label: "What can I make?", description: "Find recipes matching your pantry", icon: Lightbulb },
     { href: "/grocery-list", label: "Grocery list", description: "Auto-generated from your meal plan", icon: ShoppingCart },
@@ -150,6 +167,9 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
           </Link>
         </div>
       </div>
+
+      {/* New-user checklist; hides itself once every step is done */}
+      <GettingStarted userId={userId} steps={gettingStarted} />
 
       {/* Tonight */}
       {shows("/meal-plan") && <TonightCard />}
