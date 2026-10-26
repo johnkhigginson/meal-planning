@@ -9,6 +9,19 @@ const nextConfig: NextConfig = {
   // the adapter and its driver must be opted out of server bundling or their
   // connection handshake stalls until timeout.
   serverExternalPackages: ["@prisma/adapter-mssql", "mssql", "tedious"],
+  // The service worker must never come from the HTTP cache, or a fix to its
+  // caching rules would not reach browsers that already have it.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+    ];
+  },
   images: {
     // Blogger-hosted recipe photos that were not localized yet. Uploads under
     // /api/images and photos from other sites skip the optimizer (see
