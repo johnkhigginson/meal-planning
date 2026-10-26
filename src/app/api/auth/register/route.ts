@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/email-normalize";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { audit } from "@/lib/audit";
 import { enforceRateLimit, ipKey } from "@/lib/rate-limit";
+import { sendEmailVerification } from "@/lib/email-verification";
 
 export async function POST(request: NextRequest) {
   const limited = enforceRateLimit("register", ipKey(request), 5, 60 * 60_000);
@@ -93,6 +94,16 @@ export async function POST(request: NextRequest) {
     actorUserId: user.id,
     actorName: user.name,
     householdId,
+  });
+
+  // Verification is optional and never blocks sign-in, so send it after the
+  // response and don't let a mail failure affect registration.
+  after(async () => {
+    try {
+      await sendEmailVerification(user);
+    } catch (err) {
+      console.error("verification email failed", err);
+    }
   });
 
   return NextResponse.json(

@@ -217,3 +217,45 @@ export async function sendPasswordResetEmail(toEmail: string, resetUrl: string):
   });
   return true;
 }
+
+// Confirm the address a user signed up with. Verification never blocks sign-in;
+// it only confirms we can reach them (e.g. for password resets).
+export async function sendVerificationEmail(
+  toEmail: string,
+  name: string,
+  verifyUrl: string
+): Promise<boolean> {
+  const client = getClientOrWarn("verification");
+  if (!client) return false;
+
+  await client.sendEmail({
+    From: "hello@mylemonkitchen.com",
+    To: toEmail,
+    Subject: "Confirm your email for My Lemon Kitchen",
+    HtmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <span style="font-size: 24px; font-weight: 700;">My Lemon Kitchen</span>
+        </div>
+        <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 16px;">Confirm your email</h1>
+        <p style="color: #555; line-height: 1.6; margin: 0 0 24px;">
+          Hi ${name}, thanks for joining My Lemon Kitchen. Please confirm this is your email address
+          so we can reach you if you ever need to reset your password.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${verifyUrl}" style="display: inline-block; background: #000; color: #FFF700; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Confirm email
+          </a>
+        </div>
+        <p style="color: #999; font-size: 13px; line-height: 1.5;">
+          The link expires in 24 hours. If you didn't create an account, you can ignore this email.
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+        <p style="color: #bbb; font-size: 12px; text-align: center;">My Lemon Kitchen</p>
+      </div>
+    `,
+    TextBody: `Hi ${name}, please confirm your email for My Lemon Kitchen:\n\n${verifyUrl}\n\nThe link expires in 24 hours. If you didn't create an account, you can ignore this email.`,
+    MessageStream: "outbound",
+  });
+  return true;
+}

@@ -6,8 +6,9 @@ import { Navbar } from "./Navbar";
 import { MobileNav } from "./MobileNav";
 import { PageLoader } from "./PageLoader";
 import { ImpersonationBanner } from "./ImpersonationBanner";
+import { EmailVerificationBanner } from "./EmailVerificationBanner";
 
-const authPages = ["/login", "/register", "/forgot-password", "/reset-password"];
+const authPages = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -50,6 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <main className="min-w-0 flex-1 overflow-auto p-4 pb-28 sm:pb-4 lg:p-6 lg:pb-6">
         <ImpersonationBanner />
+        <EmailVerificationBanner />
         {children}
       </main>
     </>
