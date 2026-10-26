@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { convertQuantity, roundQuantity } from "./units";
 import type { UnitConversion } from "@/generated/prisma/client";
 import { guessIngredientCategory } from "./ingredient-category";
+import { parseIngredientLines } from "./ingredient-parse";
 
 interface AggregatedItem {
   ingredientId: number;
@@ -23,11 +24,15 @@ export async function generateGroceryList(mealPlanId: number, householdId: numbe
     prisma.mealPlan.findFirst({
       where: { id: mealPlanId, householdId },
       include: {
+        // A fixed order keeps each ingredient's unit (the first one seen) the
+        // same from run to run, so a list can be compared with a fresh one.
         entries: {
+          orderBy: { id: "asc" },
           include: {
             recipe: {
               include: {
                 ingredients: {
+                  orderBy: { id: "asc" },
                   include: { ingredient: true, unit: true },
                 },
               },
@@ -182,11 +187,13 @@ async function categorizeUncategorized(
 
 const listInclude = {
   items: { include: { ingredient: true, unit: true }, orderBy: { ingredient: { name: "asc" } } },
+  mealPlan: { select: { weekStartDate: true } },
 } as const;
 
 // A saved list plus the planned recipes each item is for, so the page can group
 // by recipe. Read from the list's meal plan as it stands now. Regenerating
 // keeps the two in step; an item no current recipe uses shows under "Other items".
+// planChanged flags a list the plan has moved on from.
 export async function loadGroceryList(listId: number, householdId: number) {
   const list = await prisma.groceryList.findFirst({
     where: { id: listId, householdId },
@@ -233,7 +240,124 @@ export async function loadGroceryList(listId: number, householdId: number) {
     });
   }
 
-  return { ...list, recipes: [...recipes.values()] };
+  const planChanged = await planChangedSinceList(list, householdId);
+  return { ...list, recipes: [...recipes.values()], planChanged };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface CurrentPlan {
+  // null when nobody has opened that week's plan yet.
+  id: number | null;
+  weekStartDate: Date;
+  // Planned meals that have a recipe, so they add to a grocery list.
+  recipeMeals: number;
+  // True when this week has nothing planned and next week does.
+  upcoming: boolean;
+}
+
+// The page sends this week's Monday ("YYYY-MM-DD") from the cook's own clock,
+// since the server's day can differ. Without one, use the server's week.
+export function parseWeekOf(value: string | null): Date {
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  const today = new Date();
+  const utc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return new Date(utc - ((today.getDay() + 6) % 7) * DAY_MS);
+}
+
+// The plan a grocery list should follow: this week's, or next week's when
+// this week has no recipes planned yet and next week does. `weekOf` is this
+// week's Monday as a SQL date (UTC midnight), from the cook's own clock.
+export async function findCurrentPlan(householdId: number, weekOf: Date): Promise<CurrentPlan> {
+  const nextWeek = new Date(weekOf.getTime() + 7 * DAY_MS);
+  const plans = await prisma.mealPlan.findMany({
+    where: { householdId, weekStartDate: { in: [weekOf, nextWeek] } },
+    select: {
+      id: true,
+      weekStartDate: true,
+      _count: { select: { entries: { where: { recipeId: { not: null } } } } },
+    },
+  });
+  const thisPlan = plans.find((p) => p.weekStartDate.getTime() === weekOf.getTime());
+  const nextPlan = plans.find((p) => p.weekStartDate.getTime() === nextWeek.getTime());
+
+  if (!thisPlan?._count.entries && nextPlan?._count.entries) {
+    return { id: nextPlan.id, weekStartDate: nextWeek, recipeMeals: nextPlan._count.entries, upcoming: true };
+  }
+  return {
+    id: thisPlan?.id ?? null,
+    weekStartDate: weekOf,
+    recipeMeals: thisPlan?._count.entries ?? 0,
+    upcoming: false,
+  };
+}
+
+// Whether a week's list no longer matches its plan: a meal was added, removed
+// or resized, or a recipe changed. Compares what to buy in total, so pantry
+// changes and check marks don't count.
+export async function planChangedSinceList(
+  list: { mealPlanId: number | null; items: { ingredientId: number; unitId: number; quantity: number }[] },
+  householdId: number
+): Promise<boolean> {
+  if (!list.mealPlanId) return false;
+  const generated = await generateGroceryList(list.mealPlanId, householdId);
+  if (!generated) return true;
+
+  const key = (item: { ingredientId: number; unitId: number }) => `${item.ingredientId}:${item.unitId}`;
+  const saved = new Map<string, number>();
+  for (const item of list.items) saved.set(key(item), (saved.get(key(item)) ?? 0) + item.quantity);
+  if (saved.size !== generated.items.length) return true;
+  return generated.items.some((item) => {
+    const before = saved.get(key(item));
+    return before === undefined || Math.abs(before - item.totalQuantity) > 1e-6;
+  });
+}
+
+// A blank list the cook fills in by hand, not tied to any meal plan.
+export const NEW_LIST_NAME = "New list";
+
+export async function createBlankList(householdId: number): Promise<number> {
+  const list = await prisma.groceryList.create({ data: { householdId, name: NEW_LIST_NAME } });
+  return list.id;
+}
+
+// Adds a typed line ("2 lb chicken") to a list. Only lists without a meal plan
+// take hand-added items, since regenerating a week's list rewrites it. The
+// same ingredient in the same unit adds to the row already there.
+export async function addItemToList(
+  listId: number,
+  householdId: number,
+  text: string
+): Promise<"added" | "not-found" | "plan-list" | "unreadable"> {
+  const list = await prisma.groceryList.findFirst({
+    where: { id: listId, householdId },
+    select: { mealPlanId: true },
+  });
+  if (!list) return "not-found";
+  if (list.mealPlanId) return "plan-list";
+
+  const [row] = await parseIngredientLines([text]);
+  if (!row) return "unreadable";
+
+  const existing = await prisma.groceryListItem.findFirst({
+    where: { groceryListId: listId, ingredientId: row.ingredientId, unitId: row.unitId },
+  });
+  if (existing) {
+    const quantity = roundQuantity(existing.quantity + row.quantity);
+    await prisma.groceryListItem.update({
+      where: { id: existing.id },
+      data: { quantity, needed: roundQuantity(existing.needed + row.quantity), checked: false },
+    });
+  } else {
+    const quantity = roundQuantity(row.quantity);
+    await prisma.groceryListItem.create({
+      data: { groceryListId: listId, ingredientId: row.ingredientId, unitId: row.unitId, quantity, needed: quantity },
+    });
+  }
+  return "added";
 }
 
 // weekStartDate is a SQL date, which arrives as UTC midnight.

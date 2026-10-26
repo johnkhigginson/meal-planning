@@ -22,9 +22,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, DollarSign, Loader2, MapPin, ShoppingCart, Store, Tag, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { AlertTriangle, Check, DollarSign, Loader2, MapPin, Plus, RefreshCw, ShoppingCart, Store, Tag, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { INGREDIENT_CATEGORIES } from "@/lib/constants";
+import { formatDate, getMonday, weekRangeLabel } from "@/lib/meal-plan";
 import { cn } from "@/lib/utils";
 
 interface GroceryListItem {
@@ -42,10 +45,14 @@ interface GroceryListItem {
 interface GroceryList {
   id: number;
   name: string;
+  createdAt: string;
   mealPlanId: number | null;
+  mealPlan: { weekStartDate: string } | null;
   items: GroceryListItem[];
   // The week's planned recipes and the ingredients each one needs.
   recipes: { id: number; name: string; ingredientIds: number[] }[];
+  // The plan no longer adds up to this list.
+  planChanged: boolean;
 }
 
 type ListView = "aisle" | "recipe";
@@ -113,7 +120,37 @@ function groupByRecipe(list: GroceryList, items: GroceryListItem[]): ListSection
 interface GroceryListSummary {
   id: number;
   name: string;
+  createdAt: string;
+  mealPlanId: number | null;
+  mealPlan: { weekStartDate: string } | null;
   _count: { items: number };
+}
+
+// The plan the page follows: this week's, or next week's when only that one
+// has recipes planned.
+interface CurrentPlan {
+  id: number | null;
+  weekStartDate: string;
+  recipeMeals: number;
+  upcoming: boolean;
+}
+
+interface Overview {
+  lists: GroceryListSummary[];
+  currentPlan: CurrentPlan;
+  // Newest list made from the current plan, if any.
+  currentListId: number | null;
+}
+
+function startedLabel(createdAt: string): string {
+  return new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Where a list came from, for the picker and under the heading.
+function listSource(list: { createdAt: string; mealPlan: { weekStartDate: string } | null }): string {
+  return list.mealPlan
+    ? `Meal plan for ${weekRangeLabel(list.mealPlan.weekStartDate)}`
+    : `Started ${startedLabel(list.createdAt)}, not from a meal plan`;
 }
 
 export default function GroceryListPage() {
@@ -152,7 +189,11 @@ function GroceryListContent() {
   const listId = searchParams.get("id");
   // undefined while loading; null when the list in the URL doesn't exist.
   const [loadedList, setLoadedList] = useState<GroceryList | null | undefined>(undefined);
-  const [lists, setLists] = useState<GroceryListSummary[] | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [overviewFailed, setOverviewFailed] = useState(false);
+  const [busy, setBusy] = useState<"generate" | "new" | null>(null);
+  const [newItem, setNewItem] = useState("");
+  const [addingItem, setAddingItem] = useState(false);
   // Price results carry their list id, so a slow response for one list never
   // shows up under another.
   const [shoppingFor, setShoppingFor] = useState<{ listId: number; result: ShoppingResult } | null>(null);
@@ -175,19 +216,40 @@ function GroceryListContent() {
     }
   }
 
+  // "This week" is the cook's own week, so the Monday comes from their clock.
+  async function fetchOverview(): Promise<Overview | null> {
+    const weekOf = formatDate(getMonday(new Date()));
+    return fetch(`/api/grocery-lists?weekOf=${weekOf}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+  }
+
+  async function refreshOverview() {
+    const data = await fetchOverview();
+    if (data) setOverview(data);
+  }
+
   useEffect(() => {
-    fetch("/api/grocery-lists")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setLists(Array.isArray(data) ? data : []))
-      .catch(() => setLists([]));
+    let cancelled = false;
+    fetchOverview().then((data) => {
+      if (cancelled) return;
+      if (data) setOverview(data);
+      else setOverviewFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // With no list in the URL (the nav link), reopen the most recent one.
+  // With no list in the URL (the nav link), open the list for the current
+  // plan. An older week's list is never opened by default; it stays in the
+  // picker.
+  const currentListId = overview?.currentListId ?? null;
   useEffect(() => {
-    if (!listId && lists && lists.length > 0) {
-      router.replace(`/grocery-list?id=${lists[0].id}`);
+    if (!listId && currentListId) {
+      router.replace(`/grocery-list?id=${currentListId}`);
     }
-  }, [listId, lists, router]);
+  }, [listId, currentListId, router]);
 
   useEffect(() => {
     if (!listId) return;
@@ -209,16 +271,73 @@ function GroceryListContent() {
   const current = loadedList && loadedList.id === wantedId ? loadedList : null;
   const loading = listId
     ? loadedList === undefined || (loadedList !== null && loadedList.id !== wantedId)
-    : lists === null || lists.length > 0;
+    : !overviewFailed && (overview === null || overview.currentListId !== null);
   const shopping = shoppingFor && current && shoppingFor.listId === current.id ? shoppingFor.result : null;
+  const lists = overview?.lists ?? null;
+  const currentPlan = overview?.currentPlan ?? null;
+  const planLabel = currentPlan?.upcoming ? "next week's plan" : "this week's plan";
 
   async function deleteList() {
     if (!current || !confirm(`Delete “${current.name}”?`)) return;
     const res = await fetch(`/api/grocery-lists/${current.id}`, { method: "DELETE" });
     if (!res.ok) return;
-    const remaining = (lists ?? []).filter((l) => l.id !== current.id);
-    setLists(remaining);
-    router.replace(remaining.length > 0 ? `/grocery-list?id=${remaining[0].id}` : "/grocery-list");
+    setOverview((prev) => prev && {
+      ...prev,
+      lists: prev.lists.filter((l) => l.id !== current.id),
+      currentListId: prev.currentListId === current.id ? null : prev.currentListId,
+    });
+    router.replace("/grocery-list");
+    refreshOverview();
+  }
+
+  // Builds (or rewrites) the list for the current plan and opens it.
+  async function generateFromPlan() {
+    if (!currentPlan?.id) return;
+    setBusy("generate");
+    const res = await fetch(`/api/meal-plans/${currentPlan.id}/grocery-list`, { method: "POST" }).catch(() => null);
+    if (res?.ok) {
+      const data: { groceryListId: number } = await res.json();
+      await refreshOverview();
+      // Regenerating rewrites the open list in place, so the URL may not change.
+      if (current?.id === data.groceryListId) await reloadList(data.groceryListId);
+      else router.push(`/grocery-list?id=${data.groceryListId}`);
+    } else {
+      toast.error("Couldn't make the list. Please try again.");
+    }
+    setBusy(null);
+  }
+
+  async function startNewList() {
+    setBusy("new");
+    const res = await fetch("/api/grocery-lists", { method: "POST" }).catch(() => null);
+    if (res?.ok) {
+      const data: { groceryListId: number } = await res.json();
+      await refreshOverview();
+      router.push(`/grocery-list?id=${data.groceryListId}`);
+    } else {
+      toast.error("Couldn't start a new list. Please try again.");
+    }
+    setBusy(null);
+  }
+
+  async function addItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!current || !newItem.trim()) return;
+    const listId = current.id;
+    setAddingItem(true);
+    const res = await fetch(`/api/grocery-lists/${listId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: newItem }),
+    }).catch(() => null);
+    if (res?.ok) {
+      setNewItem("");
+      await reloadList(listId);
+    } else {
+      const data = await res?.json().catch(() => null);
+      toast.error(data?.error ?? "Couldn't add that item. Please try again.");
+    }
+    setAddingItem(false);
   }
 
   // Reload the list after a failed save so the screen matches what's stored.
@@ -290,7 +409,6 @@ function GroceryListContent() {
 
   if (loading) return <PageLoader />;
 
-  const hasSavedLists = !!lists && lists.length > 0;
   const listPicker = lists && lists.length > 0 && (lists.length > 1 || !current) && (
     <Select
       value={current ? String(current.id) : undefined}
@@ -302,9 +420,16 @@ function GroceryListContent() {
       <SelectContent>
         {lists.map((l) => (
           <SelectItem key={l.id} value={String(l.id)}>
-            {l.name}
-            <span className="text-muted-foreground">
-              · {l._count.items} item{l._count.items !== 1 ? "s" : ""}
+            <span className="flex flex-col">
+              <span>
+                {l.name}
+                {l.mealPlanId !== null && l.mealPlanId === currentPlan?.id && (
+                  <span className="font-bold text-primary"> · {currentPlan.upcoming ? "next week" : "this week"}</span>
+                )}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {listSource(l)} · {l._count.items} item{l._count.items !== 1 ? "s" : ""}
+              </span>
             </span>
           </SelectItem>
         ))}
@@ -312,34 +437,74 @@ function GroceryListContent() {
     </Select>
   );
 
+  // The two ways forward from an old or empty screen.
+  const canGenerate = !!currentPlan?.id && currentPlan.recipeMeals > 0;
+  const planActions = (
+    <div className="flex flex-wrap gap-2 print:hidden">
+      {canGenerate ? (
+        <Button className="h-10" onClick={generateFromPlan} disabled={busy !== null}>
+          {busy === "generate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Generate from {planLabel}
+        </Button>
+      ) : (
+        <Link href="/meal-plan" className={cn(buttonVariants(), "h-10")}>
+          Plan this week
+        </Link>
+      )}
+      <Button variant="outline" className="h-10" onClick={startNewList} disabled={busy !== null}>
+        {busy === "new" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+        Start a new list
+      </Button>
+    </div>
+  );
+
   if (!current) {
     return (
       <div className="mx-auto max-w-2xl space-y-8">
         <h1 className="text-4xl leading-tight font-medium">Grocery list</h1>
-        {listPicker}
+        {listId && (
+          <p className="rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">
+            That grocery list isn&apos;t available. It may have been deleted.
+          </p>
+        )}
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input px-6 py-12 text-center">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
             <ShoppingCart className="h-6 w-6" />
           </div>
-          <p className="font-heading text-xl">
-            {hasSavedLists ? "That grocery list isn't available" : "No grocery lists yet"}
-          </p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Go to{" "}
-            <Link href="/meal-plan" className="font-bold text-primary underline-offset-4 hover:underline">
-              Meal plan
-            </Link>{" "}
-            and click &quot;Grocery list&quot; to make one for the week
-          </p>
-          <Link href="/meal-plan" className={cn(buttonVariants({ size: "lg" }), "mt-1")}>
-            Open meal plan
-          </Link>
+          {currentPlan ? (
+            <>
+              <p className="font-heading text-xl">
+                {currentPlan.upcoming ? "Next week's plan" : "This week's plan"}
+              </p>
+              <p className="text-sm font-bold">{weekRangeLabel(currentPlan.weekStartDate)}</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                {canGenerate
+                  ? `${currentPlan.recipeMeals} meal${currentPlan.recipeMeals !== 1 ? "s" : ""} with recipes planned. Make a list of what to buy for them, or start a blank list.`
+                  : "No meals with recipes planned yet. Add some to your meal plan, or start a blank list."}
+              </p>
+              <div className="mt-1">{planActions}</div>
+            </>
+          ) : (
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Couldn&apos;t load your grocery lists. Please refresh the page.
+            </p>
+          )}
         </div>
+        {listPicker && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-bold">Older lists</h2>
+            {listPicker}
+          </div>
+        )}
       </div>
     );
   }
 
   const list = current;
+  // A week's list is out of date when it's for another week than the one the
+  // page follows, or when that week's plan has changed since.
+  const otherWeek = list.mealPlanId !== null && !!currentPlan && list.mealPlanId !== currentPlan.id;
+  const outOfDate = otherWeek || list.planChanged;
   const needToBuy = list.items.filter((i) => i.needed > 0);
   const alreadyHave = list.items.filter((i) => i.needed <= 0);
   const sections = view === "recipe" ? groupByRecipe(list, needToBuy) : groupByAisle(needToBuy);
@@ -350,6 +515,7 @@ function GroceryListContent() {
         <div className="min-w-0 space-y-1">
           <h1 className="text-4xl leading-tight font-medium">Grocery list</h1>
           {listPicker || <p className="text-muted-foreground">{list.name}</p>}
+          <p className="text-sm text-muted-foreground">{listSource(list)}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-sm">
             <Badge variant="outline" className="h-6 px-2.5 font-bold tabular-nums">
               {needToBuy.filter((i) => i.checked).length}/{needToBuy.length} checked
@@ -367,6 +533,17 @@ function GroceryListContent() {
             Find best prices
           </Button>
           <Button
+            variant="outline"
+            size="icon"
+            className="size-10"
+            onClick={startNewList}
+            disabled={busy !== null}
+            aria-label="Start a new list"
+            title="Start a new list"
+          >
+            {busy === "new" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </Button>
+          <Button
             variant="ghost"
             size="icon"
             className="size-10 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -377,6 +554,48 @@ function GroceryListContent() {
           </Button>
         </div>
       </div>
+
+      {outOfDate && currentPlan && (
+        <div role="status" className="space-y-3 rounded-2xl bg-brand-soft px-4 py-3.5 print:hidden">
+          <p className="flex items-start gap-2 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>
+              <span className="font-bold">Out of date. </span>
+              {otherWeek && list.mealPlan
+                ? `This list is for ${weekRangeLabel(list.mealPlan.weekStartDate)}, not ${planLabel} (${weekRangeLabel(currentPlan.weekStartDate)}).`
+                : "The meal plan changed after this list was made."}
+              {!canGenerate && ` Nothing with a recipe is planned for ${weekRangeLabel(currentPlan.weekStartDate)} yet.`}
+            </span>
+          </p>
+          {planActions}
+        </div>
+      )}
+
+      {/* Lists not tied to a plan take items typed in by hand */}
+      {list.mealPlanId === null && (
+        <form onSubmit={addItem} className="flex gap-2 print:hidden">
+          <Input
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            placeholder="Add an item, like 2 lb chicken"
+            aria-label="Add an item"
+            maxLength={200}
+            className="h-10"
+          />
+          <Button type="submit" className="h-10" disabled={addingItem || !newItem.trim()}>
+            {addingItem ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Add
+          </Button>
+        </form>
+      )}
+
+      {list.items.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {list.mealPlanId === null
+            ? "This list is empty. Add what you need above."
+            : "Nothing to buy for this plan yet."}
+        </p>
+      )}
 
       {/* Smart shopping results */}
       {shopping && (

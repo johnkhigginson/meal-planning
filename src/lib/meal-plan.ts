@@ -57,3 +57,12 @@ export async function addMealToPlan(date: string, mealSlot: string, meal: NewMea
   });
   return res.ok;
 }
+
+// "Oct 20 to Oct 26" for a plan's week. weekStartDate is a SQL date sent as
+// UTC midnight, so it's read in UTC to keep the Monday a Monday.
+export function weekRangeLabel(weekStartDate: string | Date): string {
+  const start = new Date(weekStartDate);
+  const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  return `${fmt(start)} to ${fmt(end)}`;
+}
