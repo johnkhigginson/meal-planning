@@ -192,6 +192,9 @@ const PRODUCT_WORDS = new Set([
   "breading", "sauce", "seasoning", "mix", "powder", "paste", "dressing", "soup", "blend", "spread",
   "salt", "crumbs", "flakes", "extract", "bread", "butter", "oil", "rub", "marinade", "dip", "chips",
 ]);
+// The last word of a product made from X ("garlic powder", "ginger garlic
+// paste"). A line on one is never moved to bare X.
+const PRODUCT_FORMS = new Set(["powder", "paste", "salt", "oil", "sauce", "juice", "extract"]);
 // Units that only fit some ingredients: "2 cloves" is garlic.
 const UNIT_NOUNS: Record<string, string[]> = {
   clove: ["garlic"],
@@ -457,6 +460,30 @@ function typoOf(a: string, b: string): boolean {
 // "garlic". A closing paren stays.
 const tidyName = (name: string) => name.replace(/\s+/g, " ").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "");
 
+// A name with stray punctuation, read the way a line is: "“globs” liquid
+// lecithin" -> "liquid lecithin", note "globs"; "Heaping  teaspoon baking
+// soda" -> "baking soda", teaspoon, note "heaping". A leading "of" ('" of
+// oil') means the amount was lost, so it asks. Null when the parser can't
+// read it as one plain name.
+interface DirtyRead { name: string; notes: string[]; unit: UnitRow | null; lost: boolean }
+function readDirtyName(name: string, lookup: UnitLookup): DirtyRead | null {
+  let text = name.replace(/\s+/g, " ").trim();
+  const notes: string[] = [];
+  const quoted = text.match(/^[“"‘']([^“”"‘’']+)[”"’']\s+(?=\S)/);
+  if (quoted) {
+    notes.push(quoted[1].trim().toLowerCase());
+    text = text.slice(quoted[0].length);
+  }
+  text = tidyName(text);
+  const of = text.match(/^of\s+(?=\S)/i);
+  if (of) text = text.slice(of[0].length);
+  const parsed = text ? parseIngredientText(`1 ${text}`, lookup) : null;
+  if (!parsed || parsed.quantity !== 1 || parsed.doubts.length || !parsed.name) return null;
+  if (parsed.notes) notes.push(parsed.notes);
+  const unit = parsed.unit && parsed.unit.name.toLowerCase() !== "each" ? parsed.unit : null;
+  return { name: parsed.name, notes, unit, lost: !!of };
+}
+
 // The filter the first count used, as LIKE patterns: '(%', '%(s)%', '%*%',
 // '%$%', '%()%'. Kept so the two counts can be compared.
 function matchesLikeFilter(name: string): boolean {
@@ -587,23 +614,29 @@ export function analyze(snap: Snapshot, today: Date): Report {
     return !!p && (p.junk.length > 0 || p.prep !== "" || p.layout.length > 0);
   };
 
-  // "garlic," is garlic. Its tidy name is what a match compares and what a
-  // proposal shows, and the row is renamed to it. When another row already
-  // has that name, the dirty row is junk: its lines repoint and it goes.
+  // "garlic," is garlic. The name is read the way a line is, and the read
+  // name is what a match compares and what a proposal shows. The row is
+  // renamed to it, and words the read took off go to its lines' notes.
+  // When another row already has that name, the dirty row is junk: its
+  // lines repoint and it goes.
   const tidied = new Map<number, string>();
+  const reads = new Map<number, DirtyRead>();
   const tidyKeys = new Map<string, { id: number; name: string }>();
   for (const row of snap.ingredients) {
     if (!flagged(row.id) && tidyName(row.name) === row.name) tidyKeys.set(ingredientKey(row.name), row);
   }
   for (const row of [...snap.ingredients].sort((a, b) => a.id - b.id)) {
     const tidy = tidyName(row.name);
-    if (flagged(row.id) || tidy === row.name || !tidy || badNameReasons(tidy, lookup).length) continue;
-    const same = tidyKeys.get(ingredientKey(tidy));
+    if (flagged(row.id) || tidy === row.name || !tidy) continue;
+    const read = readDirtyName(row.name, lookup);
+    if (!read || badNameReasons(read.name, lookup).length) continue;
+    reads.set(row.id, read);
+    const same = tidyKeys.get(ingredientKey(read.name));
     if (same) {
       problems.get(row.id)!.junk.push(`stray punctuation, same name as "${same.name}" (#${same.id})`);
     } else {
-      tidied.set(row.id, tidy);
-      tidyKeys.set(ingredientKey(tidy), { id: row.id, name: tidy });
+      tidied.set(row.id, read.name);
+      tidyKeys.set(ingredientKey(read.name), { id: row.id, name: read.name });
     }
   }
   const nameOf = (row: IngredientRow) => tidied.get(row.id) ?? row.name;
@@ -694,8 +727,20 @@ export function analyze(snap: Snapshot, today: Date): Report {
     const unit = unitById.get(line.row.unitId);
     if (!ing || !unit || COOKED_LEAD.test(ing.name.trim())) return null;
     const nameWords = ing.name.trim().split(/\s+/);
-    if (nameWords.length < 2) return null;
+    if (nameWords.length < 2 || PRODUCT_FORMS.has(bare(nameWords[nameWords.length - 1]))) return null;
     const notes = line.row.notes ?? "";
+    const noteWords = new Set(wordsOf(notes));
+    // "(or tbsp grated ginger + ...)", "or 1 1/2 tsp crushed, real garlic":
+    // the note offers another way, so it says nothing about this line's name.
+    const offersAlternative = /^\s*\(?\s*or\b/i.test(notes) || /\(\s*or\s/i.test(notes);
+    // The note names the shorter name only after an "or".
+    const onlyAsAlternative = (inner: string) => {
+      const at = notes.search(/\bor\b/i);
+      if (at < 0) return false;
+      const before = new Set(wordsOf(notes.slice(0, at)));
+      const after = new Set(wordsOf(notes.slice(at)));
+      return wordsOf(inner).some((w) => after.has(w)) && !wordsOf(inner).some((w) => before.has(w));
+    };
 
     // Shorter names inside this one, longest first: "garlic parmesan", "garlic".
     const shorter: string[] = [];
@@ -708,6 +753,9 @@ export function analyze(snap: Snapshot, today: Date): Report {
       const keep = new Set(wordsOf(inner));
       return wordsOf(ing.name).filter((w) => !keep.has(w));
     };
+    // Only a name whose extra words have nothing to do with the line ("garlic
+    // parmesan breading" for minced garlic) came from a contains-match.
+    const unrelated = (inner: string) => !extraWords(inner).some((w) => noteWords.has(w)) && !onlyAsAlternative(inner);
 
     // Who else uses this row, for the reason and the shared-row check.
     const shared = linesByIngredient.get(ing.id) ?? [];
@@ -727,13 +775,13 @@ export function analyze(snap: Snapshot, today: Date): Report {
       const meaningful = extras.filter(
         (w) => !TRAILING_DESCRIPTORS.has(w) && !PREP_WORDS.has(w) && lookup(w) === null && !nouns.includes(w)
       );
-      if (noun && meaningful.length) {
+      if (noun && meaningful.length && !offersAlternative && unrelated(noun)) {
         pick = fits.find((s) => findExisting(s)) ?? noun;
         why = `unit "${unit.name}" fits "${pick}", not "${ing.name}"`;
       }
     }
-    if (!pick && FRESH_PREP.test(notes)) {
-      const fit = shorter.find((s) => findExisting(s) && extraWords(s).some((w) => PRODUCT_WORDS.has(w)));
+    if (!pick && FRESH_PREP.test(notes) && !offersAlternative) {
+      const fit = shorter.find((s) => findExisting(s) && extraWords(s).some((w) => PRODUCT_WORDS.has(w)) && unrelated(s));
       if (fit) {
         pick = fit;
         why = `note "${notes}" is prep for fresh "${fit}", but "${ing.name}" is a product`;
@@ -981,6 +1029,51 @@ export function analyze(snap: Snapshot, today: Date): Report {
     };
   };
 
+  // ── Lines on a dirty row: they follow the read name ──
+  // The words the read took off ("heaping", "globs") go to the note, and a
+  // unit it found replaces "each", which asks.
+  const dirtyLine = (line: Line): Proposal | null => {
+    const ing = ingById.get(line.row.ingredientId)!;
+    const read = reads.get(ing.id)!;
+    const current = currentOf(line);
+    const junk = flagged(ing.id);
+    const target: Target = junk ? targetFor(read.name) : { id: ing.id, name: nameOf(ing) };
+    const have = new Set(wordsOf(current.notes));
+    const moved = read.notes.filter((n) => !wordsOf(n).every((w) => have.has(w)));
+    const notes = moved.length ? tidyIngredientNote([...moved, current.notes].filter(Boolean).join(", ")) : current.notes;
+    const saved = unitById.get(line.row.unitId);
+    const questions: string[] = [];
+    let unit = current.unit;
+    if (read.unit && read.unit.id !== saved?.id) {
+      if (isEach(saved)) {
+        unit = read.unit.name;
+        questions.push(`Amount would change from ${line.row.quantity} ${current.unit} to ${line.row.quantity} ${unit}. OK?`);
+      } else {
+        questions.push(`Saved as ${line.row.quantity} ${current.unit}, but the name says "${read.unit.name}". Which unit is right?`);
+      }
+    }
+    // A renamed row asks this once, on the rename.
+    if (read.lost && junk) questions.push(`Name was '${ing.name}'. Which ${read.name}?`);
+    const sameRow = "id" in target && target.id === ing.id;
+    if (sameRow && unit === current.unit && notes === current.notes && !questions.length) return null;
+    const words = moved.length ? `; "${moved.join(", ")}" moves to the note` : "";
+    return {
+      category: "garbled_name_note",
+      confidence: questions.length || !("id" in target) ? "medium" : "high",
+      table: line.table,
+      rowId: line.row.id,
+      recipeId: line.row.recipeId,
+      recipeName: line.recipeName,
+      current,
+      proposed: { quantity: line.row.quantity, unit, target, notes },
+      reason: sameRow
+        ? `Row "${ing.name}" is renamed to "${read.name}"${words}.`
+        : `Row "${ing.name}" reads as "${read.name}", which another row already is${words}.`,
+      ambiguous: questions.length > 0,
+      question: questions.join(" "),
+    };
+  };
+
   // A line that points to another recipe stays as written, and asks.
   const recipeReference = (line: Line): Proposal => {
     const current = currentOf(line);
@@ -1002,7 +1095,9 @@ export function analyze(snap: Snapshot, today: Date): Report {
     const ing = ingById.get(line.row.ingredientId);
     const proposal = ing && RECIPE_REFERENCE.test(ing.name)
       ? recipeReference(line)
-      : flagged(line.row.ingredientId) ? reparse(line) : (wrongLink(line) ?? reparse(line));
+      : reads.has(line.row.ingredientId)
+        ? dirtyLine(line)
+        : flagged(line.row.ingredientId) ? reparse(line) : (wrongLink(line) ?? reparse(line));
     if (proposal) proposals.push(proposal);
   }
 
@@ -1102,21 +1197,24 @@ export function analyze(snap: Snapshot, today: Date): Report {
     });
   }
 
-  // ── Rows renamed to their tidy name. Their lines keep the link. ──
-  for (const [id, tidy] of tidied) {
+  // ── Rows renamed to their read name. Their lines keep the link. ──
+  for (const [id, name] of tidied) {
     const ing = ingById.get(id)!;
+    const read = reads.get(id)!;
+    const moved = read.notes.join(", ");
+    const extra = [moved && `"${moved}" moves to each line's note`, read.unit && `the unit "${read.unit.name}" is checked on each line`].filter(Boolean);
     proposals.push({
       category: "rename_ingredient",
-      confidence: "high",
+      confidence: read.lost ? "low" : "high",
       table: "Ingredient",
       rowId: id,
       recipeId: null,
       recipeName: "",
       current: { quantity: null, unit: "", ingredientId: id, ingredientName: ing.name, notes: "" },
-      proposed: { quantity: null, unit: "", target: { id, name: tidy }, notes: "" },
-      reason: `Stray punctuation or spacing in the name, and no other row is named "${tidy}". Rename the row; ${linesByIngredient.get(id)?.length ?? 0} recipe line(s) keep the link.`,
-      ambiguous: false,
-      question: "",
+      proposed: { quantity: null, unit: "", target: { id, name }, notes: moved },
+      reason: `Stray punctuation or words in the name, and no other row is named "${name}". Rename the row${extra.length ? `; ${extra.join(", and ")}` : ""}; ${linesByIngredient.get(id)?.length ?? 0} recipe line(s) keep the link.`,
+      ambiguous: read.lost,
+      question: read.lost ? `Name was '${ing.name}'. Which ${name}?` : "",
     });
   }
 
@@ -1151,6 +1249,11 @@ export function analyze(snap: Snapshot, today: Date): Report {
     for (const x of mine) {
       const key = targetKey(x.proposed.target);
       counts.set(key, { target: x.proposed.target, n: (counts.get(key)?.n ?? 0) + 1 });
+    }
+    const read = reads.get(ing.id);
+    if (!counts.size && read) {
+      const target = targetFor(read.name);
+      counts.set(targetKey(target), { target, n: 0 });
     }
     if (!counts.size && !p.nounless) {
       // No recipe line to learn from: read the name on its own.
@@ -1397,6 +1500,12 @@ function toCsv(header: string[], rows: unknown[][]): string {
   return [header, ...rows].map((row) => row.map(csvField).join(",")).join("\r\n") + "\r\n";
 }
 
+// A rename shows the new name, not just the id it keeps.
+function renameLabel(x: Proposal): string | null {
+  const t = x.proposed.target;
+  return x.category === "rename_ingredient" && "id" in t ? `rename:${t.name}` : null;
+}
+
 function proposalsCsv(proposals: Proposal[]): string {
   return toCsv(
     [
@@ -1407,7 +1516,7 @@ function proposalsCsv(proposals: Proposal[]): string {
     proposals.map((x) => [
       x.category, x.confidence, x.table, x.rowId, x.recipeId, x.recipeName, x.current.quantity, x.current.unit,
       x.current.ingredientId, x.current.ingredientName, x.current.notes, x.proposed.quantity, x.proposed.unit,
-      targetLabel(x.proposed.target), x.proposed.notes, x.reason, x.ambiguous ? "yes" : "no", x.question,
+      renameLabel(x) ?? targetLabel(x.proposed.target), x.proposed.notes, x.reason, x.ambiguous ? "yes" : "no", x.question,
     ])
   );
 }
@@ -1822,6 +1931,9 @@ function fixture(): Snapshot {
   // Misses from the fourth live run.
   add("Salsa Chicken Wraps", 32, "ounce", "your favorite salsa");
   add("Salsa Chicken Wraps", 1, "each", "your favorite ranch dressing");
+  // Misses from the fifth live run: products whose note offers fresh garlic.
+  add("Chicken Tikka Masala Recipe", 1.75, "tablespoon", "ginger garlic paste", "(or tbsp grated ginger + ¾ tbsp grated garlic)");
+  add("Homemade Spaghetti Sauce", 0.5, "teaspoon", "garlic powder", "or 1 1/2 tsp crushed, real garlic");
 
   const groceryLists: GroceryListRow[] = [{ id: 1, householdId: 1, mealPlanId: 1, name: "This week" }];
   const groceryItems: GroceryItemRow[] = [
@@ -2110,6 +2222,64 @@ function selfTest(out: string | undefined): number {
   check('cooked question shows "cooked rice"', !!dirtyCooked && targetText(dirtyCooked.proposed.target) === `cooked rice (#${riceRow.id})` && !dirtyCooked.question.includes("Proposed name looks wrong"));
   check("renamed rows are not deleted", !dirty.proposals.some((x) => x.category === "deletable_after_repoint" && [garlicRow.id, riceRow.id].includes(x.rowId)));
   check("summary counts renames", summaryMd(dirty, { mode: "self-test", isolation: "n/a", generated: "self-test" }).includes("| rename_ingredient | 2 | 0 |"));
+
+  console.log("\nFifth live run:");
+  check("ginger garlic paste with an (or ...) note is left alone", !line("Chicken Tikka Masala Recipe", "ginger garlic paste"));
+  check("garlic powder with an or ... garlic note is left alone", !line("Homemade Spaghetti Sauce", "garlic powder"));
+  check("no wrong_link off a garlic product", !report.proposals.some((x) => x.category === "wrong_link" && ["ginger garlic paste", "garlic powder"].includes(x.current.ingredientName)));
+
+  // Dirty rows as the live run had them, with "garlic," as the only garlic.
+  const renameSnap = fixture();
+  renameSnap.ingredients.find((i) => i.name === "garlic")!.name = "garlic,";
+  const unitOf = (name: string) => renameSnap.units.find((u) => u.name === name)!.id;
+  const dirtyRows: [number, string, number, string, string | null][] = [
+    [369, "-diced green chilies", 1, "can", null],
+    [725, "- chocolate chips", 1, "cup", null],
+    [726, "- nuts", 0.5, "cup", null],
+    [454, "“globs” liquid lecithin", 2, "tablespoon", null],
+    [805, '" of oil', 1, "each", null],
+    [875, "Heaping  teaspoon baking soda", 1, "each", null],
+    [878, "medium yellow onion,", 1, "each", "diced"],
+  ];
+  for (const [id, name, quantity, unit, notes] of dirtyRows) {
+    renameSnap.ingredients.push({ id, name });
+    renameSnap.recipeLines.push({ id: 9100 + id, recipeId: riceRecipe, ingredientId: id, quantity, unitId: unitOf(unit), notes });
+  }
+  const renamed = analyze(renameSnap, new Date("2026-10-26T12:00:00Z"));
+  const renameOf = (id: number) => renamed.proposals.find((x) => x.category === "rename_ingredient" && x.rowId === id);
+  const renameCsv = proposalsCsv(renamed.proposals);
+  const lineOf = (id: number) => renamed.proposals.find((x) => x.table === "RecipeIngredient" && x.rowId === 9100 + id);
+  const garlicComma = renameSnap.ingredients.find((i) => i.name === "garlic,")!.id;
+  for (const [id, name, notes, ambiguous] of [
+    [369, "diced green chilies", "", false],
+    [725, "chocolate chips", "", false],
+    [726, "nuts", "", false],
+    [garlicComma, "garlic", "", false],
+    [454, "liquid lecithin", "globs", false],
+    [805, "oil", "", true],
+    [875, "baking soda", "heaping", false],
+    [878, "yellow onion", "medium", false],
+  ] as [number, string, string, boolean][]) {
+    const x = renameOf(id);
+    const got = x ? [targetText(x.proposed.target), x.proposed.notes, x.ambiguous] : null;
+    check(`rename #${id} -> ${JSON.stringify(name)}${notes ? `, note ${JSON.stringify(notes)}` : ""}`, (same(got, [`${name} (#${id})`, notes, ambiguous]) && renameCsv.includes(`,rename:${name},`)) || (console.log(`      got ${JSON.stringify(got)}`), false));
+  }
+  check(`'" of oil' asks which oil`, renameOf(805)?.question === `Name was '" of oil'. Which oil?`);
+  check("plain renames leave their lines alone", [369, 725, 726, 805].every((id) => !lineOf(id)));
+  const shownLine = (x: Proposal | undefined) => (x ? [x.proposed.quantity, x.proposed.unit, targetText(x.proposed.target), x.proposed.notes, x.ambiguous] : null);
+  check('globs line gets note "globs"', same(shownLine(lineOf(454)), [2, "tablespoon", "liquid lecithin (#454)", "globs", false]));
+  check("heaping line: each -> teaspoon, note heaping, asks", same(shownLine(lineOf(875)), [1, "teaspoon", "baking soda (#875)", "heaping", true]) && lineOf(875)!.question === "Amount would change from 1 each to 1 teaspoon. OK?");
+  check('onion line gets note "medium, diced"', same(shownLine(lineOf(878)), [1, "each", "yellow onion (#878)", "medium, diced", false]));
+  check("renamed dirty rows are not deleted", !renamed.proposals.some((x) => x.category === "deletable_after_repoint" && dirtyRows.some(([id]) => id === x.rowId)));
+  // With a "yellow onion" row already there, the dirty row is junk: its
+  // line repoints with the note and the row goes.
+  const onionSnap = fixture();
+  onionSnap.ingredients.push({ id: 877, name: "yellow onion" }, { id: 878, name: "medium yellow onion," });
+  onionSnap.recipeLines.push({ id: 9978, recipeId: riceRecipe, ingredientId: 878, quantity: 1, unitId: onionSnap.units.find((u) => u.name === "each")!.id, notes: null });
+  const onion = analyze(onionSnap, new Date("2026-10-26T12:00:00Z"));
+  const onionLine = onion.proposals.find((x) => x.table === "RecipeIngredient" && x.rowId === 9978);
+  check("medium yellow onion, -> existing yellow onion, note medium", same(onionLine ? [targetText(onionLine.proposed.target), onionLine.proposed.notes, onionLine.ambiguous] : null, ["yellow onion (#877)", "medium", false]));
+  check("medium yellow onion, row is deleted, not renamed", onion.proposals.some((x) => x.category === "deletable_after_repoint" && x.rowId === 878) && !onion.proposals.some((x) => x.category === "rename_ingredient" && x.rowId === 878));
 
   console.log("\nSanity check on proposed names:");
   for (const [name, want] of [
