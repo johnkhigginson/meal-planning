@@ -1,0 +1,252 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { signIn } from "next-auth/react";
+import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { OAuthButtons } from "@/components/shared/OAuthButtons";
+import type { OAuthProviderId } from "@/lib/oauth-config";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+        }
+      ) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId?: string) => void;
+    };
+  }
+}
+
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+const turnstileEnabled = Boolean(SITE_KEY);
+
+export default function RegisterForm({ oauthProviders }: { oauthProviders: OAuthProviderId[] }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [company, setCompany] = useState(""); // honeypot, must stay empty
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  // Prefilled email and post-signup destination (e.g. a cookbook invite link).
+  // Read from window to avoid wrapping the page in a Suspense boundary.
+  const [callbackUrl, setCallbackUrl] = useState("/");
+
+  useEffect(() => {
+    // Read once after mount (browser-only) to avoid a hydration mismatch.
+    const sp = new URLSearchParams(window.location.search);
+    const prefill = sp.get("email");
+    const cb = sp.get("callbackUrl");
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (prefill) setEmail(prefill);
+    // Only honor same-site relative paths.
+    if (cb && cb.startsWith("/") && !cb.startsWith("//")) setCallbackUrl(cb);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!SITE_KEY) return;
+    let cancelled = false;
+
+    const renderWidget = () => {
+      if (cancelled || !window.turnstile || !containerRef.current) return;
+      if (widgetIdRef.current !== null) return;
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: SITE_KEY,
+        callback: (t) => setToken(t),
+        "error-callback": () => setToken(""),
+        "expired-callback": () => setToken(""),
+        theme: "auto",
+      });
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const SCRIPT_ID = "cf-turnstile-script";
+      let script = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement("script");
+        script.id = SCRIPT_ID;
+        script.src =
+          "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", renderWidget);
+    }
+
+    return () => {
+      cancelled = true;
+      if (widgetIdRef.current !== null && window.turnstile) {
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch {
+          // widget already removed
+        }
+        widgetIdRef.current = null;
+      }
+    };
+  }, []);
+
+  function resetTurnstile() {
+    if (widgetIdRef.current !== null && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+    setToken("");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    // Create account
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, company, turnstileToken: token }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "Registration failed");
+      setLoading(false);
+      resetTurnstile(); // Turnstile tokens are single-use
+      return;
+    }
+
+    trackEvent("sign_up");
+
+    // Auto sign in then redirect
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Account created but sign-in failed. Please try logging in.");
+      setLoading(false);
+    } else {
+      window.location.href = callbackUrl;
+    }
+  }
+
+  return (
+    <div className="flex w-full max-w-md flex-col gap-8">
+      <h1 className="text-center text-4xl leading-tight font-medium tracking-[-0.02em] sm:text-5xl">
+        Create your account
+      </h1>
+      <Card className="rounded-3xl py-7 sm:py-8">
+        <CardContent className="space-y-5 px-6 sm:px-8">
+          {error && (
+            <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
+              {error}
+            </p>
+          )}
+          <OAuthButtons providers={oauthProviders} callbackUrl={callbackUrl} />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+              />
+              <p className="text-xs text-muted-foreground">
+                At least 8 characters
+              </p>
+            </div>
+
+            {/* Honeypot: hidden from real users, tempting to naive bots. */}
+            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <Label htmlFor="company">Company</Label>
+              <Input
+                id="company"
+                name="company"
+                tabIndex={-1}
+                autoComplete="off"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+            </div>
+
+            {turnstileEnabled && <div ref={containerRef} className="flex justify-center" />}
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={loading || (turnstileEnabled && !token)}
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Create account
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              By creating an account you agree to the{" "}
+              <Link href="/terms" className="font-bold text-primary underline-offset-4 hover:underline">
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="font-bold text-primary underline-offset-4 hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+            <p className="text-center text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link
+                href={`/login${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+                className="font-bold text-primary underline-offset-4 hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

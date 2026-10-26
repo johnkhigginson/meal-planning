@@ -1,0 +1,223 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { signIn } from "next-auth/react";
+import { trackEvent } from "@/lib/analytics";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { OAuthButtons } from "@/components/shared/OAuthButtons";
+import type { OAuthProviderId } from "@/lib/oauth-config";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+        }
+      ) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId?: string) => void;
+    };
+  }
+}
+
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+const turnstileEnabled = Boolean(SITE_KEY);
+
+// Messages for the ?error= codes a Google or Apple sign-in can come back with
+// (ours from the signIn callback, the rest from Auth.js).
+function oauthErrorMessage(code: string): string | null {
+  switch (code) {
+    case "OAuthEmailUnverified":
+      return "That account's email address isn't verified with the provider, so we can't sign you in with it. Verify it there, or sign in with your email and password.";
+    case "OAuthRateLimited":
+      return "Too many sign-in attempts. Please wait a few minutes and try again.";
+    case "AccessDenied":
+      return "Sign-in was cancelled or not allowed.";
+    case "CredentialsSignin":
+      return null; // the form reports its own failures
+    default:
+      return "Sign-in didn't work. Please try again.";
+  }
+}
+
+export default function LoginForm({ oauthProviders }: { oauthProviders: OAuthProviderId[] }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  // Where to go after sign-in (e.g. back to a blog or an invite link). Read
+  // from the URL; only same-site relative paths are honored.
+  const [callbackUrl, setCallbackUrl] = useState("/");
+
+  useEffect(() => {
+    // Read once after mount (browser-only) to avoid a hydration mismatch.
+    const sp = new URLSearchParams(window.location.search);
+    const cb = sp.get("callbackUrl");
+    const errorCode = sp.get("error");
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (cb && cb.startsWith("/") && !cb.startsWith("//")) setCallbackUrl(cb);
+    if (errorCode) setError(oauthErrorMessage(errorCode) ?? "");
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!SITE_KEY) return;
+    let cancelled = false;
+
+    const renderWidget = () => {
+      if (cancelled || !window.turnstile || !containerRef.current) return;
+      if (widgetIdRef.current !== null) return;
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: SITE_KEY,
+        callback: (t) => setToken(t),
+        "error-callback": () => setToken(""),
+        "expired-callback": () => setToken(""),
+        theme: "auto",
+      });
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      const SCRIPT_ID = "cf-turnstile-script";
+      let script = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement("script");
+        script.id = SCRIPT_ID;
+        script.src =
+          "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", renderWidget);
+    }
+
+    return () => {
+      cancelled = true;
+      if (widgetIdRef.current !== null && window.turnstile) {
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch {
+          // widget already removed
+        }
+        widgetIdRef.current = null;
+      }
+    };
+  }, []);
+
+  function resetTurnstile() {
+    if (widgetIdRef.current !== null && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+    setToken("");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      turnstileToken: token,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Invalid email or password");
+      setLoading(false);
+      resetTurnstile(); // Turnstile tokens are single-use
+    } else {
+      trackEvent("login");
+      // Successful login: full page navigation to pick up the session
+      window.location.href = callbackUrl;
+    }
+  }
+
+  return (
+    <div className="flex w-full max-w-md flex-col gap-8">
+      <h1 className="text-center text-4xl leading-tight font-medium tracking-[-0.02em] sm:text-5xl">
+        Welcome back
+      </h1>
+      <Card className="rounded-3xl py-7 sm:py-8">
+        <CardContent className="space-y-5 px-6 sm:px-8">
+          {error && (
+            <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
+              {error}
+            </p>
+          )}
+          <OAuthButtons providers={oauthProviders} callbackUrl={callbackUrl} />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            {turnstileEnabled && <div ref={containerRef} className="flex justify-center" />}
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={loading || (turnstileEnabled && !token)}
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Sign in
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link
+                href={`/register${callbackUrl !== "/" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+                className="font-bold text-primary underline-offset-4 hover:underline"
+              >
+                Sign up
+              </Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
