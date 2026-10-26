@@ -44,8 +44,6 @@ const liftCard =
   "hover:-translate-y-0.5 hover:border-input hover:shadow-[0_14px_30px_-18px_rgb(60_45_10/0.45)]";
 
 export async function Dashboard({ userId, householdId, name }: DashboardProps) {
-  // Meal dates are SQL dates (UTC midnight), so compare against UTC midnight today.
-  const todayUtc = new Date(new Date().toISOString().slice(0, 10));
   const [
     me,
     recipeCount,
@@ -90,11 +88,9 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
       },
       orderBy: { publishedAt: "desc" },
     }),
-    // Getting-started checklist. A meal counts only if it is today or later, and a
-    // grocery list only if it has items, so old test data or an empty "New list"
-    // can't mark the steps done while the page above still shows nothing planned.
-    prisma.mealPlanEntry.count({ where: { mealPlan: { householdId }, date: { gte: todayUtc } } }),
-    prisma.groceryList.count({ where: { householdId, items: { some: {} } } }),
+    // Getting-started checklist: any meal in any week, any grocery list.
+    prisma.mealPlanEntry.count({ where: { mealPlan: { householdId } } }),
+    prisma.groceryList.count({ where: { householdId } }),
   ]);
 
   const hidden = parseHiddenNav(me?.hiddenNavItems);
@@ -131,15 +127,15 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
     { href: "/stores", label: "Stores", value: storeCount },
   ].filter((s) => s.always || shows(s.href));
 
-  // Every step always shows, even for a section hidden from the menu. Dropping
-  // those steps let the checklist count as complete on recipes alone and vanish.
-  // Anyone who doesn't want a step can hide the whole checklist.
+  // A step for a section the user hid from their menu is left out, so the
+  // checklist can still be completed.
   const gettingStarted = [
-    { href: "/recipes/new", label: "Add or import a recipe", description: "Type one in, paste a link or snap a photo", done: recipeCount > 0 },
+    { href: "/recipes/new", label: "Add or import a recipe", description: "Type one in, paste a link or snap a photo", done: recipeCount > 0, always: true },
     { href: "/pantry", label: "Set up your pantry", description: "Add what you have on hand", done: pantryCount > 0 },
     { href: "/meal-plan", label: "Make a meal plan", description: "Pick meals for the days ahead", done: mealEntryCount > 0 },
     { href: "/grocery-list", label: "Generate a grocery list", description: "Build it from your meal plan", done: groceryListCount > 0 },
   ]
+    .filter((s) => s.always || shows(s.href))
     .map(({ href, label, description, done }) => ({ href, label, description, done }));
 
   const quickLinks = [
