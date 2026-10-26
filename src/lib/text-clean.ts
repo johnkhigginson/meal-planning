@@ -5,14 +5,14 @@
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
-  ndash: "–", mdash: "—", hellip: "…", deg: "°",
-  frac12: "½", frac14: "¼", frac34: "¾",
-  frac13: "⅓", frac23: "⅔", times: "×",
-  eacute: "é", egrave: "è", agrave: "à", acirc: "â",
-  ccedil: "ç", ntilde: "ñ", uuml: "ü", ouml: "ö",
-  iacute: "í", oacute: "ó", aacute: "á", reg: "®",
-  copy: "©", trade: "™", bull: "•",
+  rsquo: "\u2019", lsquo: "\u2018", rdquo: "\u201d", ldquo: "\u201c",
+  ndash: "\u2013", mdash: "\u2014", hellip: "\u2026", deg: "\u00b0",
+  frac12: "\u00bd", frac14: "\u00bc", frac34: "\u00be",
+  frac13: "\u2153", frac23: "\u2154", times: "\u00d7",
+  eacute: "\u00e9", egrave: "\u00e8", agrave: "\u00e0", acirc: "\u00e2",
+  ccedil: "\u00e7", ntilde: "\u00f1", uuml: "\u00fc", ouml: "\u00f6",
+  iacute: "\u00ed", oacute: "\u00f3", aacute: "\u00e1", reg: "\u00ae",
+  copy: "\u00a9", trade: "\u2122", bull: "\u2022",
 };
 
 // A code point past U+10FFFF (or a lone surrogate) makes String.fromCodePoint
