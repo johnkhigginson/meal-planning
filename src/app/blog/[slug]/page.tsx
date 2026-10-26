@@ -5,7 +5,8 @@ import { CookbookBrowser, type BrowserPost } from "@/components/blog/CookbookBro
 import { FollowButton } from "@/components/blog/FollowButton";
 import { getPublishedBookBySlug } from "@/lib/blog";
 import { getCurrentUser } from "@/lib/auth";
-import { absoluteUrl, getSiteUrl } from "@/lib/site";
+import { absoluteUrl, SITE_NAME } from "@/lib/site";
+import { bookUrl, metaDescription, pageTitle } from "@/lib/seo";
 import { recipeAuthorName } from "@/lib/recipe-author";
 
 export const dynamic = "force-dynamic";
@@ -22,25 +23,31 @@ export async function generateMetadata({ params }: PageProps) {
   // Fall back to the site default image (app/opengraph-image.tsx).
   const cover =
     absoluteUrl(book.coverImageUrl ?? book.posts.find((p) => p.imageUrl)?.imageUrl) ?? "/opengraph-image";
-  const url = `${getSiteUrl()}/blog/${slug}`;
+  const url = bookUrl(book);
+  const description = metaDescription(
+    book.description,
+    book.tagline,
+    `Recipes from ${book.name}, a family cookbook on ${SITE_NAME}.`
+  );
   return {
-    title: book.name,
-    description: book.description ?? undefined,
+    title: pageTitle(book.name),
+    description,
     alternates: {
       canonical: url,
       types: { "application/rss+xml": `${url}/rss.xml` },
     },
     openGraph: {
       type: "website",
+      siteName: SITE_NAME,
       title: book.name,
-      description: book.description ?? undefined,
+      description,
       url,
       images: [cover],
     },
     twitter: {
       card: "summary_large_image",
       title: book.name,
-      description: book.description ?? undefined,
+      description,
       images: [cover],
     },
   };

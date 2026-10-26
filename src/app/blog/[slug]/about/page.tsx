@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { BlogShell } from "@/components/blog/BlogShell";
 import { ArrowLeft } from "lucide-react";
 import { getPublishedBookAuthors } from "@/lib/blog";
-import { getSiteUrl } from "@/lib/site";
+import { SITE_NAME } from "@/lib/site";
+import { bookUrl, metaDescription, pageTitle } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,16 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
   const data = await getPublishedBookAuthors(slug);
   if (!data) notFound();
+  const url = `${bookUrl(data.book)}/about`;
+  const description = metaDescription(
+    data.book.description,
+    `The cooks behind ${data.book.name}, a family cookbook on ${SITE_NAME}.`
+  );
   return {
-    title: `About — ${data.book.name}`,
-    alternates: { canonical: `${getSiteUrl()}/blog/${slug}/about` },
+    title: pageTitle(`About ${data.book.name}`),
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: "website", siteName: SITE_NAME, title: `About ${data.book.name}`, description, url },
   };
 }
 

@@ -9,10 +9,18 @@ const nextConfig: NextConfig = {
   // the adapter and its driver must be opted out of server bundling or their
   // connection handshake stalls until timeout.
   serverExternalPackages: ["@prisma/adapter-mssql", "mssql", "tedious"],
-  // The service worker must never come from the HTTP cache, or a fix to its
-  // caching rules would not reach browsers that already have it.
   async headers() {
     return [
+      // Signed-in app sections and private share and invite links stay out of
+      // search results even if a crawler reaches them. Not /api: recipe photos
+      // are served from /api/images and should be indexable.
+      {
+        source:
+          "/:section(admin|books|grocery-list|meal-plan|pantry|recipes|settings|stores|what-can-i-make|share|invite)/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      // The service worker must never come from the HTTP cache, or a fix to its
+      // caching rules would not reach browsers that already have it.
       {
         source: "/sw.js",
         headers: [

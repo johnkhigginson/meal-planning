@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { LemonLogo } from "@/components/shared/LemonLogo";
 import { FooterLinks } from "@/components/shared/FooterLinks";
 import Link from "next/link";
+
+// Sign-in, registration and password pages stay out of search results.
+export const metadata: Metadata = {
+  robots: { index: false, follow: true },
+};
 
 export default function AuthLayout({
   children,

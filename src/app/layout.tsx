@@ -5,6 +5,7 @@ import { AppShell } from "@/components/shared/AppShell";
 import { ServiceWorkerRegistrar } from "@/components/shared/ServiceWorkerRegistrar";
 import { Analytics } from "@/components/shared/Analytics";
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
+import { TITLE_SUFFIX } from "@/lib/seo";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({
@@ -23,7 +24,9 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
-  title: SITE_NAME,
+  // Page titles read "Recipe name | My Lemon Kitchen". See pageTitle in
+  // src/lib/seo.ts for keeping long names under about 60 characters.
+  title: { default: SITE_NAME, template: `%s${TITLE_SUFFIX}` },
   description: SITE_DESCRIPTION,
   // Share defaults. The image comes from app/opengraph-image.tsx.
   openGraph: {

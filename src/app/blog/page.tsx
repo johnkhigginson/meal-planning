@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BlogShell } from "@/components/blog/BlogShell";
@@ -5,12 +6,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen } from "lucide-react";
 import { getPublishedBooks } from "@/lib/blog";
+import { SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Recipe Blog",
-  description: "Browse our published recipe collections.",
+  description: `Browse family cookbooks and recipes published on ${SITE_NAME}.`,
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `Recipe Blog | ${SITE_NAME}`,
+    description: `Browse family cookbooks and recipes published on ${SITE_NAME}.`,
+    url: "/blog",
+  },
 };
 
 export default async function BlogIndexPage() {
