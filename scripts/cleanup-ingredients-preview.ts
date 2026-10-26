@@ -214,7 +214,9 @@ const COOKED_LEAD = /^cooked\s+(.+)$/i;
 const OF_CHOICE = /^\s*of\s+(?:your\s+)?choice$/i;
 // "Your Favorite Pie Crust Recipe": a line that points to another recipe.
 // It stays as written; the report asks.
-const RECIPE_REFERENCE = /\brecipes?\b|^\s*(?:your|my)\s+favou?rite\b/i;
+const RECIPE_REFERENCE = /\brecipes?\b/i;
+// "your favorite salsa" is salsa, with the choice in the note.
+const FAVORITE_LEAD = /^\s*((?:your|my)\s+favou?rite)\s+(?=\S)/i;
 // Containers at the front of a name ("package feta cheese"). After a weight
 // or volume they describe the amount and are not the unit.
 const CONTAINER_LEAD = /^(?:package|packages|pkg|pkgs|can|cans|jar|jars|box|boxes|bag|bags|bottle|bottles|carton|cartons|tub|tubs)\.?(?:\s+of)?\s/i;
@@ -332,6 +334,7 @@ function nameProblems(name: string, lookup: UnitLookup): NameProblems {
   if (/\s[-\u2013\u2014]\s/.test(open)) layout.push('has " - "');
   if (/\sor\s/i.test(open)) layout.push('has "or"');
   if (/^(?:lg|sm|med)\.\s/i.test(clean)) layout.push("abbreviated size");
+  if (FAVORITE_LEAD.test(clean)) layout.push('starts with "your favorite"');
   const nameWords = clean.split(/\s+/);
   if (nameWords.length > 1 && AFTER_NOUN_DESCRIPTORS.has(bare(nameWords[nameWords.length - 1]))) {
     layout.push("descriptor after the noun");
@@ -450,6 +453,10 @@ function typoOf(a: string, b: string): boolean {
   return editDistance(p, q) === 1;
 }
 
+// The name without stray punctuation or spacing around it: "garlic," ->
+// "garlic". A closing paren stays.
+const tidyName = (name: string) => name.replace(/\s+/g, " ").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "");
+
 // The filter the first count used, as LIKE patterns: '(%', '%(s)%', '%*%',
 // '%$%', '%()%'. Kept so the two counts can be compared.
 function matchesLikeFilter(name: string): boolean {
@@ -465,13 +472,14 @@ type Category =
   | "prep_in_name"
   | "garbled_name_note"
   | "junk_ingredient_repoint"
+  | "rename_ingredient"
   | "deletable_after_repoint"
   | "recipe_reference";
 type Confidence = "high" | "medium" | "low";
 
 const CATEGORIES: Category[] = [
-  "wrong_link", "cooked_separate", "lost_noun", "prep_in_name", "garbled_name_note", "junk_ingredient_repoint", "deletable_after_repoint",
-  "recipe_reference",
+  "wrong_link", "cooked_separate", "lost_noun", "prep_in_name", "garbled_name_note", "junk_ingredient_repoint", "rename_ingredient",
+  "deletable_after_repoint", "recipe_reference",
 ];
 
 // An existing Ingredient id, or a name to create. "delete" for category F.
@@ -579,11 +587,33 @@ export function analyze(snap: Snapshot, today: Date): Report {
     return !!p && (p.junk.length > 0 || p.prep !== "" || p.layout.length > 0);
   };
 
+  // "garlic," is garlic. Its tidy name is what a match compares and what a
+  // proposal shows, and the row is renamed to it. When another row already
+  // has that name, the dirty row is junk: its lines repoint and it goes.
+  const tidied = new Map<number, string>();
+  const tidyKeys = new Map<string, { id: number; name: string }>();
+  for (const row of snap.ingredients) {
+    if (!flagged(row.id) && tidyName(row.name) === row.name) tidyKeys.set(ingredientKey(row.name), row);
+  }
+  for (const row of [...snap.ingredients].sort((a, b) => a.id - b.id)) {
+    const tidy = tidyName(row.name);
+    if (flagged(row.id) || tidy === row.name || !tidy || badNameReasons(tidy, lookup).length) continue;
+    const same = tidyKeys.get(ingredientKey(tidy));
+    if (same) {
+      problems.get(row.id)!.junk.push(`stray punctuation, same name as "${same.name}" (#${same.id})`);
+    } else {
+      tidied.set(row.id, tidy);
+      tidyKeys.set(ingredientKey(tidy), { id: row.id, name: tidy });
+    }
+  }
+  const nameOf = (row: IngredientRow) => tidied.get(row.id) ?? row.name;
+
   // Rows a name can point at: clean rows only, found the way the importer
   // finds them (same name in any case, or singular/plural).
   const byKey = new Map<string, IngredientRow[]>();
-  for (const row of snap.ingredients) {
-    if (flagged(row.id)) continue;
+  for (const ing of snap.ingredients) {
+    if (flagged(ing.id)) continue;
+    const row = { id: ing.id, name: nameOf(ing) };
     const key = ingredientKey(row.name);
     byKey.set(key, [...(byKey.get(key) ?? []), row]);
   }
@@ -814,6 +844,13 @@ export function analyze(snap: Snapshot, today: Date): Report {
     let unit: UnitRow | null = unitById.get(line.row.unitId) ?? null;
     let quantity = line.row.quantity;
     let name = ing.name.trim();
+    let lineNotes = notes;
+    // "your favorite salsa": the choice goes to the note.
+    const favorite = name.match(FAVORITE_LEAD);
+    if (favorite) {
+      name = name.slice(favorite[0].length);
+      lineNotes = [favorite[1].toLowerCase().replace(/\s+/g, " "), notes].filter(Boolean).join(", ");
+    }
 
     // A unit at the front of the name: use it, or drop it when it repeats
     // the saved unit. A different unit means the amount was misread.
@@ -856,7 +893,6 @@ export function analyze(snap: Snapshot, today: Date): Report {
       confidence = "low";
     }
     // "(1 cup butter)": the whole name is a paren with its own amount.
-    let lineNotes = notes;
     if (wholeParen(name)) {
       const inner = parseIngredientText(name.slice(1, -1), lookup);
       if (inner && inner.quantity > 0 && inner.unit) {
@@ -922,7 +958,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
       confidence = "low";
     }
 
-    const target = ingredientKey(parsedName) === ingredientKey(ing.name) ? { id: ing.id, name: ing.name } : targetFor(parsedName);
+    const target = ingredientKey(parsedName) === ingredientKey(ing.name) ? { id: ing.id, name: nameOf(ing) } : targetFor(parsedName);
     if (!("id" in target)) confidence = lower(confidence, "medium");
     const unitChanged = (parsedUnit?.id ?? null) !== line.row.unitId;
     const quantityChanged = Math.abs(quantity - line.row.quantity) > 1e-9;
@@ -1045,7 +1081,7 @@ export function analyze(snap: Snapshot, today: Date): Report {
     const keep = rows.find((r) => cleanIngredientName(r.ing.name).toLowerCase() === tidy.toLowerCase()) ?? null;
     const first = keep ?? rows[0];
     // The link stays on the row the question is about; the answer renames.
-    const target: Target = { id: first.ing.id, name: first.ing.name };
+    const target: Target = { id: first.ing.id, name: nameOf(first.ing) };
     const joining = rows.filter((r) => r !== first);
     const join = joining.length
       ? ` Use "${tidy}" for ${joining.map((r) => `"${r.ing.name}" (#${r.ing.id})${r.note ? ` -> note "${r.note}"` : ""}`).join(", ")}.`
@@ -1063,6 +1099,24 @@ export function analyze(snap: Snapshot, today: Date): Report {
       reason: `${uses} recipe line(s) use ${rows.map((r) => `"${r.ing.name}"`).join(", ")}. Cooked is its own ingredient, so no line is repointed off cooked.${plain ? ` "${plain.name}" (#${plain.id}) also exists.` : ""}`,
       ambiguous: true,
       question: `Keep "${tidy}" separate from "${plainName}"?${rename}${join}`,
+    });
+  }
+
+  // ── Rows renamed to their tidy name. Their lines keep the link. ──
+  for (const [id, tidy] of tidied) {
+    const ing = ingById.get(id)!;
+    proposals.push({
+      category: "rename_ingredient",
+      confidence: "high",
+      table: "Ingredient",
+      rowId: id,
+      recipeId: null,
+      recipeName: "",
+      current: { quantity: null, unit: "", ingredientId: id, ingredientName: ing.name, notes: "" },
+      proposed: { quantity: null, unit: "", target: { id, name: tidy }, notes: "" },
+      reason: `Stray punctuation or spacing in the name, and no other row is named "${tidy}". Rename the row; ${linesByIngredient.get(id)?.length ?? 0} recipe line(s) keep the link.`,
+      ambiguous: false,
+      question: "",
     });
   }
 
@@ -1663,7 +1717,7 @@ function fixture(): Snapshot {
     return ingredients.length;
   };
   // Clean rows, to be left alone or used as targets.
-  for (const name of ["garlic", "large eggs", "butter", "baking powder", "Chicken Breast", "rice", "white rice", "eggs", "water", "ground beef", "lemon zest", "mozzarella", "cilantro", "thyme"]) ingredientId(name);
+  for (const name of ["garlic", "large eggs", "butter", "baking powder", "Chicken Breast", "rice", "white rice", "eggs", "water", "ground beef", "lemon zest", "mozzarella", "cilantro", "thyme", "ranch dressing"]) ingredientId(name);
 
   const recipes: RecipeRow[] = [];
   const recipeLines: LineRow[] = [];
@@ -1765,6 +1819,9 @@ function fixture(): Snapshot {
   add("Salad", 1, "tablespoon", "Soy Sauce - low sodium");
   add("Apple Pie", 2, "each", "Your Favorite Pie Crust Recipe - you will need 2 crusts", "one for the bottom of the pie and one for the top");
   add("Sugar Cookies", 1, "teaspoon", "almond extract or vanilla or lemon or mint or your favorite", "for icing");
+  // Misses from the fourth live run.
+  add("Salsa Chicken Wraps", 32, "ounce", "your favorite salsa");
+  add("Salsa Chicken Wraps", 1, "each", "your favorite ranch dressing");
 
   const groceryLists: GroceryListRow[] = [{ id: 1, householdId: 1, mealPlanId: 1, name: "This week" }];
   const groceryItems: GroceryItemRow[] = [
@@ -1935,8 +1992,13 @@ function selfTest(out: string | undefined): number {
   const riceRecipe = commaSnap.recipes[0].id;
   commaSnap.ingredients.push({ id: 9001, name: "cooked rice," });
   commaSnap.recipeLines.push({ id: 9001, recipeId: riceRecipe, ingredientId: 9001, quantity: 2, unitId: commaSnap.units.find((u) => u.name === "cup")!.id, notes: null });
-  const commaRice = analyze(commaSnap, new Date("2026-10-26T12:00:00Z")).proposals.filter((x) => x.category === "cooked_separate");
-  check('"cooked rice," joins "cooked rice"', commaRice.filter((x) => /cooked rice/.test(x.current.ingredientName)).length === 1 && commaRice.some((x) => x.question.includes('"cooked rice," (#9001)')));
+  const commaReport = analyze(commaSnap, new Date("2026-10-26T12:00:00Z"));
+  const commaRice = commaReport.proposals.filter((x) => x.category === "cooked_separate");
+  const cookedRiceId = commaSnap.ingredients.find((i) => i.name === "cooked rice")!.id;
+  check('"cooked rice," is not a second cooked question', commaRice.filter((x) => /cooked rice/.test(x.current.ingredientName)).length === 1 && !commaRice.some((x) => x.question.includes("#9001")));
+  const commaLine = commaReport.proposals.find((x) => x.table === "RecipeIngredient" && x.rowId === 9001);
+  check('"cooked rice," line repoints to "cooked rice"', !!commaLine && "id" in commaLine.proposed.target && commaLine.proposed.target.id === cookedRiceId && !commaLine.ambiguous);
+  check('"cooked rice," row is deleted, not renamed', commaReport.proposals.some((x) => x.category === "deletable_after_repoint" && x.rowId === 9001) && !commaReport.proposals.some((x) => x.category === "rename_ingredient"));
   check('asks "Keep \'cooked rice\' separate from \'rice\'?"', cookedQuestions.some((x) => x.question === 'Keep "cooked rice" separate from "rice"?' && x.ambiguous));
   check("cooked questions keep the link", cookedQuestions.every((x) => "id" in x.proposed.target && x.proposed.target.id === x.current.ingredientId));
 
@@ -2019,6 +2081,35 @@ function selfTest(out: string | undefined): number {
   const choiceRice = analyze(choiceSnap, new Date("2026-10-26T12:00:00Z")).proposals.filter((x) => x.category === "cooked_separate");
   const riceQuestion = choiceRice.find((x) => x.current.ingredientName === "cooked rice");
   check('"cooked rice of choice" joins "cooked rice" with note "of choice"', choiceRice.filter((x) => /cooked rice/.test(x.current.ingredientName)).length === 1 && (riceQuestion?.question ?? "").startsWith('Keep "cooked rice" separate from "rice"?') && (riceQuestion?.question ?? "").includes('"cooked rice of choice" (#9002) -> note "of choice"'));
+
+  console.log("\nFourth live run:");
+  want("your favorite salsa -> salsa", "Salsa Chicken Wraps", "your favorite salsa", [32, "ounce", "salsa (new)", "your favorite"], false);
+  want("your favorite ranch dressing -> ranch dressing", "Salsa Chicken Wraps", "your favorite ranch dressing", [1, "each", idOf("ranch dressing"), "your favorite"], false);
+  check('"your favorite" without "recipe" is not a recipe reference', ["your favorite salsa", "your favorite ranch dressing"].every((n) => line("Salsa Chicken Wraps", n)?.category !== "recipe_reference"));
+
+  // Only "garlic," and "cooked rice,", no tidy rows: each is renamed, and
+  // lines link to it with no typo question and no sanity failure.
+  const dirtySnap = fixture();
+  const garlicRow = dirtySnap.ingredients.find((i) => i.name === "garlic")!;
+  const riceRow = dirtySnap.ingredients.find((i) => i.name === "cooked rice")!;
+  garlicRow.name = "garlic,";
+  riceRow.name = "cooked rice,";
+  const dirty = analyze(dirtySnap, new Date("2026-10-26T12:00:00Z"));
+  const renames = dirty.proposals.filter((x) => x.category === "rename_ingredient");
+  check('"garlic," and "cooked rice," are renamed', same(renames.map((x) => [x.rowId, x.current.ingredientName, targetText(x.proposed.target), x.ambiguous]), [
+    [garlicRow.id, "garlic,", `garlic (#${garlicRow.id})`, false],
+    [riceRow.id, "cooked rice,", `cooked rice (#${riceRow.id})`, false],
+  ]));
+  const dirtyAlfredo = dirty.proposals.find((x) => x.recipeName === "Alfredo" && x.current.ingredientName === "garlic parmesan breading" && x.table === "RecipeIngredient");
+  check("garlic lines link to the renamed row", !!dirtyAlfredo && targetText(dirtyAlfredo.proposed.target) === `garlic (#${garlicRow.id})` && !dirtyAlfredo.ambiguous);
+  const dirtyFresh = dirty.proposals.find((x) => x.current.ingredientName === "minced fresh garlic");
+  check("fresh garlic links to the renamed row", !!dirtyFresh && targetText(dirtyFresh.proposed.target) === `garlic (#${garlicRow.id})` && !dirtyFresh.ambiguous);
+  check('no "Treat garlic as garlic," question', !dirty.proposals.some((x) => x.question.includes('as "garlic,"')));
+  check("no sanity failure on the dirty names", !dirty.sanityFailures.some((f) => /,$/.test(f.name)));
+  const dirtyCooked = dirty.proposals.find((x) => x.category === "cooked_separate" && x.rowId === riceRow.id);
+  check('cooked question shows "cooked rice"', !!dirtyCooked && targetText(dirtyCooked.proposed.target) === `cooked rice (#${riceRow.id})` && !dirtyCooked.question.includes("Proposed name looks wrong"));
+  check("renamed rows are not deleted", !dirty.proposals.some((x) => x.category === "deletable_after_repoint" && [garlicRow.id, riceRow.id].includes(x.rowId)));
+  check("summary counts renames", summaryMd(dirty, { mode: "self-test", isolation: "n/a", generated: "self-test" }).includes("| rename_ingredient | 2 | 0 |"));
 
   console.log("\nSanity check on proposed names:");
   for (const [name, want] of [
