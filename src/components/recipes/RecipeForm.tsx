@@ -181,7 +181,10 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
   const myHouseholdId = session?.user
     ? (session.user as { householdId?: string }).householdId ?? null
     : null;
+  // Two inputs, never one with a toggled attribute: the library picker has no
+  // capture attribute, and only the camera input asks for the rear camera.
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const photoUploadRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
@@ -512,7 +515,6 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
 
   function importScreenshot() {
     // A screenshot comes from the photo library, not the camera.
-    fileInputRef.current?.removeAttribute("capture");
     fileInputRef.current?.click();
   }
 
@@ -538,8 +540,12 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        setImportError(err.error || "Failed to parse photo");
+        const err = await res.json().catch(() => null);
+        setImportError(
+          typeof err?.error === "string" && err.error
+            ? err.error
+            : "Photo reading is unavailable right now. Please try again later or enter the recipe by hand."
+        );
         return;
       }
 
@@ -547,11 +553,12 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
       applyImportedData(data);
       setUrlImportError(null);
     } catch {
-      setImportError("Failed to parse photo");
+      setImportError("We couldn't reach the server. Check your connection and try again.");
     } finally {
       setParsingPhoto(false);
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
     }
   }
 
@@ -721,16 +728,25 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
           <CardTitle className="text-xl">Source</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Shared by the cookbook photo buttons and the screenshot fallback
-              offered when a URL import fails. */}
+          {/* Shared by the photo buttons and the screenshot fallback offered
+              when a URL import fails. This one is the photo library. */}
           <input
             ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoUpload}
+            className="hidden"
+            id="photo-upload"
+          />
+          {/* The camera: the only input that sets capture. */}
+          <input
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             onChange={handlePhotoUpload}
             className="hidden"
-            id="photo-upload"
+            id="photo-capture"
           />
           <Select
             value={form.sourceType}
@@ -863,42 +879,39 @@ export function RecipeForm({ initialData, recipeId, bookId }: RecipeFormProps) {
                   />
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="space-y-2">
-                <Label>Upload photo of recipe</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={parsingPhoto}
-                  >
-                    {parsingPhoto ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Upload className="mr-2 h-4 w-4" />
-                    )}
-                    {parsingPhoto ? "Parsing..." : "Upload photo"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (fileInputRef.current) {
-                        fileInputRef.current.setAttribute("capture", "environment");
-                        fileInputRef.current.click();
-                      }
-                    }}
-                    disabled={parsingPhoto}
-                  >
-                    <Camera className="mr-2 h-4 w-4" />
-                    Take photo
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Take a photo or upload an image of a cookbook page to auto-extract the recipe
-                </p>
+          {form.sourceType !== "WEBSITE" && (
+            <div className="space-y-2">
+              <Label>Upload photo of recipe</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={parsingPhoto}
+                >
+                  {parsingPhoto ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  {parsingPhoto ? "Parsing..." : "Upload photo"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={parsingPhoto}
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  Take photo
+                </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Take or upload a photo of a recipe card, handwritten note or cookbook page to auto-extract the recipe
+              </p>
             </div>
           )}
 

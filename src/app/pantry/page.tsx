@@ -24,7 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchInput } from "@/components/shared/SearchInput";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Save, Upload, Loader2, Receipt, Package, ChevronDown, Camera } from "lucide-react";
 import { PageLoader } from "@/components/shared/PageLoader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatAmount } from "@/lib/ingredient-format";
@@ -95,6 +95,7 @@ export default function PantryPage() {
 
   // Receipt upload state
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const receiptCameraRef = useRef<HTMLInputElement>(null);
   const [parsingReceipt, setParsingReceipt] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [receiptItems, setReceiptItems] = useState<ParsedReceiptItem[]>([]);
@@ -322,8 +323,12 @@ export default function PantryPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        setReceiptError(err.error || "Failed to parse receipt");
+        const err = await res.json().catch(() => null);
+        setReceiptError(
+          typeof err?.error === "string" && err.error
+            ? err.error
+            : "Receipt scanning is unavailable right now. Please try again later or add the items by hand."
+        );
         return;
       }
 
@@ -350,10 +355,11 @@ export default function PantryPage() {
       setReceiptItems(parsed);
       setReceiptDialogOpen(true);
     } catch {
-      setReceiptError("Failed to parse receipt");
+      setReceiptError("We couldn't reach the server. Check your connection and try again.");
     } finally {
       setParsingReceipt(false);
       if (receiptInputRef.current) receiptInputRef.current.value = "";
+      if (receiptCameraRef.current) receiptCameraRef.current.value = "";
     }
   }
 
@@ -497,8 +503,17 @@ export default function PantryPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-4xl leading-tight font-medium">Pantry</h1>
         <div className="flex flex-wrap gap-2">
+          {/* Library picker: no capture attribute. */}
           <input
             ref={receiptInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleReceiptUpload}
+            className="hidden"
+          />
+          {/* Camera: the only receipt input that sets capture. */}
+          <input
+            ref={receiptCameraRef}
             type="file"
             accept="image/*"
             capture="environment"
@@ -516,7 +531,16 @@ export default function PantryPage() {
             ) : (
               <Receipt className="h-4 w-4 text-primary" />
             )}
-            {parsingReceipt ? "Scanning..." : "Scan receipt"}
+            {parsingReceipt ? "Scanning..." : "Upload receipt"}
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => receiptCameraRef.current?.click()}
+            disabled={parsingReceipt}
+          >
+            <Camera className="h-4 w-4 text-primary" />
+            Take photo
           </Button>
           <Button size="lg" onClick={() => setShowAdd(true)}>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
