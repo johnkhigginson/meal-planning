@@ -5,6 +5,7 @@ import { htmlToText, extractRecipeSections } from "@/lib/blogger";
 import { extractRecipeFromText, isAiConfigured, isQuotaError, isDailyQuotaError } from "@/lib/recipe-ai";
 import { parseIngredientLines } from "@/lib/ingredient-parse";
 import { consumeAiCall, guardAi } from "@/lib/ai";
+import { aiNotConfiguredResponse } from "@/lib/ai-errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
   const limit = Math.min(Math.max(parseInt(String(body.limit ?? DEFAULT_BATCH), 10) || DEFAULT_BATCH, 1), 20);
 
   if (mode === "ai" && !isAiConfigured()) {
-    return NextResponse.json({ error: "AI is not configured (GEMINI_API_KEY missing)." }, { status: 400 });
+    return aiNotConfiguredResponse("admin/extract-ingredients", "extract");
   }
 
   // This route is the heaviest AI consumer (a batch of model calls per request,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL, guardAi } from "@/lib/ai";
 import { cleanImportedRecipeText } from "@/lib/text-clean";
+import { aiErrorResponse, aiNotConfiguredResponse } from "@/lib/ai-errors";
 
 const SYSTEM_PROMPT = `You are a recipe extraction assistant. Given a photo of a cookbook page or recipe card, extract the recipe information and return it as JSON.
 
@@ -45,10 +46,7 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "GEMINI_API_KEY not configured" },
-      { status: 500 }
-    );
+    return aiNotConfiguredResponse("recipes/parse-photo", "photo");
   }
 
   try {
@@ -83,10 +81,7 @@ export async function POST(request: NextRequest) {
 
     const text = response.text?.trim();
     if (!text) {
-      return NextResponse.json(
-        { error: "No response from AI" },
-        { status: 500 }
-      );
+      return aiErrorResponse("recipes/parse-photo", "photo", new Error("empty model response"));
     }
 
     // Parse JSON from response (handle potential code fences)
@@ -98,7 +93,6 @@ export async function POST(request: NextRequest) {
     const recipe = JSON.parse(jsonStr);
     return NextResponse.json(cleanImportedRecipeText(recipe));
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to parse photo";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return aiErrorResponse("recipes/parse-photo", "photo", err);
   }
 }

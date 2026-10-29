@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireHouseholdId } from "@/lib/auth";
 import { GEMINI_MODEL, guardAi } from "@/lib/ai";
+import { aiErrorResponse, aiNotConfiguredResponse } from "@/lib/ai-errors";
 import { cleanImportedRecipeText } from "@/lib/text-clean";
 import { parseIngredientLines, type ParsedIngredient } from "@/lib/ingredient-parse";
 
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "GEMINI_API_KEY not configured" }, { status: 500 });
+    return aiNotConfiguredResponse("recipes/import-doc", "document");
   }
 
   let content: string;
@@ -104,17 +105,22 @@ export async function POST(request: NextRequest) {
       // Send file to Gemini for extraction (handles docx, pdf, etc.)
       const ai = new GoogleGenAI({ apiKey });
       const base64 = Buffer.from(bytes).toString("base64");
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [{
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: file.type || "application/octet-stream", data: base64 } },
-            { text: "Extract all recipes from this document. Return only JSON." },
-          ],
-        }],
-        config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 8192 },
-      });
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [{
+            role: "user",
+            parts: [
+              { inlineData: { mimeType: file.type || "application/octet-stream", data: base64 } },
+              { text: "Extract all recipes from this document. Return only JSON." },
+            ],
+          }],
+          config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 8192 },
+        });
+      } catch (err) {
+        return aiErrorResponse("recipes/import-doc", "document", err);
+      }
 
       let jsonStr = response.text?.trim() || "";
       if (jsonStr.startsWith("```")) jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
@@ -161,11 +167,16 @@ export async function POST(request: NextRequest) {
 
   // Process text content with Gemini
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: [{ role: "user", parts: [{ text: `Extract all recipes from this text:\n\n${content}` }] }],
-    config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 8192 },
-  });
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ role: "user", parts: [{ text: `Extract all recipes from this text:\n\n${content}` }] }],
+      config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 8192 },
+    });
+  } catch (err) {
+    return aiErrorResponse("recipes/import-doc", "document", err);
+  }
 
   let jsonStr = response.text?.trim() || "";
   if (jsonStr.startsWith("```")) jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");

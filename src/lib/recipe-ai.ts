@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL } from "@/lib/ai";
+import { AiProviderError, aiUnavailableMessage, logAiError } from "@/lib/ai-errors";
 import { cleanStepText } from "@/lib/text-clean";
 import { normalizeImportedIngredients, type ImportedIngredient } from "@/lib/recipe-sections";
 
@@ -50,6 +51,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // A per-day free-tier quota cap (vs a transient per-minute spike). Retrying
 // these is pointless — they only reset after ~24h or by enabling billing.
 export function isDailyQuotaError(err: unknown): boolean {
+  if (err instanceof AiProviderError) return err.dailyQuota;
   const m = ((err as { message?: string })?.message || String(err)).toLowerCase();
   return m.includes("perday") || m.includes("per day") || m.includes("free_tier_requests");
 }
@@ -64,6 +66,7 @@ function isTransient(err: unknown): boolean {
 }
 
 export function isQuotaError(err: unknown): boolean {
+  if (err instanceof AiProviderError) return err.quota;
   const e = err as { status?: number; code?: number; message?: string };
   if ((e?.status ?? e?.code) === 429) return true;
   const m = (e?.message || String(err)).toLowerCase();
@@ -91,16 +94,23 @@ export async function extractRecipeFromText(text: string): Promise<AiRecipe | nu
   if (!apiKey || !text.trim()) return null;
 
   const ai = new GoogleGenAI({ apiKey });
-  const response = await generateWithRetry(ai, {
-    model: GEMINI_MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `Extract the recipe from this blog post:\n\n${text.slice(0, 24000)}` }],
-      },
-    ],
-    config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 4096 },
-  });
+  let response;
+  try {
+    response = await generateWithRetry(ai, {
+      model: GEMINI_MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: `Extract the recipe from this blog post:\n\n${text.slice(0, 24000)}` }],
+        },
+      ],
+      config: { systemInstruction: SYSTEM_PROMPT, maxOutputTokens: 4096 },
+    });
+  } catch (err) {
+    // Log the provider's details here; callers only ever see the friendly text.
+    const info = logAiError("lib/recipe-ai", err);
+    throw new AiProviderError(aiUnavailableMessage("extract"), info.providerStatus, isQuotaError(err), isDailyQuotaError(err));
+  }
 
   let jsonStr = response.text?.trim() || "";
   if (jsonStr.startsWith("```")) {

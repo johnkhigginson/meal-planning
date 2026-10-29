@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_MODEL, guardAi } from "@/lib/ai";
+import { aiErrorResponse, aiNotConfiguredResponse } from "@/lib/ai-errors";
 
 const SYSTEM_PROMPT = `You are a grocery receipt parser. Given a photo of a grocery receipt, extract each purchased item with structured detail.
 
@@ -68,10 +69,7 @@ export async function POST(request: NextRequest) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "GEMINI_API_KEY not configured" },
-      { status: 500 }
-    );
+    return aiNotConfiguredResponse("receipts/parse", "receipt");
   }
 
   try {
@@ -106,10 +104,7 @@ export async function POST(request: NextRequest) {
 
     const text = response.text?.trim();
     if (!text) {
-      return NextResponse.json(
-        { error: "No response from AI" },
-        { status: 500 }
-      );
+      return aiErrorResponse("receipts/parse", "receipt", new Error("empty model response"));
     }
 
     let jsonStr = text;
@@ -120,7 +115,6 @@ export async function POST(request: NextRequest) {
     const result = JSON.parse(jsonStr);
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to parse receipt";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return aiErrorResponse("receipts/parse", "receipt", err);
   }
 }
