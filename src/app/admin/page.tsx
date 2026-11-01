@@ -125,7 +125,7 @@ export default function AdminDashboard() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="space-y-1">
-        <h1 className="text-4xl leading-tight font-medium">Admin</h1>
+        <h1 className="text-4xl leading-tight">Admin</h1>
         <p className="text-muted-foreground">
           {isAdmin ? "Manage users, roles, and content library" : "Manage content library"}
         </p>
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
                   <Users className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="font-heading text-2xl leading-none font-semibold tabular-nums">{stats.totalUsers}</div>
+                  <div className="font-heading text-2xl leading-none tabular-nums">{stats.totalUsers}</div>
                   <div className="mt-1 text-xs font-semibold text-muted-foreground">Users</div>
                 </div>
               </CardContent>
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
                   <Store className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="font-heading text-2xl leading-none font-semibold tabular-nums">{stats.totalHouseholds}</div>
+                  <div className="font-heading text-2xl leading-none tabular-nums">{stats.totalHouseholds}</div>
                   <div className="mt-1 text-xs font-semibold text-muted-foreground">Households</div>
                 </div>
               </CardContent>

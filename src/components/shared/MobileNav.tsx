@@ -61,7 +61,7 @@ export function MobileNav() {
       <div className="sticky top-0 z-50 flex items-center justify-center border-b bg-background/95 px-4 py-2.5 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <LemonLogo className="h-6 w-6" />
-          <span className="font-heading text-base font-semibold tracking-tight">My Lemon Kitchen</span>
+          <span className="font-heading text-base tracking-tight">My Lemon Kitchen</span>
         </div>
       </div>
 

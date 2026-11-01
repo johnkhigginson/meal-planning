@@ -56,7 +56,7 @@ export function Navbar() {
       {/* Logo */}
       <div className="flex items-center justify-center gap-2.5 py-5 lg:justify-start lg:px-5">
         <LemonLogo className="h-7 w-7" />
-        <span className="hidden font-heading text-lg font-semibold tracking-tight text-sidebar-accent-foreground lg:inline">
+        <span className="hidden font-heading text-lg tracking-tight text-sidebar-accent-foreground lg:inline">
           My Lemon Kitchen
         </span>
       </div>

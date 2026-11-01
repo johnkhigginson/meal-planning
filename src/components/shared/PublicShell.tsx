@@ -13,7 +13,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           className="flex items-center gap-3 rounded-full focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
         >
           <LemonLogo className="h-8 w-8" />
-          <span className="font-heading text-xl font-semibold tracking-tight">My Lemon Kitchen</span>
+          <span className="font-heading text-xl tracking-tight">My Lemon Kitchen</span>
         </Link>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pt-6 pb-20 sm:pt-10">{children}</main>
@@ -43,7 +43,7 @@ export function LegalDoc({
   return (
     <article className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-4xl leading-tight font-medium tracking-[-0.02em] sm:text-5xl">{title}</h1>
+        <h1 className="text-4xl leading-tight tracking-[-0.02em] sm:text-5xl">{title}</h1>
         <p className="text-sm text-muted-foreground">Last updated {lastUpdated}</p>
       </div>
       <div className="space-y-8 text-base leading-7 [&_a]:font-bold [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_li]:my-1 [&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:marker:text-primary">
@@ -56,7 +56,7 @@ export function LegalDoc({
 export function LegalSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="font-heading text-2xl font-semibold">{title}</h2>
+      <h2 className="font-heading text-2xl">{title}</h2>
       {children}
     </section>
   );

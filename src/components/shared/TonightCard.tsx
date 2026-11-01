@@ -32,7 +32,7 @@ export function TonightCard() {
   return (
     <section aria-labelledby="tonight-heading" className="rounded-3xl border bg-card p-5 sm:p-6">
       <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 id="tonight-heading" className="font-heading text-2xl font-semibold">
+        <h2 id="tonight-heading" className="font-heading text-2xl">
           Tonight
         </h2>
         {meal && meal.mealSlot !== "DINNER" && (

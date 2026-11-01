@@ -167,7 +167,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
           <img src={cover} alt={title} className="h-72 w-full object-cover sm:h-80" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
-            <h1 className="font-display text-4xl font-semibold tracking-tight text-white drop-shadow-sm sm:text-5xl">
+            <h1 className="font-display text-4xl tracking-tight text-white drop-shadow-sm sm:text-5xl">
               {title}
             </h1>
             {subtitle && <p className="mt-2 max-w-2xl text-base text-white/90 sm:text-lg">{subtitle}</p>}
@@ -201,7 +201,7 @@ export function BlogHeaderEditor({ bookId, canEdit, name, tagline, description, 
           </Button>
         </div>
       )}
-      <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
+      <h1 className="font-display text-4xl tracking-tight sm:text-5xl">{title}</h1>
       {subtitle && (
         <p className="mx-auto mt-3 max-w-2xl font-display text-lg text-muted-foreground sm:text-xl">{subtitle}</p>
       )}

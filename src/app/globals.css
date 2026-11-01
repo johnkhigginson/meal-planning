@@ -7,9 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-nunito-sans);
-  --font-mono: var(--font-nunito-sans);
-  --font-heading: var(--font-display), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+  --font-mono: var(--font-figtree), system-ui, sans-serif;
+  --font-heading: var(--font-geist-serif), Georgia, "Times New Roman", serif;
+  --font-display: var(--font-geist-serif), Georgia, "Times New Roman", serif;
   /* Brand: lemon fills (primary buttons, active nav). Text on lemon is ink.
      `primary` stays a text-safe colour because ~60 screens use text-primary. */
   --color-brand: var(--brand);
@@ -154,8 +155,15 @@
     @apply font-heading;
     letter-spacing: -0.015em;
   }
+  /* Geist Serif ships Regular only. Never bold or fake-bold it. */
+  h1,
+  .font-heading,
+  .font-display {
+    font-weight: 400;
+  }
   html {
     @apply font-sans;
+    font-synthesis: none;
     scroll-behavior: smooth;
   }
   button,
@@ -209,5 +217,5 @@
 
 /* Editorial serif for the public blog's display headings. */
 .font-display {
-  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-family: var(--font-geist-serif), Georgia, "Times New Roman", serif;
 }

@@ -177,7 +177,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
                       </div>
                     )}
                     <CardContent className="flex-1 p-5">
-                      <h2 className="font-display text-xl leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{decodeEntities(recipe.name)}</h2>
+                      <h2 className="font-display text-xl leading-snug transition-colors duration-200 ease-out group-hover:text-primary">{decodeEntities(recipe.name)}</h2>
                       {recipe.publishedAt && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {formatDate(recipe.publishedAt)}
@@ -215,7 +215,7 @@ export function CookbookBrowser({ bookSlug, posts }: { bookSlug: string; posts: 
               <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
                 <Search className="h-6 w-6" aria-hidden="true" />
               </div>
-              <p className="font-heading text-xl font-semibold">No recipes match your search.</p>
+              <p className="font-heading text-xl">No recipes match your search.</p>
             </div>
           )}
         </div>

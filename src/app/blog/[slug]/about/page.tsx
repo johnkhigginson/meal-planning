@@ -47,7 +47,7 @@ export default async function AboutPage({ params }: PageProps) {
         <ArrowLeft className="h-4 w-4" /> {book.name}
       </Link>
 
-      <h1 className="font-display text-4xl leading-tight font-semibold tracking-tight">About</h1>
+      <h1 className="font-display text-4xl leading-tight tracking-tight">About</h1>
       {book.description && <p className="mt-2 text-muted-foreground">{book.description}</p>}
 
       <div className="mt-8 space-y-4">
@@ -64,12 +64,12 @@ export default async function AboutPage({ params }: PageProps) {
                 className="h-16 w-16 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-soft font-heading text-2xl font-semibold text-primary">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-soft font-heading text-2xl text-primary">
                 {author.name.charAt(0).toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
-              <h2 className="font-display text-xl font-semibold">{author.name}</h2>
+              <h2 className="font-display text-xl">{author.name}</h2>
               {author.bio ? (
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{author.bio}</p>
               ) : (

@@ -22,8 +22,8 @@ export default function NotFound() {
   return (
     <PublicShell>
       <div className="space-y-6 py-10 text-center">
-        <p className="font-heading text-6xl font-semibold text-primary">404</p>
-        <h1 className="text-4xl leading-tight font-medium tracking-[-0.02em]">Page not found</h1>
+        <p className="font-heading text-6xl text-primary">404</p>
+        <h1 className="text-4xl leading-tight tracking-[-0.02em]">Page not found</h1>
         <p className="mx-auto max-w-md text-muted-foreground">
           This page does not exist, or it is not shared publicly. Check the address, or start from
           one of these.

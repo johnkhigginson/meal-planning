@@ -19,7 +19,7 @@ export function RecipeInstructions({ text }: { text: string }) {
       {sections.map((section, i) => (
         <div key={i}>
           {section.name && (
-            <h3 className="mb-2 font-heading text-xl font-semibold">{section.name}</h3>
+            <h3 className="mb-2 font-heading text-xl">{section.name}</h3>
           )}
           <div className="whitespace-pre-wrap">{section.body}</div>
         </div>

@@ -60,7 +60,7 @@ export function GettingStarted({ userId, steps }: { userId: number; steps: Getti
     <section aria-labelledby="getting-started-heading" className="rounded-3xl border bg-card p-5 sm:p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <h2 id="getting-started-heading" className="font-heading text-2xl font-semibold">
+          <h2 id="getting-started-heading" className="font-heading text-2xl">
             Getting started
           </h2>
           <p className="text-sm text-muted-foreground">

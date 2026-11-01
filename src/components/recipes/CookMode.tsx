@@ -147,7 +147,7 @@ export function CookMode({ recipeName, steps }: { recipeName: string; steps: Coo
             {steps.map((s, i) => (
               <li key={i}>
                 {s.section && s.section !== steps[i - 1]?.section && (
-                  <p className="mt-4 mb-2 font-heading text-xl font-semibold">{s.section}</p>
+                  <p className="mt-4 mb-2 font-heading text-xl">{s.section}</p>
                 )}
                 <button
                   type="button"

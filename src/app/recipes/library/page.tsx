@@ -68,7 +68,7 @@ export default function BrowseLibraryPage() {
           Recipes
         </Link>
         <div className="space-y-1">
-          <h1 className="text-4xl leading-tight font-medium">Recipe library</h1>
+          <h1 className="text-4xl leading-tight">Recipe library</h1>
           <p className="text-muted-foreground">Browse and add recipes to your collection</p>
         </div>
       </div>

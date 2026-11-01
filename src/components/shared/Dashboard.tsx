@@ -147,7 +147,7 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
     <div className="mx-auto max-w-6xl space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-4xl leading-tight font-medium sm:text-5xl">
+          <h1 className="text-4xl leading-tight sm:text-5xl">
             {greeting()}, {firstName}
           </h1>
           <p className="text-muted-foreground">Here&apos;s what&apos;s in your kitchen</p>
@@ -178,7 +178,7 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
       {shows("/meal-plan") && (
         <section aria-labelledby="week-heading" className="rounded-3xl border bg-card p-5 sm:p-6">
           <div className="mb-4 flex items-baseline justify-between gap-3">
-            <h2 id="week-heading" className="font-heading text-2xl font-semibold">
+            <h2 id="week-heading" className="font-heading text-2xl">
               This week
             </h2>
             <Link href="/meal-plan" className="text-sm font-bold text-primary hover:underline">
@@ -235,7 +235,7 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
             href={stat.href}
             className={cn("flex flex-col gap-1 rounded-2xl border bg-card p-5 transition-[transform,box-shadow,border-color] duration-200 ease-out", liftCard)}
           >
-            <span className="font-heading text-4xl leading-none font-medium tabular-nums">{stat.value}</span>
+            <span className="font-heading text-4xl leading-none tabular-nums">{stat.value}</span>
             <span className="text-sm font-semibold text-muted-foreground">{stat.label}</span>
           </Link>
         ))}
@@ -245,7 +245,7 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
       {recentRecipes.length > 0 && (
         <section aria-labelledby="recent-heading">
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 id="recent-heading" className="font-heading text-2xl font-semibold">
+            <h2 id="recent-heading" className="font-heading text-2xl">
               Recently added
             </h2>
             <Link href="/recipes" className="text-sm font-bold text-primary hover:underline">
@@ -291,7 +291,7 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
       {/* Published blogs with reach */}
       {publishedBooks.length > 0 && (
         <section aria-labelledby="blogs-heading">
-          <h2 id="blogs-heading" className="mb-4 font-heading text-2xl font-semibold">
+          <h2 id="blogs-heading" className="mb-4 font-heading text-2xl">
             Your blogs
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -327,7 +327,7 @@ export async function Dashboard({ userId, householdId, name }: DashboardProps) {
       {/* Quick actions */}
       {quickLinks.length > 0 && (
         <section aria-labelledby="quick-heading">
-          <h2 id="quick-heading" className="mb-4 font-heading text-2xl font-semibold">
+          <h2 id="quick-heading" className="mb-4 font-heading text-2xl">
             Quick actions
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">

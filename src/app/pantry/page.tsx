@@ -501,7 +501,7 @@ export default function PantryPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-4xl leading-tight font-medium">Pantry</h1>
+        <h1 className="text-4xl leading-tight">Pantry</h1>
         <div className="flex flex-wrap gap-2">
           {/* Library picker: no capture attribute. */}
           <input

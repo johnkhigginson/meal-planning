@@ -63,7 +63,7 @@ export default function WhatCanIMakePage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="space-y-1">
-        <h1 className="text-4xl leading-tight font-medium">What can I make?</h1>
+        <h1 className="text-4xl leading-tight">What can I make?</h1>
         <p className="text-muted-foreground">
           Recipes ranked by what you have in your pantry
         </p>
@@ -88,7 +88,7 @@ export default function WhatCanIMakePage() {
           }}
           className="w-48"
         />
-        <span className="min-w-[3ch] font-heading text-lg font-semibold tabular-nums">
+        <span className="min-w-[3ch] font-heading text-lg tabular-nums">
           {Math.round(minMatch * 100)}%
         </span>
       </div>
@@ -261,7 +261,7 @@ export default function WhatCanIMakePage() {
       {!loading && unlisted.length > 0 && (
         <section aria-labelledby="unlisted-heading" className="space-y-3">
           <div className="space-y-1">
-            <h2 id="unlisted-heading" className="font-heading text-2xl font-semibold">
+            <h2 id="unlisted-heading" className="font-heading text-2xl">
               No ingredient list yet
             </h2>
             <p className="text-sm text-muted-foreground">

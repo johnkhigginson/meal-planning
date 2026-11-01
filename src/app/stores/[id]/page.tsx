@@ -226,7 +226,7 @@ export default function StoreDetailPage() {
         </Link>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
-            <h1 className="text-4xl leading-tight font-medium">{store?.name}</h1>
+            <h1 className="text-4xl leading-tight">{store?.name}</h1>
             <p className="text-muted-foreground">
               <span className="font-heading tabular-nums">{prices.length}</span> prices tracked
             </p>

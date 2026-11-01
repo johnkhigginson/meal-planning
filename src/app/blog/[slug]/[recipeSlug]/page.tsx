@@ -64,7 +64,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
       <article>
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-display text-4xl leading-tight font-semibold tracking-tight">{decodeEntities(recipe.name)}</h1>
+          <h1 className="font-display text-4xl leading-tight tracking-tight">{decodeEntities(recipe.name)}</h1>
           <PrintButton />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -160,7 +160,7 @@ export default async function BlogRecipePage({ params }: PageProps) {
 
         {recipe.author?.bio && (
           <div className="mt-10 rounded-2xl border bg-card p-5">
-            <p className="font-heading text-xl font-semibold">About {recipe.author.name}</p>
+            <p className="font-heading text-xl">About {recipe.author.name}</p>
             <p className="mt-1 text-sm text-muted-foreground">{recipe.author.bio}</p>
           </div>
         )}

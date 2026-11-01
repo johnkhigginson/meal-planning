@@ -44,7 +44,7 @@ export default async function HelpPage() {
       <PublicShell>
         <div className="space-y-8">
           <div className="space-y-2">
-            <h1 className="text-4xl leading-tight font-medium">Help &amp; getting started</h1>
+            <h1 className="text-4xl leading-tight">Help &amp; getting started</h1>
             <p className="text-muted-foreground">
               A quick tour of how to add recipes, build cookbooks, and publish your blog.{" "}
               <Link href="/register" className="font-bold text-primary underline-offset-4 hover:underline">
@@ -112,7 +112,7 @@ export default async function HelpPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-2">
-        <h1 className="text-4xl leading-tight font-medium">Help &amp; getting started</h1>
+        <h1 className="text-4xl leading-tight">Help &amp; getting started</h1>
         <p className="text-muted-foreground">
           A quick tour of how to add recipes, build cookbooks, and publish your blog.
         </p>

@@ -71,7 +71,7 @@ export function RecipeComments({ recipeId, canModerate }: { recipeId: number; ca
 
   return (
     <section className="mt-10 border-t pt-8">
-      <h2 className="mb-4 flex items-center gap-2 font-heading text-2xl font-semibold">
+      <h2 className="mb-4 flex items-center gap-2 font-heading text-2xl">
         <MessageCircle className="h-5 w-5 text-primary" aria-hidden="true" />
         Comments{comments.length > 0 ? ` (${comments.length})` : ""}
       </h2>

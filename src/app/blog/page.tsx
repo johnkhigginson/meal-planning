@@ -33,7 +33,7 @@ export default async function BlogIndexPage() {
 
   return (
     <BlogShell>
-      <h1 className="mb-1 font-display text-4xl leading-tight font-semibold tracking-tight">Recipe collections</h1>
+      <h1 className="mb-1 font-display text-4xl leading-tight tracking-tight">Recipe collections</h1>
       <p className="mb-8 text-muted-foreground">Browse our published cookbooks.</p>
 
       {books.length === 0 ? (
@@ -41,7 +41,7 @@ export default async function BlogIndexPage() {
           <div className="flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-primary">
             <BookOpen className="h-6 w-6" aria-hidden="true" />
           </div>
-          <p className="font-heading text-xl font-semibold">No published cookbooks yet.</p>
+          <p className="font-heading text-xl">No published cookbooks yet.</p>
           <p className="text-muted-foreground">Check back soon!</p>
         </div>
       ) : (
@@ -60,7 +60,7 @@ export default async function BlogIndexPage() {
                 <CardContent className="p-5">
                   <div className="flex items-center gap-2">
                     <BookOpen className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <h2 className="font-display text-xl font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{book.name}</h2>
+                    <h2 className="font-display text-xl transition-colors duration-200 ease-out group-hover:text-primary">{book.name}</h2>
                   </div>
                   {book.description && (
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">

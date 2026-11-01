@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Nunito_Sans, Fraunces } from "next/font/google";
+import localFont from "next/font/local";
 import { Providers } from "@/components/shared/Providers";
 import { AppShell } from "@/components/shared/AppShell";
 import { ServiceWorkerRegistrar } from "@/components/shared/ServiceWorkerRegistrar";
@@ -8,18 +8,24 @@ import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { TITLE_SUFFIX } from "@/lib/seo";
 import "./globals.css";
 
-const nunitoSans = Nunito_Sans({
-  variable: "--font-nunito-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+// Body and UI: Figtree (variable, 300-900). Self-hosted; licence in ./fonts.
+const figtree = localFont({
+  src: "./fonts/Figtree-VF.ttf",
+  variable: "--font-figtree",
+  weight: "300 900",
+  display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
-// Warm editorial serif: app headings (font-heading) and the blog (font-display).
-const fraunces = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
+// App headings (font-heading) and the blog (font-display). Regular (400) is
+// the only weight, so hierarchy comes from size, tracking and colour.
+const geistSerif = localFont({
+  src: "./fonts/GeistSerif-Regular.woff2",
+  variable: "--font-geist-serif",
+  weight: "400",
+  style: "normal",
+  display: "swap",
+  fallback: ["Georgia", "Times New Roman", "serif"],
 });
 
 export const metadata: Metadata = {
@@ -64,7 +70,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${nunitoSans.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${figtree.variable} ${geistSerif.variable} h-full antialiased`}
     >
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />

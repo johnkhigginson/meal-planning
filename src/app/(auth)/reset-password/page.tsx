@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="flex w-full max-w-md flex-col gap-8">
-      <h1 className="text-center text-4xl leading-tight font-medium tracking-[-0.02em] sm:text-5xl">
+      <h1 className="text-center text-4xl leading-tight tracking-[-0.02em] sm:text-5xl">
         Choose a new password
       </h1>
       <Card className="rounded-3xl py-7 sm:py-8">

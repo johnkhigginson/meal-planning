@@ -82,7 +82,7 @@ export default function AdminLogsPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="flex items-center gap-2 text-4xl leading-tight font-medium">
+          <h1 className="flex items-center gap-2 text-4xl leading-tight">
             <ScrollText className="h-7 w-7 text-primary" aria-hidden="true" /> Activity log
           </h1>
           <p className="text-muted-foreground">{total} recorded events</p>

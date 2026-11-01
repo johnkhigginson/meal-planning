@@ -52,7 +52,7 @@ export default function BooksPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="space-y-1">
-        <h1 className="text-4xl leading-tight font-medium">Recipe books</h1>
+        <h1 className="text-4xl leading-tight">Recipe books</h1>
         <p className="text-muted-foreground">Organize your recipes into collections</p>
       </div>
 
@@ -93,7 +93,7 @@ export default function BooksPage() {
                 {/* Cover: a paper panel with a ruled title plate, like a cookbook jacket. */}
                 <div className="flex aspect-[5/3] flex-col items-center justify-center gap-3 rounded-xl border bg-muted px-6 text-center">
                   <BookOpen className="h-5 w-5 text-primary" />
-                  <h3 className="line-clamp-2 border-y-[3px] border-double border-input py-2 font-heading text-2xl leading-tight font-semibold text-balance transition-colors duration-200 ease-out group-hover:text-primary">
+                  <h3 className="line-clamp-2 border-y-[3px] border-double border-input py-2 font-heading text-2xl leading-tight text-balance transition-colors duration-200 ease-out group-hover:text-primary">
                     {book.name}
                   </h3>
                 </div>

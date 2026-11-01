@@ -102,7 +102,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
             </div>
           )}
           <div className="flex items-start gap-3">
-            <h1 className="text-[clamp(2.25rem,5vw,3.75rem)] leading-[1.04] font-medium tracking-[-0.025em] text-balance">
+            <h1 className="text-[clamp(2.25rem,5vw,3.75rem)] leading-[1.04] tracking-[-0.025em] text-balance">
               {decodeEntities(recipe.name)}
             </h1>
             {recipe.isFavorite && (
@@ -210,7 +210,7 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           aria-labelledby="method-heading"
           className={recipe.ingredients.length === 0 ? "min-w-0 lg:col-span-2" : "min-w-0"}
         >
-          <h2 id="method-heading" className="mb-4 font-heading text-2xl font-semibold">
+          <h2 id="method-heading" className="mb-4 font-heading text-2xl">
             {recipe.bodyHtml ? "Recipe" : "Method"}
           </h2>
           {recipe.bodyHtml ? (

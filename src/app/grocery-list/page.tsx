@@ -463,7 +463,7 @@ function GroceryListContent() {
   if (!current) {
     return (
       <div className="mx-auto max-w-2xl space-y-8">
-        <h1 className="text-4xl leading-tight font-medium">Grocery list</h1>
+        <h1 className="text-4xl leading-tight">Grocery list</h1>
         {listId && (
           <p className="rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">
             That grocery list isn&apos;t available. It may have been deleted.
@@ -525,7 +525,7 @@ function GroceryListContent() {
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-4xl leading-tight font-medium">Grocery list</h1>
+          <h1 className="text-4xl leading-tight">Grocery list</h1>
           {listPicker || <p className="text-muted-foreground">{list.name}</p>}
           <p className="text-sm text-muted-foreground">{listSource(list)}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-sm">

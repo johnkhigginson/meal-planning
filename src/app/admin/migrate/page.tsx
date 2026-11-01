@@ -268,7 +268,7 @@ export default function MigratePage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl leading-tight font-medium">Import from Blogger</h1>
+          <h1 className="text-3xl leading-tight">Import from Blogger</h1>
           <p className="text-muted-foreground">
             Migrate a Blogspot blog into a cookbook. Each post becomes a recipe with its
             original content preserved.
@@ -525,7 +525,7 @@ export default function MigratePage() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border bg-card p-3 text-center">
-      <div className="font-heading text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="font-heading text-2xl tabular-nums">{value}</div>
       <div className="text-xs font-semibold text-muted-foreground">{label}</div>
     </div>
   );

@@ -182,7 +182,7 @@ export default function LibraryPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-1">
-        <h1 className="text-4xl leading-tight font-medium">Content library</h1>
+        <h1 className="text-4xl leading-tight">Content library</h1>
         <p className="text-muted-foreground">
           Recipes and stores here are available for all users to add to their accounts
         </p>
@@ -193,7 +193,7 @@ export default function LibraryPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="h-5 w-5 text-primary" aria-hidden="true" />
-            <CardTitle className="font-heading text-xl font-semibold">Recipes ({recipes.length})</CardTitle>
+            <CardTitle className="font-heading text-xl">Recipes ({recipes.length})</CardTitle>
           </div>
           <Button size="sm" onClick={() => setRecipeDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -230,7 +230,7 @@ export default function LibraryPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Store className="h-5 w-5 text-primary" aria-hidden="true" />
-            <CardTitle className="font-heading text-xl font-semibold">Stores ({stores.length})</CardTitle>
+            <CardTitle className="font-heading text-xl">Stores ({stores.length})</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

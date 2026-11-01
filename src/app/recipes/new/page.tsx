@@ -11,7 +11,7 @@ export default async function NewRecipePage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <h1 className="text-3xl leading-tight font-medium">{validBookId ? "Add recipe to cookbook" : "Add recipe"}</h1>
+      <h1 className="text-3xl leading-tight">{validBookId ? "Add recipe to cookbook" : "Add recipe"}</h1>
       <RecipeForm bookId={validBookId} />
     </div>
   );

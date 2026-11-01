@@ -91,7 +91,7 @@ export default function StoresPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="space-y-1">
-        <h1 className="text-4xl leading-tight font-medium">Stores</h1>
+        <h1 className="text-4xl leading-tight">Stores</h1>
         <p className="text-muted-foreground">
           Manage stores and pricing for smart shopping lists
         </p>
@@ -123,7 +123,7 @@ export default function StoresPage() {
               <div className="flex items-center justify-between gap-2">
                 <Link href={`/stores/${store.id}`} className="min-w-0 flex-1 rounded-xl focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="font-heading text-lg leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{store.name}</div>
+                    <div className="font-heading text-lg leading-snug transition-colors duration-200 ease-out group-hover:text-primary">{store.name}</div>
                     <Badge variant="secondary">
                       {store._count.prices} prices
                     </Badge>
@@ -172,7 +172,7 @@ export default function StoresPage() {
         if (available.length === 0) return null;
         return (
           <section aria-labelledby="library-heading">
-            <h2 id="library-heading" className="mb-4 font-heading text-2xl font-semibold">
+            <h2 id="library-heading" className="mb-4 font-heading text-2xl">
               Add from library
             </h2>
             <div className="flex flex-wrap gap-2">

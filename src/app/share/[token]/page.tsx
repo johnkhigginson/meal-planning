@@ -75,7 +75,7 @@ export default function SharePage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
         <LemonLogo className="mb-5 h-12 w-12" />
-        <h1 className="text-3xl leading-tight font-medium">Share link not found</h1>
+        <h1 className="text-3xl leading-tight">Share link not found</h1>
         <p className="mt-2 text-muted-foreground">This link may have expired or been removed.</p>
         <Link href="/" className={cn(buttonVariants({ size: "lg" }), "mt-6")}>
           Go home
@@ -92,7 +92,7 @@ export default function SharePage() {
       {/* Header */}
       <div className="flex items-center gap-2">
         <LemonLogo className="h-8 w-8" />
-        <span className="font-heading text-lg font-semibold">My Lemon Kitchen</span>
+        <span className="font-heading text-lg">My Lemon Kitchen</span>
       </div>
 
       {/* Import bar */}
@@ -126,7 +126,7 @@ export default function SharePage() {
           <header className="space-y-3">
             <div className="flex items-start gap-3">
               <UtensilsCrossed className="mt-2.5 h-6 w-6 shrink-0 text-primary" />
-              <h1 className="text-4xl leading-tight font-medium text-balance">{decodeEntities(data.recipe.name)}</h1>
+              <h1 className="text-4xl leading-tight text-balance">{decodeEntities(data.recipe.name)}</h1>
             </div>
             {data.recipe.description && <p className="text-lg leading-relaxed text-muted-foreground">{decodeEntities(data.recipe.description)}</p>}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -138,7 +138,7 @@ export default function SharePage() {
           </header>
           <div className="grid gap-8 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             <section aria-labelledby="share-ingredients">
-              <h2 id="share-ingredients" className="mb-3 font-heading text-2xl font-semibold">Ingredients</h2>
+              <h2 id="share-ingredients" className="mb-3 font-heading text-2xl">Ingredients</h2>
               {groupBySection(data.recipe.ingredients).map((group, g) => (
                 <div key={g} className="mb-4 last:mb-0">
                   {group.name && (
@@ -161,7 +161,7 @@ export default function SharePage() {
               ))}
             </section>
             <section aria-labelledby="share-method">
-              <h2 id="share-method" className="mb-3 font-heading text-2xl font-semibold">Instructions</h2>
+              <h2 id="share-method" className="mb-3 font-heading text-2xl">Instructions</h2>
               <div className="text-[17px] leading-relaxed">
                 <RecipeInstructions text={data.recipe.instructions} />
               </div>
@@ -176,7 +176,7 @@ export default function SharePage() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <BookOpen className="h-6 w-6 text-primary" />
-              <h1 className="text-4xl leading-tight font-medium">{data.book.name}</h1>
+              <h1 className="text-4xl leading-tight">{data.book.name}</h1>
               <Badge variant="secondary">{data.book.entries.length} recipes</Badge>
             </div>
             {data.book.description && <p className="text-muted-foreground">{data.book.description}</p>}

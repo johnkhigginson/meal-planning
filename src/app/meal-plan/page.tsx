@@ -259,7 +259,7 @@ export default function MealPlanPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-4xl leading-tight font-medium">Meal plan</h1>
+          <h1 className="text-4xl leading-tight">Meal plan</h1>
           <p className="text-muted-foreground">
             {currentMonday.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
             {" - "}
@@ -354,7 +354,7 @@ export default function MealPlanPage() {
                   className={`rounded-2xl px-3 py-2 text-center ${isToday(date) ? "bg-brand text-brand-foreground" : ""}`}
                 >
                   <div className={`text-xs font-extrabold tracking-[0.08em] uppercase ${isToday(date) ? "" : "text-muted-foreground"}`}>{DAY_LABELS[i]}</div>
-                  <div className="font-heading text-xl leading-tight font-semibold tabular-nums">{date.getDate()}</div>
+                  <div className="font-heading text-xl leading-tight tabular-nums">{date.getDate()}</div>
                 </div>
               ))}
               {activeSlots.map((slot) => (

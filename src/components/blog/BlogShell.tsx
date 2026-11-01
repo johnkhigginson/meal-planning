@@ -31,7 +31,7 @@ export function BlogShell({
             className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <LemonLogo className="h-7 w-7 shrink-0" />
-            <span className="truncate font-display text-lg font-semibold tracking-tight">{homeLabel}</span>
+            <span className="truncate font-display text-lg tracking-tight">{homeLabel}</span>
           </Link>
           <nav className="flex shrink-0 items-center gap-4 text-sm font-bold text-muted-foreground sm:gap-5">
             <Link
@@ -71,7 +71,7 @@ export function BlogShell({
 // Tailwind-only article styling for preserved blog HTML (no typography plugin).
 export const PROSE_CLASS =
   "max-w-none text-base leading-7 text-foreground [&_a]:font-bold [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 " +
-  "[&_h2]:mt-8 [&_h2]:mb-2 [&_h2]:font-display [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:font-display [&_h3]:text-xl [&_h3]:font-semibold " +
+  "[&_h2]:mt-8 [&_h2]:mb-2 [&_h2]:font-display [&_h2]:text-2xl [&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:font-display [&_h3]:text-xl " +
   "[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_li]:marker:text-primary " +
   "[&_strong]:font-bold [&_img]:my-5 [&_img]:max-w-full [&_img]:rounded-2xl [&_img]:h-auto [&_blockquote]:my-5 [&_blockquote]:rounded-2xl [&_blockquote]:bg-muted " +
   "[&_blockquote]:px-5 [&_blockquote]:py-3 [&_blockquote]:font-display [&_blockquote]:italic [&_table]:my-3 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_iframe]:max-w-full";

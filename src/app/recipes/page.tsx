@@ -111,7 +111,7 @@ export default function RecipesPage() {
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-4xl leading-tight font-medium">Recipes</h1>
+          <h1 className="text-4xl leading-tight">Recipes</h1>
           <p className="text-muted-foreground">Your recipe collection</p>
         </div>
         <div className="flex flex-wrap gap-2">

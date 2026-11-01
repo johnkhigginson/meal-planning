@@ -214,7 +214,7 @@ export default function BookDetailPage() {
         </Link>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-1">
-            <h1 className="text-4xl leading-tight font-medium text-balance">{book.name}</h1>
+            <h1 className="text-4xl leading-tight text-balance">{book.name}</h1>
             {book.description && <p className="max-w-2xl text-muted-foreground">{book.description}</p>}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -278,7 +278,7 @@ export default function BookDetailPage() {
       {/* Collaborators (cookbook owner only) */}
       {isOwner && (
         <section aria-labelledby="collab-heading" className="rounded-2xl border bg-card p-5">
-          <h2 id="collab-heading" className="flex items-center gap-2 font-heading text-xl font-semibold">
+          <h2 id="collab-heading" className="flex items-center gap-2 font-heading text-xl">
             <UserPlus className="h-5 w-5 text-primary" /> Collaborators
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -382,7 +382,7 @@ export default function BookDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/recipes/${recipe.id}`} className="min-w-0 flex-1 rounded-lg focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                      <h3 className="font-heading text-lg leading-snug font-semibold transition-colors duration-200 ease-out group-hover:text-primary">{decodeEntities(recipe.name)}</h3>
+                      <h3 className="font-heading text-lg leading-snug transition-colors duration-200 ease-out group-hover:text-primary">{decodeEntities(recipe.name)}</h3>
                       {recipe.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{decodeEntities(recipe.description)}</p>}
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold text-muted-foreground">
                         {totalTime > 0 && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{totalTime}m</span>}

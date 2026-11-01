@@ -250,7 +250,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <h1 className="text-3xl leading-tight font-medium sm:text-4xl">Settings</h1>
+      <h1 className="text-3xl leading-tight sm:text-4xl">Settings</h1>
 
       {/* Profile */}
       <Card>
@@ -289,7 +289,7 @@ export default function SettingsPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
               ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-soft font-heading text-xl font-semibold text-primary">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-soft font-heading text-xl text-primary">
                   {name.charAt(0).toUpperCase()}
                 </div>
               )}

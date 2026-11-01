@@ -21,7 +21,7 @@ export default function AuthLayout({
           className="flex items-center gap-3 rounded-full focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
         >
           <LemonLogo className="h-8 w-8" />
-          <span className="font-heading text-xl font-semibold tracking-tight">My Lemon Kitchen</span>
+          <span className="font-heading text-xl tracking-tight">My Lemon Kitchen</span>
         </Link>
       </header>
       <main className="flex flex-1 flex-col items-center px-4 pt-6 pb-20 sm:pt-12">
