@@ -73,8 +73,10 @@ export function LandingPage() {
           <p className="text-sm font-bold tracking-[0.14em] text-primary uppercase">
             Recipes, pantry, plans, groceries
           </p>
-          <h1 className="text-[clamp(2.75rem,5.4vw,4.75rem)] leading-[1.02] tracking-[-0.025em] text-balance">
-            Your whole kitchen, <em className="font-normal">finally</em> in one place.
+          <h1 className="text-[clamp(2.75rem,5vw,4.25rem)] leading-[1.02] tracking-[-0.025em] text-balance">
+            Your whole kitchen,<span className="lg:hidden"> </span>
+            <br className="hidden lg:block" />
+            <em className="font-normal text-leaf not-italic">finally</em> in one place.
           </h1>
           <p className="max-w-[34em] text-lg leading-relaxed text-muted-foreground sm:text-xl">
             Plan meals, track your pantry, and generate smart grocery lists. Share it all with the
@@ -93,7 +95,7 @@ export function LandingPage() {
           </p>
         </div>
 
-        <div className="flex min-w-0 flex-[1_1_380px] justify-center">
+        <div className="flex min-w-0 flex-[1_1_380px] justify-center lg:flex-[0_1_400px]">
           <LemonSlice>
             <div className="pointer-events-none absolute bottom-[6%] left-0 z-10 flex items-center gap-3 rounded-2xl border bg-card px-4 py-3 shadow-[0_12px_30px_-16px_rgb(60_45_10/0.35)]">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-leaf-soft">
